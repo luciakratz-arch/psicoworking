@@ -1,0 +1,12 @@
+{
+  "name": "psicoworking-admin",
+  "description": "Build script para pré-compilar os arquivos JSX/Babel do admin do psicólogo",
+  "private": true,
+  "scripts": {
+    "build": "node build-admin.js"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/preset-react": "^7.24.0"
+  }
+}

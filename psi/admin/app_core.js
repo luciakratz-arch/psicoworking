@@ -26,6 +26,10 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const functions = firebase.functions();
 
+// ─── Cloud Functions usadas pelo admin ────────────────────────────
+const chamarCadastrarPaciente = functions.httpsCallable("cadastrarPaciente");
+const chamarDefinirCarimboEquipe = functions.httpsCallable("definirCarimboEquipe");
+
 // ─── Login (Firebase Authentication — ver CLAUDE.md REGRA 9) ─────
 // Nunca comparar senha manualmente contra um campo do Firestore.
 async function loginComEmailSenha(email, senha) {
@@ -65,4 +69,56 @@ function useUsuarioLogado() {
   }, []);
 
   return { usuario, carregando };
+}
+
+// ─── Tela de Login ─────────────────────────────────────────────
+function TelaLogin() {
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [erro, setErro] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  async function aoEnviar(evento) {
+    evento.preventDefault();
+    setErro("");
+    setEnviando(true);
+    try {
+      await loginComEmailSenha(email, senha);
+    } catch (e) {
+      setErro("E-mail ou senha incorretos.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="tela-central">
+      <form className="cartao-login" onSubmit={aoEnviar}>
+        <h1>PsicoWorking</h1>
+        <p className="subtitulo">Entrar no painel</p>
+
+        <label>E-mail</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+
+        <label>Senha</label>
+        <input
+          type="password"
+          value={senha}
+          onChange={(e) => setSenha(e.target.value)}
+          required
+        />
+
+        {erro && <p className="mensagem-erro">{erro}</p>}
+
+        <button type="submit" disabled={enviando}>
+          {enviando ? "Entrando..." : "Entrar"}
+        </button>
+      </form>
+    </div>
+  );
 }
