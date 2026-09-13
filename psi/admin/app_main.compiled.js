@@ -2,11 +2,33 @@
 //  app_main.js — App(), Sidebar, routing
 // ═══════════════════════════════════════════════════════════════
 
+function usarConexaoGoogleAgenda(usuario) {
+  const [status, setStatus] = useState(null); // null=verificando, 'ok', 'erro'
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const codigo = params.get("code");
+    if (!codigo || !usuario || usuario.role !== "psi") return;
+
+    // Limpa o código da URL imediatamente para não reenviar em caso de F5.
+    window.history.replaceState({}, "", window.location.pathname);
+    chamarConectarGoogleCalendar({
+      codigoAutorizacao: codigo,
+      redirectUri: window.location.origin + window.location.pathname
+    }).then(() => setStatus("ok")).catch(() => setStatus("erro"));
+  }, [usuario]);
+  return status;
+}
 function App() {
   const {
     usuario,
     carregando
   } = useUsuarioLogado();
+  const [telaAtiva, setTelaAtiva] = useState("pacientes");
+  const statusConexaoGoogle = usarConexaoGoogleAgenda(usuario);
+  useEffect(() => {
+    if (statusConexaoGoogle === "ok") setTelaAtiva("agenda");
+  }, [statusConexaoGoogle]);
   if (carregando) {
     return /*#__PURE__*/React.createElement("div", {
       className: "tela-central"
@@ -29,24 +51,43 @@ function App() {
   return /*#__PURE__*/React.createElement("div", {
     className: "layout-admin"
   }, /*#__PURE__*/React.createElement(Sidebar, {
-    usuario: usuario
+    usuario: usuario,
+    telaAtiva: telaAtiva,
+    aoTrocarTela: setTelaAtiva
   }), /*#__PURE__*/React.createElement("main", {
     className: "area-principal"
-  }, /*#__PURE__*/React.createElement(TelaPacientes, {
+  }, statusConexaoGoogle === "erro" && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, "N\xE3o foi poss\xEDvel conectar o Google Agenda. Tente novamente."), telaAtiva === "pacientes" && /*#__PURE__*/React.createElement(TelaPacientes, {
+    usuario: usuario
+  }), telaAtiva === "agenda" && /*#__PURE__*/React.createElement(TelaAgenda, {
     usuario: usuario
   })));
 }
 function Sidebar({
-  usuario
+  usuario,
+  telaAtiva,
+  aoTrocarTela
 }) {
   return /*#__PURE__*/React.createElement("aside", {
     className: "barra-lateral"
   }, /*#__PURE__*/React.createElement("div", {
     className: "marca-barra-lateral"
   }, "PsicoWorking"), /*#__PURE__*/React.createElement("nav", null, /*#__PURE__*/React.createElement("a", {
-    className: "item-menu item-menu-ativo",
-    href: "#"
-  }, "Pacientes")), /*#__PURE__*/React.createElement("div", {
+    className: "item-menu" + (telaAtiva === "pacientes" ? " item-menu-ativo" : ""),
+    href: "#",
+    onClick: e => {
+      e.preventDefault();
+      aoTrocarTela("pacientes");
+    }
+  }, "Pacientes"), /*#__PURE__*/React.createElement("a", {
+    className: "item-menu" + (telaAtiva === "agenda" ? " item-menu-ativo" : ""),
+    href: "#",
+    onClick: e => {
+      e.preventDefault();
+      aoTrocarTela("agenda");
+    }
+  }, "Agenda")), /*#__PURE__*/React.createElement("div", {
     className: "rodape-barra-lateral"
   }, /*#__PURE__*/React.createElement("p", {
     className: "email-usuario"
