@@ -2,26 +2,24 @@
 //  CLOUD FUNCTIONS — PsicoWorking
 //
 //  Este arquivo roda do lado do Google (nunca no navegador do
-//  usuário). É a única peça do sistema com poder de:
-//    1) dar o "carimbo" (psi_id + role) que as regras do Firestore
-//       usam para decidir quem pode ver o quê;
-//    2) guardar e usar o token do Google Calendar sem nunca expor
-//       esse token ao navegador.
+//  usuário). É a única peça do sistema com poder de dar o
+//  "carimbo" (psi_id + role) que as regras do Firestore usam
+//  para decidir quem pode ver o quê.
+//
+//  A função do Google Calendar foi movida para
+//  google-calendar-TODO.js — ela precisa de uma configuração
+//  extra (Secret Manager + credenciais OAuth do Google) que fica
+//  para uma etapa separada, feita com calma quando formos ativar
+//  a integração de agenda.
 // ═══════════════════════════════════════════════════════════════
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 const db = admin.firestore();
 const auth = admin.auth();
-
-// Segredos do Google Calendar — configurados via `firebase functions:secrets:set`,
-// NUNCA escritos direto no código nem no repositório.
-const GOOGLE_CLIENT_ID = defineSecret("GOOGLE_CLIENT_ID");
-const GOOGLE_CLIENT_SECRET = defineSecret("GOOGLE_CLIENT_SECRET");
 
 // ─────────────────────────────────────────────────────────────
 // 1) CARIMBO DE IDENTIDADE (custom claims)
@@ -131,48 +129,7 @@ exports.cadastrarPaciente = onCall(async (request) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// 3) GOOGLE CALENDAR — troca de código por token
-//
-// O token de acesso/atualização do Google NUNCA é devolvido ao
-// navegador. Fica só nesta função e no Firestore, num documento
-// que as regras de segurança bloqueiam para qualquer leitura vinda
-// do cliente (só a própria Cloud Function, via Admin SDK, acessa).
-// ─────────────────────────────────────────────────────────────
-exports.conectarGoogleCalendar = onCall(
-  { secrets: [GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET] },
-  async (request) => {
-    const chamador = request.auth;
-    if (!chamador || chamador.token.role !== "psi") {
-      throw new HttpsError("permission-denied", "Só o psicólogo conecta a própria agenda.");
-    }
-
-    const { codigoAutorizacao, redirectUri } = request.data || {};
-    if (!codigoAutorizacao || !redirectUri) {
-      throw new HttpsError("invalid-argument", "Código de autorização do Google ausente.");
-    }
-
-    const { google } = require("googleapis");
-    const oauth2Client = new google.auth.OAuth2(
-      GOOGLE_CLIENT_ID.value(),
-      GOOGLE_CLIENT_SECRET.value(),
-      redirectUri
-    );
-
-    const { tokens } = await oauth2Client.getToken(codigoAutorizacao);
-
-    // Guardado numa coleção separada, nunca lida pelo cliente (ver firestore.rules:
-    // não existe "match" para clinica_google_tokens => acesso negado por padrão).
-    await db
-      .collection("clinica_google_tokens")
-      .doc(chamador.token.psi_id)
-      .set(tokens, { merge: true });
-
-    return { ok: true };
-  }
-);
-
-// ─────────────────────────────────────────────────────────────
-// 4) Trava de segurança extra: se alguém tentar criar um
+// 3) Trava de segurança extra: se alguém tentar criar um
 //    documento de paciente sem psi_id batendo com quem criou,
 //    a auditoria registra a tentativa (as regras já bloqueiam
 //    a escrita — isto aqui é só o registro para investigação).
