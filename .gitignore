@@ -1,0 +1,20 @@
+# Segredos — NUNCA versionar
+functions/.env
+functions/.env.*
+*-service-account*.json
+*serviceAccountKey*.json
+.firebaserc.local
+
+# Dependências
+functions/node_modules/
+node_modules/
+
+# Logs e cache do Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Sistema
+.DS_Store
+Thumbs.db

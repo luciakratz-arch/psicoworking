@@ -1,0 +1,168 @@
+// ═══════════════════════════════════════════════════════════════
+//  REGRAS DE SEGURANÇA DO BANCO DE DADOS — PsicoWorking
+//
+//  PRINCÍPIO: o isolamento entre clínicas (psi_id) e o controle de
+//  papel de cada pessoa (role) NUNCA são decididos por um campo que
+//  o navegador do usuário escreve. São decididos pelo "carimbo"
+//  (custom claim) do login de cada pessoa, carimbo esse que só a
+//  Cloud Function (functions/index.js) pode colocar — o navegador
+//  nunca tem esse poder.
+// ═══════════════════════════════════════════════════════════════
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Funções auxiliares ──────────────────────────────────────
+    function estaLogado() {
+      return request.auth != null;
+    }
+
+    function carimboClinica() {
+      return request.auth.token.psi_id;
+    }
+
+    function carimboPapel() {
+      return request.auth.token.role; // 'admin_matriz' | 'psi' | 'secretaria' | 'paciente'
+    }
+
+    function ehAdminMatriz() {
+      return estaLogado() && carimboPapel() == 'admin_matriz';
+    }
+
+    function ehEquipeDaClinica(psiId) {
+      return estaLogado()
+        && carimboClinica() == psiId
+        && (carimboPapel() == 'psi' || carimboPapel() == 'secretaria');
+    }
+
+    function ehDonoPaciente(psiId, pacienteId) {
+      return estaLogado()
+        && carimboPapel() == 'paciente'
+        && carimboClinica() == psiId
+        && request.auth.uid == pacienteId;
+    }
+
+    // ── Cadastro dos psicólogos (vitrine pública) ───────────────
+    match /psi_profiles/{psiId} {
+      allow read: if true; // nome, foto, especialidade — nada de paciente aqui
+      allow write: if ehAdminMatriz();
+    }
+
+    // ── Personalização do site do psicólogo ─────────────────────
+    match /psi_config/{psiId} {
+      allow read: if true;
+      allow write: if ehAdminMatriz() || ehEquipeDaClinica(psiId);
+    }
+
+    // ── Depoimentos anônimos ─────────────────────────────────────
+    match /psi_depoimentos/{depoimentoId} {
+      allow read: if resource.data.aprovado == true;
+      allow create: if estaLogado() && carimboPapel() == 'paciente'
+                    && request.resource.data.psi_id == carimboClinica()
+                    && request.resource.data.keys().hasOnly(['psi_id','estrelas','texto','aprovado','criadoEm'])
+                    && request.resource.data.aprovado == false;
+      allow update: if ehEquipeDaClinica(resource.data.psi_id);
+      allow delete: if ehAdminMatriz() || ehEquipeDaClinica(resource.data.psi_id);
+    }
+
+    // ── Dados clínicos sensíveis: cada um só vê o que é seu ─────
+    match /clinica_pacientes/{pacienteId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+      allow read: if ehDonoPaciente(resource.data.psi_id, pacienteId);
+    }
+
+    match /clinica_sessoes/{sessaoId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+    }
+
+    match /clinica_pacotes/{pacoteId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+    }
+
+    match /clinica_lancamentos/{lancId} {
+      // financeiro: paciente nunca acessa
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+    }
+
+    match /clinica_metas/{metaId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+      allow read, update: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
+    }
+
+    match /clinica_tcc/{registroId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, create: if estaLogado() && carimboPapel() == 'paciente'
+                           && request.resource.data.psi_id == carimboClinica()
+                           && request.resource.data.pacienteId == request.auth.uid;
+    }
+
+    match /clinica_humor/{registroId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, create: if estaLogado() && carimboPapel() == 'paciente'
+                           && request.resource.data.psi_id == carimboClinica()
+                           && request.resource.data.pacienteId == request.auth.uid;
+    }
+
+    match /clinica_diario/{registroId} {
+      // diário terapêutico: só o próprio paciente escreve; psi só lê
+      allow read, write: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
+      allow read: if ehEquipeDaClinica(resource.data.psi_id);
+    }
+
+    match /clinica_recursos/{recursoId} {
+      allow read: if estaLogado();
+      allow write: if ehAdminMatriz() || ehEquipeDaClinica(resource.data.psi_id);
+    }
+
+    match /clinica_fabulas/{id} {
+      allow read: if estaLogado();
+      allow write: if ehAdminMatriz();
+    }
+
+    match /clinica_psicoeducacao/{id} {
+      allow read: if estaLogado();
+      allow write: if ehAdminMatriz();
+    }
+
+    match /clinica_recurso_acessos/{logId} {
+      allow create: if estaLogado() && request.resource.data.psi_id == carimboClinica();
+      allow read: if ehEquipeDaClinica(resource.data.psi_id) || ehAdminMatriz();
+      allow update, delete: if false; // registro de uso nunca é editado ou apagado
+    }
+
+    match /clinica_gestao_ansiedade/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, create: if estaLogado() && carimboPapel() == 'paciente'
+                           && request.resource.data.psi_id == carimboClinica();
+    }
+
+    match /clinica_arvore_decisao/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, create: if estaLogado() && carimboPapel() == 'paciente'
+                           && request.resource.data.psi_id == carimboClinica();
+    }
+
+    match /clinica_agenda/{eventoId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+    }
+
+    // ── Trilha de auditoria: só a Cloud Function grava, ninguém apaga ──
+    match /clinica_audit_log/{logId} {
+      allow read: if ehAdminMatriz();
+      allow write: if false;
+    }
+
+    // ── Tudo que não foi listado: bloqueado por padrão ──────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
