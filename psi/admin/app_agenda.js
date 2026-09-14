@@ -109,19 +109,26 @@ function TelaAgenda({ usuario }) {
       )}
 
       {eventos.length > 0 && (
-        <ul className="lista-eventos">
-          {eventos.map((ev) => (
-            <li key={ev.id} className="item-evento">
-              <div className="item-evento-data">{formatarDataHora(ev.inicio)}</div>
-              <div className="item-evento-titulo">{ev.titulo}</div>
-              {ev.link && (
-                <a href={ev.link} target="_blank" rel="noreferrer" className="item-evento-link">
-                  Ver no Google Agenda
-                </a>
-              )}
-            </li>
+        <div className="grupos-agenda">
+          {agruparPorDia(eventos).map((grupo) => (
+            <div key={grupo.chave} className="cartao-dia">
+              <div className="cabecalho-dia">{grupo.rotulo}</div>
+              <ul className="lista-eventos">
+                {grupo.eventos.map((ev) => (
+                  <li key={ev.id} className="item-evento">
+                    <div className="item-evento-hora">{formatarHora(ev.inicio)}</div>
+                    <div className="item-evento-titulo">{ev.titulo}</div>
+                    {ev.link && (
+                      <a href={ev.link} target="_blank" rel="noreferrer" className="item-evento-link">
+                        Google Agenda ↗
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       {mostrarForm && (
@@ -138,19 +145,53 @@ function TelaAgenda({ usuario }) {
   );
 }
 
-function formatarDataHora(isoString) {
+function formatarHora(isoString) {
+  try {
+    return new Date(isoString).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  } catch (e) {
+    return "";
+  }
+}
+
+function formatarRotuloDia(isoString) {
   try {
     const data = new Date(isoString);
-    return data.toLocaleString("pt-BR", {
-      weekday: "short",
+    const hoje = new Date();
+    const amanha = new Date();
+    amanha.setDate(hoje.getDate() + 1);
+    const mesmoDia = (a, b) => a.toDateString() === b.toDateString();
+
+    if (mesmoDia(data, hoje)) return "Hoje";
+    if (mesmoDia(data, amanha)) return "Amanhã";
+
+    const rotulo = data.toLocaleDateString("pt-BR", {
+      weekday: "long",
       day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
+      month: "long",
     });
+    return rotulo.charAt(0).toUpperCase() + rotulo.slice(1);
   } catch (e) {
     return isoString;
   }
+}
+
+// Agrupa a lista (já vem ordenada por data da própria function) em
+// blocos por dia, cada um com um rótulo amigável (Hoje/Amanhã/data).
+function agruparPorDia(eventos) {
+  const grupos = [];
+  const porChave = {};
+
+  for (const ev of eventos) {
+    const chave = (ev.inicio || "").slice(0, 10); // YYYY-MM-DD
+    if (!porChave[chave]) {
+      const grupo = { chave, rotulo: formatarRotuloDia(ev.inicio), eventos: [] };
+      porChave[chave] = grupo;
+      grupos.push(grupo);
+    }
+    porChave[chave].eventos.push(ev);
+  }
+
+  return grupos;
 }
 
 function FormNovaSessao({ aoFechar, aoCriar }) {

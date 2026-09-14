@@ -90,21 +90,28 @@ function TelaAgenda({
     className: "mensagem-erro"
   }, erro), !carregando && eventos.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
-  }, "Nenhuma sess\xE3o nos pr\xF3ximos 30 dias."), eventos.length > 0 && /*#__PURE__*/React.createElement("ul", {
+  }, "Nenhuma sess\xE3o nos pr\xF3ximos 30 dias."), eventos.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "grupos-agenda"
+  }, agruparPorDia(eventos).map(grupo => /*#__PURE__*/React.createElement("div", {
+    key: grupo.chave,
+    className: "cartao-dia"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-dia"
+  }, grupo.rotulo), /*#__PURE__*/React.createElement("ul", {
     className: "lista-eventos"
-  }, eventos.map(ev => /*#__PURE__*/React.createElement("li", {
+  }, grupo.eventos.map(ev => /*#__PURE__*/React.createElement("li", {
     key: ev.id,
     className: "item-evento"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "item-evento-data"
-  }, formatarDataHora(ev.inicio)), /*#__PURE__*/React.createElement("div", {
+    className: "item-evento-hora"
+  }, formatarHora(ev.inicio)), /*#__PURE__*/React.createElement("div", {
     className: "item-evento-titulo"
   }, ev.titulo), ev.link && /*#__PURE__*/React.createElement("a", {
     href: ev.link,
     target: "_blank",
     rel: "noreferrer",
     className: "item-evento-link"
-  }, "Ver no Google Agenda")))), mostrarForm && /*#__PURE__*/React.createElement(FormNovaSessao, {
+  }, "Google Agenda \u2197"))))))), mostrarForm && /*#__PURE__*/React.createElement(FormNovaSessao, {
     aoFechar: () => setMostrarForm(false),
     aoCriar: async dados => {
       await chamarCriarEventoAgenda(dados);
@@ -113,19 +120,55 @@ function TelaAgenda({
     }
   }));
 }
-function formatarDataHora(isoString) {
+function formatarHora(isoString) {
   try {
-    const data = new Date(isoString);
-    return data.toLocaleString("pt-BR", {
-      weekday: "short",
-      day: "2-digit",
-      month: "2-digit",
+    return new Date(isoString).toLocaleString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit"
     });
   } catch (e) {
+    return "";
+  }
+}
+function formatarRotuloDia(isoString) {
+  try {
+    const data = new Date(isoString);
+    const hoje = new Date();
+    const amanha = new Date();
+    amanha.setDate(hoje.getDate() + 1);
+    const mesmoDia = (a, b) => a.toDateString() === b.toDateString();
+    if (mesmoDia(data, hoje)) return "Hoje";
+    if (mesmoDia(data, amanha)) return "Amanhã";
+    const rotulo = data.toLocaleDateString("pt-BR", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long"
+    });
+    return rotulo.charAt(0).toUpperCase() + rotulo.slice(1);
+  } catch (e) {
     return isoString;
   }
+}
+
+// Agrupa a lista (já vem ordenada por data da própria function) em
+// blocos por dia, cada um com um rótulo amigável (Hoje/Amanhã/data).
+function agruparPorDia(eventos) {
+  const grupos = [];
+  const porChave = {};
+  for (const ev of eventos) {
+    const chave = (ev.inicio || "").slice(0, 10); // YYYY-MM-DD
+    if (!porChave[chave]) {
+      const grupo = {
+        chave,
+        rotulo: formatarRotuloDia(ev.inicio),
+        eventos: []
+      };
+      porChave[chave] = grupo;
+      grupos.push(grupo);
+    }
+    porChave[chave].eventos.push(ev);
+  }
+  return grupos;
 }
 function FormNovaSessao({
   aoFechar,
