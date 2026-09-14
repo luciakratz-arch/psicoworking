@@ -100,12 +100,12 @@ function TelaLogin() {
               Por enquanto mostra um texto de boas-vindas neutro. */}
           <h1>Bem-vinda(o) de volta</h1>
           <p>Acesse o painel e continue de onde parou.</p>
-          <div className="selo-plataforma">PsiCoWorking</div>
         </div>
       </div>
 
       <div className="painel-formulario">
         <form className="cartao-login" onSubmit={aoEnviar}>
+          <div className="logo-plataforma">PsiCoWorking</div>
           <h2>Entrar</h2>
           <p className="subtitulo">Acesse o painel da sua clínica</p>
 
