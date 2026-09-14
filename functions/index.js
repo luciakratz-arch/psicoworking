@@ -75,45 +75,108 @@ exports.cadastrarPaciente = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Só a equipe da clínica cadastra pacientes.");
   }
 
-  const { email, nome } = request.data || {};
-  if (!email || !nome) {
-    throw new HttpsError("invalid-argument", "Nome e e-mail do paciente são obrigatórios.");
+  const dadosPaciente = validarDadosPaciente(request.data);
+
+  const resultado = await criarPacienteEConta({
+    psiId: psiIdDoChamador,
+    status: dadosPaciente.status || "ativo",
+    dadosPaciente,
+    criadoPor: chamador.uid,
+  });
+
+  return resultado;
+});
+
+// ─────────────────────────────────────────────────────────────
+// 2b) AUTOCADASTRO PÚBLICO — o "link de cadastro" que a psicóloga
+//     manda pro paciente preencher sozinho. Sem autenticação (é
+//     público por natureza), mas sempre cria com status "pendente"
+//     — a psicóloga aprova depois, igual ao modelo do site antigo.
+// ─────────────────────────────────────────────────────────────
+exports.autoCadastroPaciente = onCall(async (request) => {
+  const { psiId } = request.data || {};
+  if (!psiId) {
+    throw new HttpsError("invalid-argument", "Link de cadastro inválido (falta psiId).");
   }
 
-  const senhaTemporaria = admin.firestore().collection("_").doc().id + "Aa1!";
+  // Confirma que existe uma clínica com esse psi_id antes de aceitar o
+  // cadastro (evita criar pacientes "órfãos" com um link inventado).
+  // Checa psi_config em vez de psi_profiles porque o cadastro de
+  // psicólogas pela Admin Matriz ainda não existe — psi_config é
+  // criado assim que a psicóloga salva Configurações pela 1ª vez.
+  const psiExiste = await db.collection("psi_config").doc(psiId).get();
+  if (!psiExiste.exists) {
+    throw new HttpsError("not-found", "Clínica não encontrada para este link.");
+  }
 
-  const usuarioCriado = await auth.createUser({
+  const dadosPaciente = validarDadosPaciente(request.data);
+
+  const resultado = await criarPacienteEConta({
+    psiId,
+    status: "pendente",
+    dadosPaciente,
+    criadoPor: null,
+  });
+
+  return resultado;
+});
+
+// Campos aceitos no cadastro de paciente — mesmo modelo do sistema
+// já usado pela Dra. Lucia (nome, contato, dados ocupacionais p/ NR-1).
+function validarDadosPaciente(dados) {
+  const { nome, email } = dados || {};
+  if (!nome || !email) {
+    throw new HttpsError("invalid-argument", "Nome e e-mail do paciente são obrigatórios.");
+  }
+  return {
+    nome,
     email,
-    password: senhaTemporaria,
-    displayName: nome,
+    telefone: dados.telefone || "",
+    dataNasc: dados.dataNasc || "",
+    cpf: dados.cpf || "",
+    genero: dados.genero || "",
+    status: dados.status || "",
+    empresa: dados.empresa || "",
+    setor: dados.setor || "",
+    cargo: dados.cargo || "",
+    objetivos: dados.objetivos || "",
+  };
+}
+
+// Cria a conta de login (Firebase Auth) + o documento do paciente,
+// compartilhado pelo cadastro feito pela equipe e pelo autocadastro
+// público — a única diferença é o status inicial e quem executou.
+async function criarPacienteEConta({ psiId, status, dadosPaciente, criadoPor }) {
+  const usuarioCriado = await auth.createUser({
+    email: dadosPaciente.email,
+    displayName: dadosPaciente.nome,
   });
 
   await auth.setCustomUserClaims(usuarioCriado.uid, {
-    psi_id: psiIdDoChamador,
+    psi_id: psiId,
     role: "paciente",
   });
 
   await db.collection("clinica_pacientes").doc(usuarioCriado.uid).set({
-    psi_id: psiIdDoChamador,
-    nome,
-    email,
-    criadoPor: chamador.uid,
+    ...dadosPaciente,
+    status,
+    psi_id: psiId,
+    criadoPor,
     criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-    inativo: false,
   });
 
-  const linkDefinirSenha = await auth.generatePasswordResetLink(email);
+  const linkDefinirSenha = await auth.generatePasswordResetLink(dadosPaciente.email);
 
   await db.collection("clinica_audit_log").add({
-    acao: "cadastrar_paciente",
+    acao: criadoPor ? "cadastrar_paciente" : "autocadastro_paciente",
     alvoUid: usuarioCriado.uid,
-    psiId: psiIdDoChamador,
-    executadoPor: chamador.uid,
+    psiId,
+    executadoPor: criadoPor,
     criadoEm: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   return { ok: true, uid: usuarioCriado.uid, linkDefinirSenha };
-});
+}
 
 // ─────────────────────────────────────────────────────────────
 // 3) Auditoria de segurança extra

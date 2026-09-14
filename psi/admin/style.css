@@ -117,6 +117,10 @@ button {
   font-size: 14px;
   font-weight: 600;
   padding: 10px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
 }
 
 .cartao-login button[type="submit"] {
@@ -294,29 +298,56 @@ button {
 
 .texto-vazio { color: var(--texto-suave); font-size: 14px; }
 
-/* ── Tabela de pacientes ───────────────────── */
-.tabela-pacientes {
-  width: 100%;
-  border-collapse: collapse;
+/* ── Pacientes: cabeçalho, busca, filtros ────── */
+.conteudo-larga { max-width: 1000px; }
+.subtitulo-pagina { font-size: 13px; color: var(--texto-suave); margin-top: 4px; }
+.acoes-cabecalho { display: flex; gap: 10px; flex-wrap: wrap; }
+.acoes-cabecalho button { display: flex; align-items: center; gap: 7px; }
+
+.barra-filtros { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
+.campo-busca { flex: 1; min-width: 220px; padding: 10px 14px; border: 1px solid var(--borda); border-radius: 8px; font-size: 14px; }
+.campo-busca:focus { outline: none; border-color: var(--cor-marca); }
+.botao-filtro { background: var(--branco); color: var(--texto-suave); border: 1px solid var(--borda) !important; font-size: 13px; padding: 9px 16px; }
+.botao-filtro-ativo, .botao-filtro-ativo:hover { background: var(--cor-marca); color: white; border-color: var(--cor-marca) !important; }
+
+/* ── Pacientes: grupos por status ─────────────── */
+.grupo-status { margin-bottom: 26px; }
+.titulo-grupo-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--texto-suave); margin-bottom: 10px;
+}
+.ponto-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ponto-ativo { background: var(--sucesso); }
+.ponto-alta { background: var(--texto-suave); }
+.ponto-inativo { background: var(--erro); }
+.ponto-pendente { background: #F59E0B; }
+
+.cartao-lista-pacientes {
   background: var(--branco);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  border-top: 3px solid var(--cor-marca);
 }
-.tabela-pacientes th {
-  text-align: left;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--cor-marca);
-  background: var(--fundo);
-  padding: 12px 16px;
+.linha-paciente {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--borda);
+  cursor: pointer;
+  transition: background .12s;
 }
-.tabela-pacientes td { padding: 14px 16px; border-bottom: 1px solid var(--borda); font-size: 14px; }
-.linha-clicavel { cursor: pointer; }
-.linha-clicavel:hover { background: var(--fundo); }
+.linha-paciente:last-child { border-bottom: none; }
+.linha-paciente:hover { background: var(--fundo); }
+.avatar-paciente {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--marca-plataforma-lavanda);
+  color: var(--cor-marca-escura);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 14px; flex-shrink: 0;
+}
+.info-paciente { flex: 1; min-width: 0; }
+.nome-paciente { font-weight: 500; font-size: 14px; }
+.email-paciente { font-size: 13px; color: var(--texto-suave); }
 
 .etiqueta-ativo, .etiqueta-inativo {
   font-size: 12px;
@@ -347,11 +378,58 @@ button {
 .modal p { font-size: 14px; margin-bottom: 8px; line-height: 1.5; }
 .campo-link { min-height: 70px; margin-top: 8px; font-size: 12px; resize: none; }
 
+.modal-largo { max-width: 680px; max-height: 88vh; overflow-y: auto; }
+
 .acoes-modal {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 20px;
+}
+
+/* ── Formulário de paciente (2 colunas) ───────── */
+.grade-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+.grade-2col label { display: block; font-size: 13px; margin: 12px 0 4px; color: var(--texto-suave); }
+.grade-2col input, .grade-2col select { width: 100%; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 8px; font-size: 14px; }
+.grade-2col input:focus, .grade-2col select:focus { outline: none; border-color: var(--cor-marca); }
+.campo-largura-total { grid-column: span 2; }
+.opcional { font-size: 11px; color: var(--texto-suave); font-weight: 400; }
+.titulo-secao-form {
+  font-size: 12px; font-weight: 700; color: var(--cor-marca);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--marca-plataforma-lavanda);
+  padding-bottom: 6px; margin: 14px 0 4px;
+}
+
+.pills-status { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.pill-status {
+  padding: 7px 14px; border-radius: 20px; font-size: 13px;
+  border: 1.5px solid var(--cor-pill) !important;
+  background: white; color: var(--cor-pill);
+}
+.pill-status-ativa { background: var(--cor-pill); color: white; }
+
+.campo-com-mic { position: relative; }
+.campo-com-mic textarea { padding-right: 40px; }
+.botao-mic {
+  position: absolute; right: 8px; top: 8px;
+  background: var(--marca-plataforma-lavanda);
+  color: var(--cor-marca);
+  border: none; border-radius: 7px; padding: 6px 8px;
+}
+.botao-mic-gravando { background: var(--erro); color: white; }
+
+.cartao-credenciais {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--borda);
+}
+.titulo-credenciais { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; }
+.texto-credenciais { font-size: 13px; color: var(--texto-suave); margin-bottom: 12px; }
+
+@media (max-width: 640px) {
+  .grade-2col { grid-template-columns: 1fr; }
+  .campo-largura-total { grid-column: span 1; }
 }
 
 /* ── Agenda ────────────────────────────────── */

@@ -156,3 +156,58 @@ function TelaLogin() {
     </div>
   );
 }
+
+// ─── Campo de texto com ditado por voz (mesmo padrão do sistema
+// já usado pela Dra. Lucia) — usa a Web Speech API do navegador. ────
+function TextAreaVoz({ value, onChange, className, rows, placeholder }) {
+  const [gravando, setGravando] = useState(false);
+  const reconhecimentoRef = useRef(null);
+  const temSuporte = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  function alternarGravacao() {
+    if (gravando) {
+      reconhecimentoRef.current?.stop();
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = "pt-BR";
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      let textoNovo = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) textoNovo += e.results[i][0].transcript;
+      }
+      if (textoNovo) {
+        onChange({ target: { value: (value ? value + " " : "") + textoNovo } });
+      }
+    };
+    rec.onend = () => setGravando(false);
+    rec.start();
+    reconhecimentoRef.current = rec;
+    setGravando(true);
+  }
+
+  return (
+    <div className="campo-com-mic">
+      <textarea
+        className={className}
+        rows={rows}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+      />
+      {temSuporte && (
+        <button
+          type="button"
+          className={"botao-mic" + (gravando ? " botao-mic-gravando" : "")}
+          onClick={alternarGravacao}
+          title="Falar em vez de digitar"
+        >
+          <Icone nome={gravando ? "square" : "mic"} tamanho={14} />
+        </button>
+      )}
+    </div>
+  );
+}
