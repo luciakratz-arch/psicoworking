@@ -456,6 +456,30 @@ button {
   font-size: 12px; font-weight: 600; background: var(--branco);
 }
 
+/* ── Financeiro: Orçamento ─────────────────────── */
+.form-servico-orcamento {
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 16px;
+  margin: 12px 0 16px;
+}
+.tabela-servicos-scroll { overflow-x: auto; }
+.tabela-servicos { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.tabela-servicos th {
+  text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--texto-suave); border-bottom: 2px solid var(--borda);
+}
+.tabela-servicos td { padding: 10px; border-bottom: 1px solid var(--borda); }
+.tabela-servicos tr:last-child td { border-bottom: none; }
+.lista-selecao-servicos { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.item-selecao-servico {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; border: 1.5px solid var(--borda); border-radius: 10px;
+  cursor: pointer; transition: all .15s; font-size: 13px; font-weight: 500;
+}
+.item-selecao-ativo { border-color: var(--cor-marca); background: var(--marca-plataforma-lavanda); }
+
 .aviso-modulo-futuro {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px;

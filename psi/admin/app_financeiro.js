@@ -358,7 +358,7 @@ function TelaFinanceiro({ usuario }) {
         ))}
       </div>
 
-      {aba !== "lancamentos" && aba !== "pacotes" && aba !== "acompanhamento" && aba !== "comissoes" && (
+      {aba !== "lancamentos" && aba !== "pacotes" && aba !== "acompanhamento" && aba !== "comissoes" && aba !== "orcamento" && (
         <div className="cartao-secao">
           <p className="texto-vazio">
             Essa aba ({ABAS_FINANCEIRO.find((a) => a.id === aba)?.rotulo}) ainda não foi construída — é a próxima etapa combinada.
@@ -386,6 +386,10 @@ function TelaFinanceiro({ usuario }) {
 
       {aba === "comissoes" && (
         <ComissoesTab usuario={usuario} config={configComissao} parceiras={parceiras} />
+      )}
+
+      {aba === "orcamento" && (
+        <OrcamentoTab usuario={usuario} />
       )}
 
       {aba === "lancamentos" && (
@@ -1523,6 +1527,248 @@ function FormParceira({ usuario, parceira, aoFechar }) {
             <button type="submit" className="botao-primario" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Orçamento ───────────────────────────────────────────────────
+// Porta o gerador de orçamentos por WhatsApp do sistema real. Duas
+// mudanças em relação ao original: (1) cada clínica tem sua própria
+// tabela de serviços (psi_id) e começa vazia — os preços e serviços
+// da Dra. Lucia eram específicos da clínica dela, não fazem sentido
+// como padrão para uma psicóloga nova; (2) as modalidades de desconto
+// foram generalizadas (Particular/Convênio/Social/Estudante) em vez
+// da modalidade "Adufg", específica de um convênio da Dra. Lucia.
+
+const MODAL_COLS_ORCAMENTO = [
+  { valor: "particular", rotulo: "Particular", cor: "#7c3aed" },
+  { valor: "convenio", rotulo: "Convênio", cor: "#0891b2" },
+  { valor: "social", rotulo: "Social", cor: "#059669" },
+  { valor: "estudante", rotulo: "Estudante", cor: "#d97706" },
+];
+
+function OrcamentoTab({ usuario }) {
+  const [servicos, setServicos] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [editando, setEditando] = useState(null);
+  const [novoAberto, setNovoAberto] = useState(false);
+  const [formServ, setFormServ] = useState({ nome: "", particular: "", convenio: "", social: "", estudante: "", obs: "" });
+  const [nomeClinica, setNomeClinica] = useState("");
+
+  const [nomeCliente, setNomeCliente] = useState("");
+  const [whatsCliente, setWhatsCliente] = useState("");
+  const [modalidade, setModalidade] = useState("particular");
+  const [selecionados, setSelecionados] = useState([]);
+
+  useEffect(() => {
+    const cancelar = db.collection("clinica_orcamento_servicos")
+      .where("psi_id", "==", usuario.psiId)
+      .onSnapshot((snap) => {
+        const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        lista.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+        setServicos(lista);
+        setCarregando(false);
+      }, () => setCarregando(false));
+    return cancelar;
+  }, [usuario.psiId]);
+
+  useEffect(() => {
+    db.collection("psi_config").doc(usuario.psiId).get().then((doc) => {
+      if (doc.exists) setNomeClinica(doc.data().nome || "");
+    });
+  }, [usuario.psiId]);
+
+  function toggleSelecionado(id) {
+    setSelecionados((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function salvarServico() {
+    if (!formServ.nome.trim()) { alert("Informe o nome do serviço."); return; }
+    const dados = {
+      nome: formServ.nome.trim(),
+      particular: Number(formServ.particular) || 0,
+      convenio: Number(formServ.convenio) || 0,
+      social: Number(formServ.social) || 0,
+      estudante: Number(formServ.estudante) || 0,
+      obs: formServ.obs || "",
+    };
+    if (editando) {
+      await db.collection("clinica_orcamento_servicos").doc(editando).update(dados);
+      setEditando(null);
+    } else {
+      await db.collection("clinica_orcamento_servicos").add({ ...dados, psi_id: usuario.psiId, criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+      setNovoAberto(false);
+    }
+    setFormServ({ nome: "", particular: "", convenio: "", social: "", estudante: "", obs: "" });
+  }
+
+  async function excluirServico(id) {
+    if (!confirm("Excluir este serviço?")) return;
+    await db.collection("clinica_orcamento_servicos").doc(id).delete();
+    setSelecionados((prev) => prev.filter((x) => x !== id));
+  }
+
+  function iniciarEdicao(s) {
+    setEditando(s.id);
+    setFormServ({ nome: s.nome, particular: s.particular, convenio: s.convenio, social: s.social, estudante: s.estudante || 0, obs: s.obs || "" });
+    setNovoAberto(false);
+  }
+
+  function gerarWhatsApp() {
+    if (!nomeCliente.trim()) { alert("Informe o nome do cliente."); return; }
+    if (selecionados.length === 0) { alert("Selecione ao menos um serviço."); return; }
+    const itens = servicos.filter((s) => selecionados.includes(s.id));
+    const total = itens.reduce((sum, s) => sum + (s[modalidade] || 0), 0);
+    const linkCadastro = `${window.location.origin}/psi/cadastro-paciente/?psi=${usuario.psiId}`;
+    let linhas = "";
+    if (modalidade === "particular") {
+      linhas = itens.map((s) => "🔹 " + s.nome + " — " + fmtMoeda(s.particular) + (s.obs ? "\n   " + s.obs : "")).join("\n");
+    } else {
+      linhas = itens.map((s) => "🔹 " + s.nome + "\n   De " + fmtMoeda(s.particular) + " por " + fmtMoeda(s[modalidade]) + (s.obs ? ", " + s.obs : "")).join("\n");
+    }
+    const intro = modalidade === "convenio"
+      ? "Você tem direito a um desconto especial de convênio! 🎓\n\n"
+      : modalidade === "social"
+      ? "Como atendimento social, você tem acesso ao valor reduzido! 💙\n\n"
+      : modalidade === "estudante"
+      ? "Como estudante, você tem um desconto especial! 🌟\n\n"
+      : "";
+    const assinatura = nomeClinica ? `*${nomeClinica}*` : "consultório";
+    const msg = "Olá, " + nomeCliente + "! 😊\n\nSegue o orçamento personalizado de " + assinatura + ":\n\n" + intro + linhas +
+      "\n\n💰 *Total: " + fmtMoeda(total) + "*\n\n📋 Para agendar sua consulta, faça seu cadastro pelo link:\n" + linkCadastro +
+      "\n\nQualquer dúvida estou à disposição! 🦋" + (nomeClinica ? "\n_" + nomeClinica + "_" : "");
+    const wNum = whatsCliente.replace(/\D/g, "");
+    if (wNum) {
+      window.open("https://wa.me/55" + wNum + "?text=" + encodeURIComponent(msg), "_blank");
+    } else {
+      window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+    }
+  }
+
+  if (carregando) return <p className="texto-vazio">Carregando...</p>;
+
+  return (
+    <div>
+      <div className="cartao-secao">
+        <div className="cabecalho-secao-lanc">
+          <span className="titulo-secao-lanc">Tabela de Serviços</span>
+          <button
+            className="botao-icone"
+            onClick={() => { setNovoAberto(true); setEditando(null); setFormServ({ nome: "", particular: "", convenio: "", social: "", estudante: "", obs: "" }); }}
+            title="Novo Serviço"
+          >
+            <Icone nome="plus" tamanho={15} />
+          </button>
+        </div>
+
+        {(novoAberto || editando) && (
+          <div className="form-servico-orcamento">
+            <div className="grade-2col">
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label>Nome do Serviço</label>
+                <input value={formServ.nome} onChange={(e) => setFormServ((p) => ({ ...p, nome: e.target.value }))} placeholder="Ex.: Psicoterapia" />
+              </div>
+              {MODAL_COLS_ORCAMENTO.map((m) => (
+                <div key={m.valor}>
+                  <label style={{ color: m.cor }}>{m.rotulo} (R$)</label>
+                  <input type="number" step="0.01" value={formServ[m.valor]} onChange={(e) => setFormServ((p) => ({ ...p, [m.valor]: e.target.value }))} placeholder="0" />
+                </div>
+              ))}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label>Observação <span className="opcional">(aparece na mensagem)</span></label>
+                <input value={formServ.obs || ""} onChange={(e) => setFormServ((p) => ({ ...p, obs: e.target.value }))} placeholder="Ex.: O ideal é de 2 a 3 sessões por semana." />
+              </div>
+            </div>
+            <div className="acoes-modal">
+              <button className="botao-secundario" onClick={() => { setNovoAberto(false); setEditando(null); }}>Cancelar</button>
+              <button className="botao-primario" onClick={salvarServico}>Salvar</button>
+            </div>
+          </div>
+        )}
+
+        {servicos.length === 0 && !novoAberto ? (
+          <p className="texto-vazio">Nenhum serviço cadastrado ainda — clique no + para adicionar o primeiro.</p>
+        ) : (
+          <div className="tabela-servicos-scroll">
+            <table className="tabela-servicos">
+              <thead>
+                <tr>
+                  <th>Serviço</th>
+                  {MODAL_COLS_ORCAMENTO.map((m) => <th key={m.valor} style={{ color: m.cor }}>{m.rotulo}</th>)}
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {servicos.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.nome}</td>
+                    {MODAL_COLS_ORCAMENTO.map((m) => <td key={m.valor} style={{ color: m.cor, fontWeight: 700 }}>{fmtMoeda(s[m.valor])}</td>)}
+                    <td>
+                      <button className="botao-icone" onClick={() => iniciarEdicao(s)} title="Editar"><Icone nome="pencil" tamanho={14} /></button>
+                      <button className="botao-icone botao-icone-perigo" onClick={() => excluirServico(s.id)} title="Excluir"><Icone nome="trash-2" tamanho={14} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="cartao-secao">
+        <div className="cabecalho-secao-lanc"><span className="titulo-secao-lanc">Gerar Orçamento</span></div>
+
+        <div className="grade-2col">
+          <div>
+            <label>Nome do Cliente</label>
+            <input value={nomeCliente} onChange={(e) => setNomeCliente(e.target.value)} placeholder="Nome completo" />
+          </div>
+          <div>
+            <label>WhatsApp <span className="opcional">(opcional)</span></label>
+            <input value={whatsCliente} onChange={(e) => setWhatsCliente(e.target.value)} placeholder="(62) 9 9999-9999" />
+          </div>
+        </div>
+
+        <label>Modalidade</label>
+        <div className="pills-status">
+          {MODAL_COLS_ORCAMENTO.map((m) => (
+            <button key={m.valor} type="button" className={"pill-status" + (modalidade === m.valor ? " pill-status-ativa" : "")} style={{ "--cor-pill": m.cor }} onClick={() => setModalidade(m.valor)}>
+              {m.rotulo}
+            </button>
+          ))}
+        </div>
+
+        <label style={{ marginTop: 16 }}>Selecione os Serviços</label>
+        {servicos.length === 0 ? (
+          <p className="texto-vazio">Cadastre ao menos um serviço na tabela acima.</p>
+        ) : (
+          <div className="lista-selecao-servicos">
+            {servicos.map((s) => {
+              const sel = selecionados.includes(s.id);
+              const cor = MODAL_COLS_ORCAMENTO.find((m) => m.valor === modalidade)?.cor;
+              return (
+                <div key={s.id} className={"item-selecao-servico" + (sel ? " item-selecao-ativo" : "")} onClick={() => toggleSelecionado(s.id)}>
+                  <span>{sel ? "✓ " : ""}{s.nome}</span>
+                  <span style={{ color: cor, fontWeight: 700 }}>{fmtMoeda(s[modalidade])}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {selecionados.length > 0 && (
+          <div className="grade-resumo-mes" style={{ marginTop: 16 }}>
+            <div className="cartao-resumo saldo">
+              <span className="rotulo-resumo">{selecionados.length} serviço(s) selecionado(s)</span>
+              <span className="valor-resumo">{fmtMoeda(servicos.filter((s) => selecionados.includes(s.id)).reduce((sum, s) => sum + (s[modalidade] || 0), 0))}</span>
+            </div>
+          </div>
+        )}
+
+        <button className="botao-primario" style={{ width: "100%", marginTop: 16, justifyContent: "center" }} onClick={gerarWhatsApp}>
+          <Icone nome="message-circle" tamanho={16} /> Gerar e Enviar pelo WhatsApp
+        </button>
       </div>
     </div>
   );

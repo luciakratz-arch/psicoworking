@@ -170,6 +170,11 @@ service cloud.firestore {
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
     }
 
+    match /clinica_orcamento_servicos/{servicoId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+    }
+
     // ── Trilha de auditoria: só a Cloud Function grava, ninguém apaga ──
     match /clinica_audit_log/{logId} {
       allow read: if ehAdminMatriz();

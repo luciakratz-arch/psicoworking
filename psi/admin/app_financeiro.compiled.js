@@ -435,7 +435,7 @@ function TelaFinanceiro({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: a.icone,
     tamanho: 15
-  }), " ", a.rotulo))), aba !== "lancamentos" && aba !== "pacotes" && aba !== "acompanhamento" && aba !== "comissoes" && /*#__PURE__*/React.createElement("div", {
+  }), " ", a.rotulo))), aba !== "lancamentos" && aba !== "pacotes" && aba !== "acompanhamento" && aba !== "comissoes" && aba !== "orcamento" && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
@@ -456,6 +456,8 @@ function TelaFinanceiro({
     usuario: usuario,
     config: configComissao,
     parceiras: parceiras
+  }), aba === "orcamento" && /*#__PURE__*/React.createElement(OrcamentoTab, {
+    usuario: usuario
   }), aba === "lancamentos" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "faixa-meses"
   }, mesesDoAno.map(m => /*#__PURE__*/React.createElement("button", {
@@ -1969,4 +1971,336 @@ function FormParceira({
     className: "botao-primario",
     disabled: salvando
   }, salvando ? "Salvando..." : "Salvar")))));
+}
+
+// ─── Orçamento ───────────────────────────────────────────────────
+// Porta o gerador de orçamentos por WhatsApp do sistema real. Duas
+// mudanças em relação ao original: (1) cada clínica tem sua própria
+// tabela de serviços (psi_id) e começa vazia — os preços e serviços
+// da Dra. Lucia eram específicos da clínica dela, não fazem sentido
+// como padrão para uma psicóloga nova; (2) as modalidades de desconto
+// foram generalizadas (Particular/Convênio/Social/Estudante) em vez
+// da modalidade "Adufg", específica de um convênio da Dra. Lucia.
+
+const MODAL_COLS_ORCAMENTO = [{
+  valor: "particular",
+  rotulo: "Particular",
+  cor: "#7c3aed"
+}, {
+  valor: "convenio",
+  rotulo: "Convênio",
+  cor: "#0891b2"
+}, {
+  valor: "social",
+  rotulo: "Social",
+  cor: "#059669"
+}, {
+  valor: "estudante",
+  rotulo: "Estudante",
+  cor: "#d97706"
+}];
+function OrcamentoTab({
+  usuario
+}) {
+  const [servicos, setServicos] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [editando, setEditando] = useState(null);
+  const [novoAberto, setNovoAberto] = useState(false);
+  const [formServ, setFormServ] = useState({
+    nome: "",
+    particular: "",
+    convenio: "",
+    social: "",
+    estudante: "",
+    obs: ""
+  });
+  const [nomeClinica, setNomeClinica] = useState("");
+  const [nomeCliente, setNomeCliente] = useState("");
+  const [whatsCliente, setWhatsCliente] = useState("");
+  const [modalidade, setModalidade] = useState("particular");
+  const [selecionados, setSelecionados] = useState([]);
+  useEffect(() => {
+    const cancelar = db.collection("clinica_orcamento_servicos").where("psi_id", "==", usuario.psiId).onSnapshot(snap => {
+      const lista = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+      lista.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+      setServicos(lista);
+      setCarregando(false);
+    }, () => setCarregando(false));
+    return cancelar;
+  }, [usuario.psiId]);
+  useEffect(() => {
+    db.collection("psi_config").doc(usuario.psiId).get().then(doc => {
+      if (doc.exists) setNomeClinica(doc.data().nome || "");
+    });
+  }, [usuario.psiId]);
+  function toggleSelecionado(id) {
+    setSelecionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+  async function salvarServico() {
+    if (!formServ.nome.trim()) {
+      alert("Informe o nome do serviço.");
+      return;
+    }
+    const dados = {
+      nome: formServ.nome.trim(),
+      particular: Number(formServ.particular) || 0,
+      convenio: Number(formServ.convenio) || 0,
+      social: Number(formServ.social) || 0,
+      estudante: Number(formServ.estudante) || 0,
+      obs: formServ.obs || ""
+    };
+    if (editando) {
+      await db.collection("clinica_orcamento_servicos").doc(editando).update(dados);
+      setEditando(null);
+    } else {
+      await db.collection("clinica_orcamento_servicos").add({
+        ...dados,
+        psi_id: usuario.psiId,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setNovoAberto(false);
+    }
+    setFormServ({
+      nome: "",
+      particular: "",
+      convenio: "",
+      social: "",
+      estudante: "",
+      obs: ""
+    });
+  }
+  async function excluirServico(id) {
+    if (!confirm("Excluir este serviço?")) return;
+    await db.collection("clinica_orcamento_servicos").doc(id).delete();
+    setSelecionados(prev => prev.filter(x => x !== id));
+  }
+  function iniciarEdicao(s) {
+    setEditando(s.id);
+    setFormServ({
+      nome: s.nome,
+      particular: s.particular,
+      convenio: s.convenio,
+      social: s.social,
+      estudante: s.estudante || 0,
+      obs: s.obs || ""
+    });
+    setNovoAberto(false);
+  }
+  function gerarWhatsApp() {
+    if (!nomeCliente.trim()) {
+      alert("Informe o nome do cliente.");
+      return;
+    }
+    if (selecionados.length === 0) {
+      alert("Selecione ao menos um serviço.");
+      return;
+    }
+    const itens = servicos.filter(s => selecionados.includes(s.id));
+    const total = itens.reduce((sum, s) => sum + (s[modalidade] || 0), 0);
+    const linkCadastro = `${window.location.origin}/psi/cadastro-paciente/?psi=${usuario.psiId}`;
+    let linhas = "";
+    if (modalidade === "particular") {
+      linhas = itens.map(s => "🔹 " + s.nome + " — " + fmtMoeda(s.particular) + (s.obs ? "\n   " + s.obs : "")).join("\n");
+    } else {
+      linhas = itens.map(s => "🔹 " + s.nome + "\n   De " + fmtMoeda(s.particular) + " por " + fmtMoeda(s[modalidade]) + (s.obs ? ", " + s.obs : "")).join("\n");
+    }
+    const intro = modalidade === "convenio" ? "Você tem direito a um desconto especial de convênio! 🎓\n\n" : modalidade === "social" ? "Como atendimento social, você tem acesso ao valor reduzido! 💙\n\n" : modalidade === "estudante" ? "Como estudante, você tem um desconto especial! 🌟\n\n" : "";
+    const assinatura = nomeClinica ? `*${nomeClinica}*` : "consultório";
+    const msg = "Olá, " + nomeCliente + "! 😊\n\nSegue o orçamento personalizado de " + assinatura + ":\n\n" + intro + linhas + "\n\n💰 *Total: " + fmtMoeda(total) + "*\n\n📋 Para agendar sua consulta, faça seu cadastro pelo link:\n" + linkCadastro + "\n\nQualquer dúvida estou à disposição! 🦋" + (nomeClinica ? "\n_" + nomeClinica + "_" : "");
+    const wNum = whatsCliente.replace(/\D/g, "");
+    if (wNum) {
+      window.open("https://wa.me/55" + wNum + "?text=" + encodeURIComponent(msg), "_blank");
+    } else {
+      window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+    }
+  }
+  if (carregando) return /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Carregando...");
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-secao-lanc"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "titulo-secao-lanc"
+  }, "Tabela de Servi\xE7os"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-icone",
+    onClick: () => {
+      setNovoAberto(true);
+      setEditando(null);
+      setFormServ({
+        nome: "",
+        particular: "",
+        convenio: "",
+        social: "",
+        estudante: "",
+        obs: ""
+      });
+    },
+    title: "Novo Servi\xE7o"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "plus",
+    tamanho: 15
+  }))), (novoAberto || editando) && /*#__PURE__*/React.createElement("div", {
+    className: "form-servico-orcamento"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "grade-2col"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      gridColumn: "1 / -1"
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Nome do Servi\xE7o"), /*#__PURE__*/React.createElement("input", {
+    value: formServ.nome,
+    onChange: e => setFormServ(p => ({
+      ...p,
+      nome: e.target.value
+    })),
+    placeholder: "Ex.: Psicoterapia"
+  })), MODAL_COLS_ORCAMENTO.map(m => /*#__PURE__*/React.createElement("div", {
+    key: m.valor
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      color: m.cor
+    }
+  }, m.rotulo, " (R$)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    step: "0.01",
+    value: formServ[m.valor],
+    onChange: e => setFormServ(p => ({
+      ...p,
+      [m.valor]: e.target.value
+    })),
+    placeholder: "0"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      gridColumn: "1 / -1"
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Observa\xE7\xE3o ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(aparece na mensagem)")), /*#__PURE__*/React.createElement("input", {
+    value: formServ.obs || "",
+    onChange: e => setFormServ(p => ({
+      ...p,
+      obs: e.target.value
+    })),
+    placeholder: "Ex.: O ideal \xE9 de 2 a 3 sess\xF5es por semana."
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: () => {
+      setNovoAberto(false);
+      setEditando(null);
+    }
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: salvarServico
+  }, "Salvar"))), servicos.length === 0 && !novoAberto ? /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhum servi\xE7o cadastrado ainda \u2014 clique no + para adicionar o primeiro.") : /*#__PURE__*/React.createElement("div", {
+    className: "tabela-servicos-scroll"
+  }, /*#__PURE__*/React.createElement("table", {
+    className: "tabela-servicos"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Servi\xE7o"), MODAL_COLS_ORCAMENTO.map(m => /*#__PURE__*/React.createElement("th", {
+    key: m.valor,
+    style: {
+      color: m.cor
+    }
+  }, m.rotulo)), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, servicos.map(s => /*#__PURE__*/React.createElement("tr", {
+    key: s.id
+  }, /*#__PURE__*/React.createElement("td", null, s.nome), MODAL_COLS_ORCAMENTO.map(m => /*#__PURE__*/React.createElement("td", {
+    key: m.valor,
+    style: {
+      color: m.cor,
+      fontWeight: 700
+    }
+  }, fmtMoeda(s[m.valor]))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("button", {
+    className: "botao-icone",
+    onClick: () => iniciarEdicao(s),
+    title: "Editar"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "pencil",
+    tamanho: 14
+  })), /*#__PURE__*/React.createElement("button", {
+    className: "botao-icone botao-icone-perigo",
+    onClick: () => excluirServico(s.id),
+    title: "Excluir"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "trash-2",
+    tamanho: 14
+  }))))))))), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-secao-lanc"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "titulo-secao-lanc"
+  }, "Gerar Or\xE7amento")), /*#__PURE__*/React.createElement("div", {
+    className: "grade-2col"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Nome do Cliente"), /*#__PURE__*/React.createElement("input", {
+    value: nomeCliente,
+    onChange: e => setNomeCliente(e.target.value),
+    placeholder: "Nome completo"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "WhatsApp ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional)")), /*#__PURE__*/React.createElement("input", {
+    value: whatsCliente,
+    onChange: e => setWhatsCliente(e.target.value),
+    placeholder: "(62) 9 9999-9999"
+  }))), /*#__PURE__*/React.createElement("label", null, "Modalidade"), /*#__PURE__*/React.createElement("div", {
+    className: "pills-status"
+  }, MODAL_COLS_ORCAMENTO.map(m => /*#__PURE__*/React.createElement("button", {
+    key: m.valor,
+    type: "button",
+    className: "pill-status" + (modalidade === m.valor ? " pill-status-ativa" : ""),
+    style: {
+      "--cor-pill": m.cor
+    },
+    onClick: () => setModalidade(m.valor)
+  }, m.rotulo))), /*#__PURE__*/React.createElement("label", {
+    style: {
+      marginTop: 16
+    }
+  }, "Selecione os Servi\xE7os"), servicos.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Cadastre ao menos um servi\xE7o na tabela acima.") : /*#__PURE__*/React.createElement("div", {
+    className: "lista-selecao-servicos"
+  }, servicos.map(s => {
+    const sel = selecionados.includes(s.id);
+    const cor = MODAL_COLS_ORCAMENTO.find(m => m.valor === modalidade)?.cor;
+    return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      className: "item-selecao-servico" + (sel ? " item-selecao-ativo" : ""),
+      onClick: () => toggleSelecionado(s.id)
+    }, /*#__PURE__*/React.createElement("span", null, sel ? "✓ " : "", s.nome), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: cor,
+        fontWeight: 700
+      }
+    }, fmtMoeda(s[modalidade])));
+  })), selecionados.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "grade-resumo-mes",
+    style: {
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cartao-resumo saldo"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "rotulo-resumo"
+  }, selecionados.length, " servi\xE7o(s) selecionado(s)"), /*#__PURE__*/React.createElement("span", {
+    className: "valor-resumo"
+  }, fmtMoeda(servicos.filter(s => selecionados.includes(s.id)).reduce((sum, s) => sum + (s[modalidade] || 0), 0))))), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      width: "100%",
+      marginTop: 16,
+      justifyContent: "center"
+    },
+    onClick: gerarWhatsApp
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "message-circle",
+    tamanho: 16
+  }), " Gerar e Enviar pelo WhatsApp")));
 }
