@@ -467,6 +467,7 @@ function AbaModulosPaciente({ paciente }) {
   const [config, setConfig] = useState(paciente.modulosConfig || {});
   const [filtroTipo, setFiltroTipo] = useState("todas");
   const [busca, setBusca] = useState("");
+  const [visualizando, setVisualizando] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -559,28 +560,43 @@ function AbaModulosPaciente({ paciente }) {
 
       {categorias.length === 0 && <p className="texto-vazio">Nenhum item encontrado.</p>}
 
-      {categorias.map((cat) => (
-        <div key={cat} className="grupo-status">
-          <div className="titulo-grupo-status">{formatarCategoria(cat)} ({porCategoria[cat].length})</div>
-          <div className="cartao-lista-pacientes">
-            {porCategoria[cat].map((item) => {
-              const ativo = !!config[item.id]?.ativo;
-              return (
-                <div key={item.id} className="linha-modulo">
-                  <div className="info-lancamento">
-                    <div className="descricao-lancamento">{item.titulo}</div>
-                    {item.descricao && <div className="detalhe-lancamento">{item.descricao}</div>}
-                    {ativo && config[item.id]?.dataInicio && (
-                      <div className="detalhe-lancamento">Ativado em {config[item.id].dataInicio.split("-").reverse().join("/")}</div>
-                    )}
+      {categorias.map((cat) => {
+        const cores = corDaCategoria(cat);
+        return (
+          <div key={cat} className="grupo-status">
+            <div className="titulo-grupo-status">
+              <span className="etiqueta-categoria-recurso" style={{ "--cor-cat": cores.cor, "--bg-cat": cores.bg }}>
+                {formatarCategoria(cat)}
+              </span>
+              ({porCategoria[cat].length})
+            </div>
+            <div className="cartao-lista-pacientes">
+              {porCategoria[cat].map((item) => {
+                const ativo = !!config[item.id]?.ativo;
+                return (
+                  <div key={item.id} className="linha-modulo" style={{ "--cor-cat": cores.cor }}>
+                    <div className="info-lancamento">
+                      <div className="descricao-lancamento">{item.titulo}</div>
+                      {item.descricao && <div className="detalhe-lancamento">{item.descricao}</div>}
+                      {ativo && config[item.id]?.dataInicio && (
+                        <div className="detalhe-lancamento">Ativado em {config[item.id].dataInicio.split("-").reverse().join("/")}</div>
+                      )}
+                    </div>
+                    <button className="botao-icone" onClick={() => setVisualizando(item)} title="Visualizar">
+                      <Icone nome="eye" tamanho={15} />
+                    </button>
+                    <ToggleModulo ativo={ativo} onClick={() => alternar(item)} />
                   </div>
-                  <ToggleModulo ativo={ativo} onClick={() => alternar(item)} />
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
+
+      {visualizando && (
+        <VisualizarRecursoModal item={visualizando} aoFechar={() => setVisualizando(null)} />
+      )}
     </div>
   );
 }

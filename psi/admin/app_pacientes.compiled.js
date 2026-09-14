@@ -509,6 +509,7 @@ function AbaModulosPaciente({
   const [config, setConfig] = useState(paciente.modulosConfig || {});
   const [filtroTipo, setFiltroTipo] = useState("todas");
   const [busca, setBusca] = useState("");
+  const [visualizando, setVisualizando] = useState(null);
   useEffect(() => {
     Promise.all([db.collection("recursos_terapeuticos").get(), db.collection("fabulas_terapeuticas").get(), db.collection("psicoeducacao_conteudos").get()]).then(([r, f, p]) => {
       setRecursos(r.docs.map(d => ({
@@ -600,29 +601,51 @@ function AbaModulosPaciente({
     onChange: e => setBusca(e.target.value)
   }), categorias.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
-  }, "Nenhum item encontrado."), categorias.map(cat => /*#__PURE__*/React.createElement("div", {
-    key: cat,
-    className: "grupo-status"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "titulo-grupo-status"
-  }, formatarCategoria(cat), " (", porCategoria[cat].length, ")"), /*#__PURE__*/React.createElement("div", {
-    className: "cartao-lista-pacientes"
-  }, porCategoria[cat].map(item => {
-    const ativo = !!config[item.id]?.ativo;
+  }, "Nenhum item encontrado."), categorias.map(cat => {
+    const cores = corDaCategoria(cat);
     return /*#__PURE__*/React.createElement("div", {
-      key: item.id,
-      className: "linha-modulo"
+      key: cat,
+      className: "grupo-status"
     }, /*#__PURE__*/React.createElement("div", {
-      className: "info-lancamento"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "descricao-lancamento"
-    }, item.titulo), item.descricao && /*#__PURE__*/React.createElement("div", {
-      className: "detalhe-lancamento"
-    }, item.descricao), ativo && config[item.id]?.dataInicio && /*#__PURE__*/React.createElement("div", {
-      className: "detalhe-lancamento"
-    }, "Ativado em ", config[item.id].dataInicio.split("-").reverse().join("/"))), /*#__PURE__*/React.createElement(ToggleModulo, {
-      ativo: ativo,
-      onClick: () => alternar(item)
-    }));
-  })))));
+      className: "titulo-grupo-status"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "etiqueta-categoria-recurso",
+      style: {
+        "--cor-cat": cores.cor,
+        "--bg-cat": cores.bg
+      }
+    }, formatarCategoria(cat)), "(", porCategoria[cat].length, ")"), /*#__PURE__*/React.createElement("div", {
+      className: "cartao-lista-pacientes"
+    }, porCategoria[cat].map(item => {
+      const ativo = !!config[item.id]?.ativo;
+      return /*#__PURE__*/React.createElement("div", {
+        key: item.id,
+        className: "linha-modulo",
+        style: {
+          "--cor-cat": cores.cor
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "info-lancamento"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "descricao-lancamento"
+      }, item.titulo), item.descricao && /*#__PURE__*/React.createElement("div", {
+        className: "detalhe-lancamento"
+      }, item.descricao), ativo && config[item.id]?.dataInicio && /*#__PURE__*/React.createElement("div", {
+        className: "detalhe-lancamento"
+      }, "Ativado em ", config[item.id].dataInicio.split("-").reverse().join("/"))), /*#__PURE__*/React.createElement("button", {
+        className: "botao-icone",
+        onClick: () => setVisualizando(item),
+        title: "Visualizar"
+      }, /*#__PURE__*/React.createElement(Icone, {
+        nome: "eye",
+        tamanho: 15
+      })), /*#__PURE__*/React.createElement(ToggleModulo, {
+        ativo: ativo,
+        onClick: () => alternar(item)
+      }));
+    })));
+  }), visualizando && /*#__PURE__*/React.createElement(VisualizarRecursoModal, {
+    item: visualizando,
+    aoFechar: () => setVisualizando(null)
+  }));
 }
