@@ -99,7 +99,10 @@ function TelaAgenda({
   }, /*#__PURE__*/React.createElement("button", {
     className: "botao-seta",
     onClick: () => setSemanaOffset(s => s - 1)
-  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "chevron-left",
+    tamanho: 16
+  })), /*#__PURE__*/React.createElement("div", {
     className: "rotulo-semana"
   }, formatarPeriodoSemana(inicioSemana), semanaOffset !== 0 && /*#__PURE__*/React.createElement("button", {
     className: "botao-hoje",
@@ -107,7 +110,10 @@ function TelaAgenda({
   }, "Hoje")), /*#__PURE__*/React.createElement("button", {
     className: "botao-seta",
     onClick: () => setSemanaOffset(s => s + 1)
-  }, "\u203A")), erro && /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "chevron-right",
+    tamanho: 16
+  }))), erro && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
   }, erro), carregando && /*#__PURE__*/React.createElement("p", null, "Carregando..."), !carregando && /*#__PURE__*/React.createElement("div", {
     className: "grupos-agenda"

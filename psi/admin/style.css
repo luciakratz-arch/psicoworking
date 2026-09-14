@@ -159,15 +159,15 @@ button {
 }
 
 /* ── Layout admin ──────────────────────────── */
-.layout-admin { display: flex; min-height: 100vh; }
+.layout-admin { display: flex; min-height: 100vh; background: var(--fundo); }
 
 .barra-lateral {
-  width: 220px;
+  width: 248px;
   background: var(--branco);
   border-right: 1px solid var(--borda);
   display: flex;
   flex-direction: column;
-  padding: 20px 0;
+  padding: 24px 0 0;
   flex-shrink: 0;
 }
 
@@ -175,25 +175,67 @@ button {
   font-weight: 700;
   color: var(--cor-marca);
   font-size: 18px;
-  padding: 0 20px 20px;
+  padding: 0 24px 24px;
 }
 
-.barra-lateral nav { flex: 1; }
+.marca-barra-lateral-clinica {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 24px 24px;
+  border-bottom: 1px solid var(--borda);
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.avatar-marca, .avatar-usuario {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: var(--cor-marca);
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.avatar-usuario { border-radius: 50%; width: 34px; height: 34px; font-size: 13px; }
+
+.barra-lateral nav { flex: 1; padding: 4px 12px; display: flex; flex-direction: column; gap: 2px; }
 
 .item-menu {
-  display: block;
-  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 8px;
   color: var(--texto-suave);
   text-decoration: none;
   font-size: 14px;
+  font-weight: 500;
+  transition: background .12s;
 }
-.item-menu-ativo { background: var(--fundo); color: var(--cor-marca); font-weight: 600; border-right: 3px solid var(--cor-marca); }
+.item-menu:hover { background: var(--fundo); }
+.item-menu-ativo, .item-menu-ativo:hover { background: var(--cor-marca); color: white; }
+.item-menu-ativo .icone-lucide { color: white; }
 
-.rodape-barra-lateral { padding: 16px 20px; border-top: 1px solid var(--borda); }
-.email-usuario { font-size: 12px; color: var(--texto-suave); margin-bottom: 8px; word-break: break-all; }
-.botao-sair { background: none; color: var(--erro); padding: 0; font-size: 13px; }
+.icone-lucide { flex-shrink: 0; }
+.item-menu .icone-lucide { color: var(--texto-suave); }
+.item-menu-ativo .icone-lucide { color: white; }
 
-.area-principal { flex: 1; padding: 32px; min-width: 0; }
+.rodape-barra-lateral {
+  padding: 16px 20px;
+  margin-top: 12px;
+  border-top: 1px solid var(--borda);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rodape-info { min-width: 0; flex: 1; }
+.email-usuario { font-size: 12px; color: var(--texto-suave); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.botao-sair { display: flex; align-items: center; gap: 5px; background: none; color: var(--erro); padding: 0; font-size: 12px; font-weight: 600; }
+
+.area-principal { flex: 1; padding: 36px 40px; min-width: 0; }
 
 .conteudo { max-width: 900px; }
 
@@ -201,11 +243,11 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
   flex-wrap: wrap;
   gap: 12px;
 }
-.cabecalho-secao h2 { font-size: 22px; }
+.cabecalho-secao h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
 
 .botao-primario { background: var(--cor-marca); color: white; }
 .botao-primario:hover { background: var(--cor-marca-escura); }
@@ -386,16 +428,7 @@ button {
 .dica-campo { font-size: 12px; color: var(--texto-suave); margin-top: 6px; }
 .mensagem-sucesso { color: var(--sucesso); font-size: 13px; margin-top: 10px; }
 
-/* Marca da clínica no menu, quando já configurada */
-.marca-barra-lateral-clinica {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 20px 20px;
-  font-weight: 600;
-  font-size: 15px;
-}
-.logo-barra-lateral { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; }
+.logo-barra-lateral { width: 38px; height: 38px; object-fit: contain; border-radius: 10px; }
 
 @media (max-width: 640px) {
   .layout-admin { flex-direction: column; }

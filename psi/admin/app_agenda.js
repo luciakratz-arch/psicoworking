@@ -111,14 +111,18 @@ function TelaAgenda({ usuario }) {
       </div>
 
       <div className="navegador-semana">
-        <button className="botao-seta" onClick={() => setSemanaOffset((s) => s - 1)}>‹</button>
+        <button className="botao-seta" onClick={() => setSemanaOffset((s) => s - 1)}>
+          <Icone nome="chevron-left" tamanho={16} />
+        </button>
         <div className="rotulo-semana">
           {formatarPeriodoSemana(inicioSemana)}
           {semanaOffset !== 0 && (
             <button className="botao-hoje" onClick={() => setSemanaOffset(0)}>Hoje</button>
           )}
         </div>
-        <button className="botao-seta" onClick={() => setSemanaOffset((s) => s + 1)}>›</button>
+        <button className="botao-seta" onClick={() => setSemanaOffset((s) => s + 1)}>
+          <Icone nome="chevron-right" tamanho={16} />
+        </button>
       </div>
 
       {erro && <p className="mensagem-erro">{erro}</p>}

@@ -94,44 +94,78 @@ function Sidebar({
   configClinica
 }) {
   const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl);
+  const inicial = (configClinica?.nome || usuario.email || "?").trim().charAt(0).toUpperCase();
+  const itens = [{
+    id: "pacientes",
+    rotulo: "Pacientes",
+    icone: "users"
+  }, {
+    id: "agenda",
+    rotulo: "Agenda",
+    icone: "calendar-days"
+  }, {
+    id: "configuracoes",
+    rotulo: "Configurações",
+    icone: "settings"
+  }];
   return /*#__PURE__*/React.createElement("aside", {
     className: "barra-lateral"
   }, temMarca ? /*#__PURE__*/React.createElement("div", {
     className: "marca-barra-lateral-clinica"
-  }, configClinica.logoUrl && /*#__PURE__*/React.createElement("img", {
+  }, configClinica.logoUrl ? /*#__PURE__*/React.createElement("img", {
     src: configClinica.logoUrl,
     alt: "Logo",
     className: "logo-barra-lateral"
-  }), /*#__PURE__*/React.createElement("span", null, configClinica.nome)) : /*#__PURE__*/React.createElement("div", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "avatar-marca"
+  }, inicial), /*#__PURE__*/React.createElement("span", null, configClinica.nome)) : /*#__PURE__*/React.createElement("div", {
     className: "logo-plataforma marca-barra-lateral"
-  }, "PsiCoWorking"), /*#__PURE__*/React.createElement("nav", null, /*#__PURE__*/React.createElement("a", {
-    className: "item-menu" + (telaAtiva === "pacientes" ? " item-menu-ativo" : ""),
+  }, "PsiCoWorking"), /*#__PURE__*/React.createElement("nav", null, itens.map(item => /*#__PURE__*/React.createElement("a", {
+    key: item.id,
+    className: "item-menu" + (telaAtiva === item.id ? " item-menu-ativo" : ""),
     href: "#",
     onClick: e => {
       e.preventDefault();
-      aoTrocarTela("pacientes");
+      aoTrocarTela(item.id);
     }
-  }, "Pacientes"), /*#__PURE__*/React.createElement("a", {
-    className: "item-menu" + (telaAtiva === "agenda" ? " item-menu-ativo" : ""),
-    href: "#",
-    onClick: e => {
-      e.preventDefault();
-      aoTrocarTela("agenda");
-    }
-  }, "Agenda"), /*#__PURE__*/React.createElement("a", {
-    className: "item-menu" + (telaAtiva === "configuracoes" ? " item-menu-ativo" : ""),
-    href: "#",
-    onClick: e => {
-      e.preventDefault();
-      aoTrocarTela("configuracoes");
-    }
-  }, "Configura\xE7\xF5es")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: item.icone,
+    tamanho: 17
+  }), item.rotulo))), /*#__PURE__*/React.createElement("div", {
     className: "rodape-barra-lateral"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "avatar-usuario"
+  }, usuario.email.charAt(0).toUpperCase()), /*#__PURE__*/React.createElement("div", {
+    className: "rodape-info"
   }, /*#__PURE__*/React.createElement("p", {
     className: "email-usuario"
   }, usuario.email), /*#__PURE__*/React.createElement("button", {
     className: "botao-sair",
     onClick: logout
-  }, "Sair")));
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "log-out",
+    tamanho: 13
+  }), " Sair"))));
+}
+
+// Wrapper simples da biblioteca Lucide (CDN, sem lucide-react) —
+// desenha um <i data-lucide> e deixa a lib substituir pelo SVG.
+function Icone({
+  nome,
+  tamanho = 16
+}) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (window.lucide) window.lucide.createIcons();
+  });
+  return /*#__PURE__*/React.createElement("i", {
+    ref: ref,
+    "data-lucide": nome,
+    className: "icone-lucide",
+    style: {
+      width: tamanho,
+      height: tamanho
+    }
+  });
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));

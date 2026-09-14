@@ -103,46 +103,62 @@ function App() {
 
 function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
   const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl);
+  const inicial = (configClinica?.nome || usuario.email || "?").trim().charAt(0).toUpperCase();
+
+  const itens = [
+    { id: "pacientes", rotulo: "Pacientes", icone: "users" },
+    { id: "agenda", rotulo: "Agenda", icone: "calendar-days" },
+    { id: "configuracoes", rotulo: "Configurações", icone: "settings" },
+  ];
 
   return (
     <aside className="barra-lateral">
       {temMarca ? (
         <div className="marca-barra-lateral-clinica">
-          {configClinica.logoUrl && <img src={configClinica.logoUrl} alt="Logo" className="logo-barra-lateral" />}
+          {configClinica.logoUrl ? (
+            <img src={configClinica.logoUrl} alt="Logo" className="logo-barra-lateral" />
+          ) : (
+            <div className="avatar-marca">{inicial}</div>
+          )}
           <span>{configClinica.nome}</span>
         </div>
       ) : (
         <div className="logo-plataforma marca-barra-lateral">PsiCoWorking</div>
       )}
       <nav>
-        <a
-          className={"item-menu" + (telaAtiva === "pacientes" ? " item-menu-ativo" : "")}
-          href="#"
-          onClick={(e) => { e.preventDefault(); aoTrocarTela("pacientes"); }}
-        >
-          Pacientes
-        </a>
-        <a
-          className={"item-menu" + (telaAtiva === "agenda" ? " item-menu-ativo" : "")}
-          href="#"
-          onClick={(e) => { e.preventDefault(); aoTrocarTela("agenda"); }}
-        >
-          Agenda
-        </a>
-        <a
-          className={"item-menu" + (telaAtiva === "configuracoes" ? " item-menu-ativo" : "")}
-          href="#"
-          onClick={(e) => { e.preventDefault(); aoTrocarTela("configuracoes"); }}
-        >
-          Configurações
-        </a>
+        {itens.map((item) => (
+          <a
+            key={item.id}
+            className={"item-menu" + (telaAtiva === item.id ? " item-menu-ativo" : "")}
+            href="#"
+            onClick={(e) => { e.preventDefault(); aoTrocarTela(item.id); }}
+          >
+            <Icone nome={item.icone} tamanho={17} />
+            {item.rotulo}
+          </a>
+        ))}
       </nav>
       <div className="rodape-barra-lateral">
-        <p className="email-usuario">{usuario.email}</p>
-        <button className="botao-sair" onClick={logout}>Sair</button>
+        <div className="avatar-usuario">{usuario.email.charAt(0).toUpperCase()}</div>
+        <div className="rodape-info">
+          <p className="email-usuario">{usuario.email}</p>
+          <button className="botao-sair" onClick={logout}>
+            <Icone nome="log-out" tamanho={13} /> Sair
+          </button>
+        </div>
       </div>
     </aside>
   );
+}
+
+// Wrapper simples da biblioteca Lucide (CDN, sem lucide-react) —
+// desenha um <i data-lucide> e deixa a lib substituir pelo SVG.
+function Icone({ nome, tamanho = 16 }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (window.lucide) window.lucide.createIcons();
+  });
+  return <i ref={ref} data-lucide={nome} className="icone-lucide" style={{ width: tamanho, height: tamanho }}></i>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
