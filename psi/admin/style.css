@@ -279,6 +279,67 @@ button {
 
 .conteudo { max-width: 900px; }
 
+/* ── Dashboard ─────────────────────────────── */
+.grade-cartoes-stat {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.cartao-stat {
+  background: var(--branco);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.cabecalho-cartao-stat { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.titulo-cartao-stat { font-size: 13px; color: var(--texto-suave); }
+.icone-cartao-stat {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: var(--marca-plataforma-lavanda);
+  color: var(--cor-marca);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.valor-cartao-stat { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.legenda-cartao-stat { font-size: 12px; color: var(--texto-suave); margin-top: 4px; }
+
+.cartao-secao {
+  background: var(--branco);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  margin-bottom: 20px;
+}
+.titulo-cartao-secao { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.descricao-cartao-secao { font-size: 13px; color: var(--texto-suave); margin: 4px 0 16px; }
+
+.linha-atividade {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--borda);
+}
+.linha-atividade:last-child { border-bottom: none; }
+.info-atividade { flex: 1; min-width: 0; }
+.badges-atividade { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.badge-atividade {
+  font-size: 11px;
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: 20px;
+  padding: 2px 10px;
+  color: var(--texto-suave);
+}
+
+.aviso-modulo-futuro {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px;
+  color: var(--texto-suave);
+  background: var(--fundo);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
 .cabecalho-secao {
   display: flex;
   justify-content: space-between;

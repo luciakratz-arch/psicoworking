@@ -8,6 +8,7 @@ const babel = require("@babel/core");
 
 const ARQUIVOS = [
   "psi/admin/app_core.js",
+  "psi/admin/app_dashboard.js",
   "psi/admin/app_pacientes.js",
   "psi/admin/app_agenda.js",
   "psi/admin/app_config.js",

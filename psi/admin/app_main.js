@@ -50,7 +50,7 @@ function usarConfiguracaoClinica(psiId) {
 
 function App() {
   const { usuario, carregando } = useUsuarioLogado();
-  const [telaAtiva, setTelaAtiva] = useState("pacientes");
+  const [telaAtiva, setTelaAtiva] = useState("dashboard");
   const statusConexaoGoogle = usarConexaoGoogleAgenda(usuario);
   const configClinica = usarConfiguracaoClinica(usuario && usuario.psiId);
 
@@ -93,6 +93,9 @@ function App() {
             Não foi possível conectar o Google Agenda: {statusConexaoGoogle}
           </p>
         )}
+        {telaAtiva === "dashboard" && (
+          <TelaDashboard usuario={usuario} aoAbrirPaciente={() => setTelaAtiva("pacientes")} />
+        )}
         {telaAtiva === "pacientes" && <TelaPacientes usuario={usuario} />}
         {telaAtiva === "agenda" && <TelaAgenda usuario={usuario} />}
         {telaAtiva === "configuracoes" && <TelaConfiguracoes usuario={usuario} />}
@@ -106,6 +109,7 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
   const inicial = (configClinica?.nome || usuario.email || "?").trim().charAt(0).toUpperCase();
 
   const itens = [
+    { id: "dashboard", rotulo: "Dashboard", icone: "layout-dashboard" },
     { id: "pacientes", rotulo: "Pacientes", icone: "users" },
     { id: "agenda", rotulo: "Agenda", icone: "calendar-days" },
     { id: "configuracoes", rotulo: "Configurações", icone: "settings" },

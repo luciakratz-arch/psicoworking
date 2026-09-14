@@ -43,7 +43,7 @@ function App() {
     usuario,
     carregando
   } = useUsuarioLogado();
-  const [telaAtiva, setTelaAtiva] = useState("pacientes");
+  const [telaAtiva, setTelaAtiva] = useState("dashboard");
   const statusConexaoGoogle = usarConexaoGoogleAgenda(usuario);
   const configClinica = usarConfiguracaoClinica(usuario && usuario.psiId);
   useEffect(() => {
@@ -79,7 +79,10 @@ function App() {
     className: "area-principal"
   }, statusConexaoGoogle && statusConexaoGoogle.startsWith("erro") && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
-  }, "N\xE3o foi poss\xEDvel conectar o Google Agenda: ", statusConexaoGoogle), telaAtiva === "pacientes" && /*#__PURE__*/React.createElement(TelaPacientes, {
+  }, "N\xE3o foi poss\xEDvel conectar o Google Agenda: ", statusConexaoGoogle), telaAtiva === "dashboard" && /*#__PURE__*/React.createElement(TelaDashboard, {
+    usuario: usuario,
+    aoAbrirPaciente: () => setTelaAtiva("pacientes")
+  }), telaAtiva === "pacientes" && /*#__PURE__*/React.createElement(TelaPacientes, {
     usuario: usuario
   }), telaAtiva === "agenda" && /*#__PURE__*/React.createElement(TelaAgenda, {
     usuario: usuario
@@ -96,6 +99,10 @@ function Sidebar({
   const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl);
   const inicial = (configClinica?.nome || usuario.email || "?").trim().charAt(0).toUpperCase();
   const itens = [{
+    id: "dashboard",
+    rotulo: "Dashboard",
+    icone: "layout-dashboard"
+  }, {
     id: "pacientes",
     rotulo: "Pacientes",
     icone: "users"
