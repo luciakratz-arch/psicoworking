@@ -10,6 +10,13 @@
   --branco: #FFFFFF;
   --erro: #DC2626;
   --sucesso: #16A34A;
+
+  /* Cor de marca do login — hoje é um valor fixo (roxo, de exemplo).
+     Quando psi_config existir, isto passa a ser definido via JS
+     (document.documentElement.style.setProperty) com a cor de cada
+     psicóloga, lida pelo slug da URL — nada mais no CSS precisa mudar. */
+  --cor-marca: #7B00C4;
+  --cor-marca-escura: #5A0090;
 }
 
 body {
@@ -18,35 +25,59 @@ body {
   color: var(--texto);
 }
 
-/* ── Login ─────────────────────────────────── */
-.tela-central {
+/* ── Login (tela dividida) ──────────────────── */
+.tela-login-split {
   min-height: 100vh;
+  display: flex;
+}
+
+.painel-marca {
+  flex: 1;
+  background: linear-gradient(155deg, var(--cor-marca), var(--cor-marca-escura));
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 48px;
+  color: white;
+}
+.painel-marca-conteudo { max-width: 380px; }
+.painel-marca-conteudo h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 36px;
+  margin-bottom: 16px;
+}
+.painel-marca-conteudo p { font-size: 15px; opacity: 0.9; line-height: 1.6; }
+
+.painel-formulario {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: var(--branco);
 }
 
 .cartao-login {
-  background: var(--branco);
-  border-radius: 12px;
-  padding: 32px;
   width: 100%;
-  max-width: 360px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  text-align: center;
+  max-width: 340px;
 }
 
-.cartao-login h1 { font-size: 22px; margin-bottom: 4px; color: var(--primaria); }
-.subtitulo { color: var(--texto-suave); margin-bottom: 20px; font-size: 14px; }
+.cartao-login h2 { font-size: 24px; margin-bottom: 4px; }
+.subtitulo { color: var(--texto-suave); margin-bottom: 24px; font-size: 14px; }
 
-.cartao-login label { display: block; text-align: left; font-size: 13px; margin: 12px 0 4px; color: var(--texto-suave); }
+.cartao-login label { display: block; text-align: left; font-size: 13px; margin: 14px 0 4px; color: var(--texto-suave); }
 .cartao-login input, .modal input, .modal textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 11px 14px;
   border: 1px solid var(--borda);
   border-radius: 8px;
   font-size: 14px;
+}
+.cartao-login input:focus, .modal input:focus, .modal textarea:focus {
+  outline: none;
+  border-color: var(--cor-marca);
+  box-shadow: 0 0 0 3px rgba(123, 0, 196, 0.12);
 }
 
 button {
@@ -60,14 +91,40 @@ button {
 
 .cartao-login button[type="submit"] {
   width: 100%;
-  margin-top: 20px;
-  background: var(--primaria);
+  margin-top: 24px;
+  background: var(--cor-marca);
   color: white;
-  padding: 12px;
+  padding: 13px;
+  transition: background .15s;
 }
+.cartao-login button[type="submit"]:hover { background: var(--cor-marca-escura); }
 .cartao-login button[type="submit"]:disabled { opacity: 0.6; cursor: default; }
 
 .mensagem-erro { color: var(--erro); font-size: 13px; margin-top: 10px; }
+
+/* Tela central genérica (usada em "Carregando..." e "Acesso não permitido") */
+.tela-central {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.tela-central .cartao-login {
+  background: var(--branco);
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .tela-login-split { flex-direction: column; }
+  .painel-marca { flex: none; padding: 32px 24px; text-align: center; }
+  .painel-marca-conteudo h1 { font-size: 26px; margin-bottom: 8px; }
+  .painel-marca-conteudo p { display: none; }
+  .painel-formulario { flex: none; padding: 32px 24px; }
+}
 
 /* ── Layout admin ──────────────────────────── */
 .layout-admin { display: flex; min-height: 100vh; }

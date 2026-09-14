@@ -92,33 +92,42 @@ function TelaLogin() {
   }
 
   return (
-    <div className="tela-central">
-      <form className="cartao-login" onSubmit={aoEnviar}>
-        <h1>PsicoWorking</h1>
-        <p className="subtitulo">Entrar no painel</p>
+    <div className="tela-login-split">
+      <div className="painel-marca">
+        <div className="painel-marca-conteudo">
+          <h1>PsicoWorking</h1>
+          <p>A plataforma completa para organizar sua clínica de psicologia.</p>
+        </div>
+      </div>
 
-        <label>E-mail</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+      <div className="painel-formulario">
+        <form className="cartao-login" onSubmit={aoEnviar}>
+          <h2>Entrar</h2>
+          <p className="subtitulo">Acesse o painel da sua clínica</p>
 
-        <label>Senha</label>
-        <input
-          type="password"
-          value={senha}
-          onChange={(e) => setSenha(e.target.value)}
-          required
-        />
+          <label>E-mail</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-        {erro && <p className="mensagem-erro">{erro}</p>}
+          <label>Senha</label>
+          <input
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            required
+          />
 
-        <button type="submit" disabled={enviando}>
-          {enviando ? "Entrando..." : "Entrar"}
-        </button>
-      </form>
+          {erro && <p className="mensagem-erro">{erro}</p>}
+
+          <button type="submit" disabled={enviando}>
+            {enviando ? "Entrando..." : "Entrar"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

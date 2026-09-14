@@ -95,13 +95,19 @@ function TelaLogin() {
     }
   }
   return /*#__PURE__*/React.createElement("div", {
-    className: "tela-central"
+    className: "tela-login-split"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "painel-marca"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "painel-marca-conteudo"
+  }, /*#__PURE__*/React.createElement("h1", null, "PsicoWorking"), /*#__PURE__*/React.createElement("p", null, "A plataforma completa para organizar sua cl\xEDnica de psicologia."))), /*#__PURE__*/React.createElement("div", {
+    className: "painel-formulario"
   }, /*#__PURE__*/React.createElement("form", {
     className: "cartao-login",
     onSubmit: aoEnviar
-  }, /*#__PURE__*/React.createElement("h1", null, "PsicoWorking"), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("h2", null, "Entrar"), /*#__PURE__*/React.createElement("p", {
     className: "subtitulo"
-  }, "Entrar no painel"), /*#__PURE__*/React.createElement("label", null, "E-mail"), /*#__PURE__*/React.createElement("input", {
+  }, "Acesse o painel da sua cl\xEDnica"), /*#__PURE__*/React.createElement("label", null, "E-mail"), /*#__PURE__*/React.createElement("input", {
     type: "email",
     value: email,
     onChange: e => setEmail(e.target.value),
@@ -116,5 +122,5 @@ function TelaLogin() {
   }, erro), /*#__PURE__*/React.createElement("button", {
     type: "submit",
     disabled: enviando
-  }, enviando ? "Entrando..." : "Entrar")));
+  }, enviando ? "Entrando..." : "Entrar"))));
 }
