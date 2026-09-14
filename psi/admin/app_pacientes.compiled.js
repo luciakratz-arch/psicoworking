@@ -24,6 +24,44 @@ const STATUS_PACIENTE = [{
   rotulo: "Alta",
   cor: "var(--texto-suave)"
 }];
+
+// Abas do perfil clínico completo do paciente — mesma estrutura do
+// sistema real (perfil_paciente.js), menos "Terapia de Casal" (a Dra.
+// Lucia decidiu não fazer essa por enquanto). Só "Perfil" está
+// funcional; as outras vão sendo construídas uma de cada vez.
+const ABAS_PACIENTE = [{
+  id: "perfil",
+  rotulo: "Perfil",
+  icone: "user"
+}, {
+  id: "modulos",
+  rotulo: "Módulos",
+  icone: "grid"
+}, {
+  id: "metas",
+  rotulo: "Metas",
+  icone: "target"
+}, {
+  id: "laudos",
+  rotulo: "Laudos",
+  icone: "file-text"
+}, {
+  id: "evolucao",
+  rotulo: "Evolução",
+  icone: "trending-up"
+}, {
+  id: "saude-ocupacional",
+  rotulo: "Saúde Ocupacional",
+  icone: "briefcase"
+}, {
+  id: "questionarios",
+  rotulo: "Questionários",
+  icone: "clipboard-list"
+}, {
+  id: "links",
+  rotulo: "Links Partilhados",
+  icone: "link"
+}];
 function TelaPacientes({
   usuario
 }) {
@@ -64,6 +102,14 @@ function TelaPacientes({
       setLinkCopiado(true);
       setTimeout(() => setLinkCopiado(false), 2500);
     }).catch(() => prompt("Copie o texto:", texto));
+  }
+  if (pacienteSelecionado) {
+    return /*#__PURE__*/React.createElement(PerfilPaciente, {
+      usuario: usuario,
+      paciente: pacienteSelecionado,
+      aoFechar: () => setPacienteSelecionado(null),
+      aoExcluir: () => setPacienteSelecionado(null)
+    });
   }
   return /*#__PURE__*/React.createElement("div", {
     className: "conteudo conteudo-larga"
@@ -129,9 +175,6 @@ function TelaPacientes({
   }, "Nenhum paciente encontrado."), mostrarForm && /*#__PURE__*/React.createElement(FormNovoPaciente, {
     usuario: usuario,
     aoFechar: () => setMostrarForm(false)
-  }), pacienteSelecionado && /*#__PURE__*/React.createElement(PerfilPaciente, {
-    paciente: pacienteSelecionado,
-    aoFechar: () => setPacienteSelecionado(null)
   }));
 }
 function CamposPaciente({
@@ -300,9 +343,68 @@ function FormNovoPaciente({
     onClick: aoFechar
   }, "Concluir")))));
 }
+
+// Painel do paciente — tela cheia com abas, igual ao sistema real
+// (perfil_paciente.js: cabeçalho com nome/ID/Excluir + barra de abas).
 function PerfilPaciente({
+  usuario,
   paciente,
-  aoFechar
+  aoFechar,
+  aoExcluir
+}) {
+  const [aba, setAba] = useState("perfil");
+  const [excluindo, setExcluindo] = useState(false);
+  async function excluirPaciente() {
+    if (!confirm(`Excluir ${paciente.nome}? Isso remove o cadastro clínico dele — não pode ser desfeito.`)) return;
+    setExcluindo(true);
+    try {
+      await db.collection("clinica_pacientes").doc(paciente.id).delete();
+      aoExcluir();
+    } catch (e) {
+      alert("Erro ao excluir: " + e.message);
+      setExcluindo(false);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "conteudo conteudo-larga"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-perfil-paciente"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario botao-voltar-perfil",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 15
+  }), " Voltar"), /*#__PURE__*/React.createElement("div", {
+    className: "titulo-perfil-paciente"
+  }, /*#__PURE__*/React.createElement("h2", null, paciente.nome), /*#__PURE__*/React.createElement("span", {
+    className: "subtitulo-pagina"
+  }, "Perfil cl\xEDnico completo \xB7 ID: ", paciente.id)), /*#__PURE__*/React.createElement("button", {
+    className: "botao-perigo",
+    onClick: excluirPaciente,
+    disabled: excluindo
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "trash-2",
+    tamanho: 15
+  }), " ", excluindo ? "Excluindo..." : "Excluir paciente")), /*#__PURE__*/React.createElement("div", {
+    className: "abas-financeiro abas-perfil-paciente"
+  }, ABAS_PACIENTE.map(a => /*#__PURE__*/React.createElement("button", {
+    key: a.id,
+    className: "aba-financeiro" + (aba === a.id ? " aba-financeiro-ativa" : ""),
+    onClick: () => setAba(a.id)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: a.icone,
+    tamanho: 15
+  }), " ", a.rotulo))), aba === "perfil" && /*#__PURE__*/React.createElement(AbaPerfilPaciente, {
+    paciente: paciente
+  }), aba !== "perfil" && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Essa aba (", ABAS_PACIENTE.find(a => a.id === aba)?.rotulo, ") ainda n\xE3o foi constru\xEDda \u2014 \xE9 uma das pr\xF3ximas etapas.")));
+}
+function AbaPerfilPaciente({
+  paciente
 }) {
   const [form, setForm] = useState({
     ...paciente
@@ -338,23 +440,16 @@ function PerfilPaciente({
     }
   }
   return /*#__PURE__*/React.createElement("div", {
-    className: "sobreposicao",
-    onClick: aoFechar
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "modal modal-largo",
-    onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("h3", null, paciente.nome), /*#__PURE__*/React.createElement(CamposPaciente, {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement(CamposPaciente, {
     form: form,
     setForm: setForm,
     mostrarStatus: true
   }), mensagem && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-sucesso"
   }, mensagem), /*#__PURE__*/React.createElement("div", {
-    className: "acoes-modal"
+    className: "acoes-modal acoes-perfil-paciente"
   }, /*#__PURE__*/React.createElement("button", {
-    className: "botao-secundario",
-    onClick: aoFechar
-  }, "Fechar"), /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
     onClick: salvar,
     disabled: salvando
@@ -374,5 +469,5 @@ function PerfilPaciente({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "send",
     tamanho: 14
-  }), " ", reenviando ? "Enviando..." : "Enviar link de redefinição de senha"))));
+  }), " ", reenviando ? "Enviando..." : "Enviar link de redefinição de senha")));
 }

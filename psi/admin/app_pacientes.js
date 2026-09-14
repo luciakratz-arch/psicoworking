@@ -17,6 +17,21 @@ const STATUS_PACIENTE = [
   { valor: "alta", rotulo: "Alta", cor: "var(--texto-suave)" },
 ];
 
+// Abas do perfil clínico completo do paciente — mesma estrutura do
+// sistema real (perfil_paciente.js), menos "Terapia de Casal" (a Dra.
+// Lucia decidiu não fazer essa por enquanto). Só "Perfil" está
+// funcional; as outras vão sendo construídas uma de cada vez.
+const ABAS_PACIENTE = [
+  { id: "perfil", rotulo: "Perfil", icone: "user" },
+  { id: "modulos", rotulo: "Módulos", icone: "grid" },
+  { id: "metas", rotulo: "Metas", icone: "target" },
+  { id: "laudos", rotulo: "Laudos", icone: "file-text" },
+  { id: "evolucao", rotulo: "Evolução", icone: "trending-up" },
+  { id: "saude-ocupacional", rotulo: "Saúde Ocupacional", icone: "briefcase" },
+  { id: "questionarios", rotulo: "Questionários", icone: "clipboard-list" },
+  { id: "links", rotulo: "Links Partilhados", icone: "link" },
+];
+
 function TelaPacientes({ usuario }) {
   const [pacientes, setPacientes] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -67,6 +82,17 @@ function TelaPacientes({ usuario }) {
         setTimeout(() => setLinkCopiado(false), 2500);
       })
       .catch(() => prompt("Copie o texto:", texto));
+  }
+
+  if (pacienteSelecionado) {
+    return (
+      <PerfilPaciente
+        usuario={usuario}
+        paciente={pacienteSelecionado}
+        aoFechar={() => setPacienteSelecionado(null)}
+        aoExcluir={() => setPacienteSelecionado(null)}
+      />
+    );
   }
 
   return (
@@ -151,13 +177,6 @@ function TelaPacientes({ usuario }) {
 
       {mostrarForm && (
         <FormNovoPaciente usuario={usuario} aoFechar={() => setMostrarForm(false)} />
-      )}
-
-      {pacienteSelecionado && (
-        <PerfilPaciente
-          paciente={pacienteSelecionado}
-          aoFechar={() => setPacienteSelecionado(null)}
-        />
       )}
     </div>
   );
@@ -301,7 +320,65 @@ function FormNovoPaciente({ usuario, aoFechar }) {
   );
 }
 
-function PerfilPaciente({ paciente, aoFechar }) {
+// Painel do paciente — tela cheia com abas, igual ao sistema real
+// (perfil_paciente.js: cabeçalho com nome/ID/Excluir + barra de abas).
+function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
+  const [aba, setAba] = useState("perfil");
+  const [excluindo, setExcluindo] = useState(false);
+
+  async function excluirPaciente() {
+    if (!confirm(`Excluir ${paciente.nome}? Isso remove o cadastro clínico dele — não pode ser desfeito.`)) return;
+    setExcluindo(true);
+    try {
+      await db.collection("clinica_pacientes").doc(paciente.id).delete();
+      aoExcluir();
+    } catch (e) {
+      alert("Erro ao excluir: " + e.message);
+      setExcluindo(false);
+    }
+  }
+
+  return (
+    <div className="conteudo conteudo-larga">
+      <div className="cabecalho-perfil-paciente">
+        <button className="botao-secundario botao-voltar-perfil" onClick={aoFechar}>
+          <Icone nome="arrow-left" tamanho={15} /> Voltar
+        </button>
+        <div className="titulo-perfil-paciente">
+          <h2>{paciente.nome}</h2>
+          <span className="subtitulo-pagina">Perfil clínico completo · ID: {paciente.id}</span>
+        </div>
+        <button className="botao-perigo" onClick={excluirPaciente} disabled={excluindo}>
+          <Icone nome="trash-2" tamanho={15} /> {excluindo ? "Excluindo..." : "Excluir paciente"}
+        </button>
+      </div>
+
+      <div className="abas-financeiro abas-perfil-paciente">
+        {ABAS_PACIENTE.map((a) => (
+          <button
+            key={a.id}
+            className={"aba-financeiro" + (aba === a.id ? " aba-financeiro-ativa" : "")}
+            onClick={() => setAba(a.id)}
+          >
+            <Icone nome={a.icone} tamanho={15} /> {a.rotulo}
+          </button>
+        ))}
+      </div>
+
+      {aba === "perfil" && <AbaPerfilPaciente paciente={paciente} />}
+
+      {aba !== "perfil" && (
+        <div className="cartao-secao">
+          <p className="texto-vazio">
+            Essa aba ({ABAS_PACIENTE.find((a) => a.id === aba)?.rotulo}) ainda não foi construída — é uma das próximas etapas.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AbaPerfilPaciente({ paciente }) {
   const [form, setForm] = useState({ ...paciente });
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState("");
@@ -334,31 +411,26 @@ function PerfilPaciente({ paciente, aoFechar }) {
   }
 
   return (
-    <div className="sobreposicao" onClick={aoFechar}>
-      <div className="modal modal-largo" onClick={(e) => e.stopPropagation()}>
-        <h3>{paciente.nome}</h3>
+    <div className="cartao-secao">
+      <CamposPaciente form={form} setForm={setForm} mostrarStatus={true} />
 
-        <CamposPaciente form={form} setForm={setForm} mostrarStatus={true} />
+      {mensagem && <p className="mensagem-sucesso">{mensagem}</p>}
 
-        {mensagem && <p className="mensagem-sucesso">{mensagem}</p>}
+      <div className="acoes-modal acoes-perfil-paciente">
+        <button className="botao-primario" onClick={salvar} disabled={salvando}>
+          {salvando ? "Salvando..." : "Salvar alterações"}
+        </button>
+      </div>
 
-        <div className="acoes-modal">
-          <button className="botao-secundario" onClick={aoFechar}>Fechar</button>
-          <button className="botao-primario" onClick={salvar} disabled={salvando}>
-            {salvando ? "Salvando..." : "Salvar alterações"}
-          </button>
-        </div>
-
-        <div className="cartao-credenciais">
-          <div className="titulo-credenciais"><Icone nome="key" tamanho={16} /> Acesso do paciente</div>
-          <p className="texto-credenciais">
-            Aqui não guardamos nem mostramos a senha de ninguém — se o paciente esqueceu a senha,
-            envie um link novo pra ele definir uma senha nova.
-          </p>
-          <button className="botao-secundario" onClick={reenviarLinkSenha} disabled={reenviando}>
-            <Icone nome="send" tamanho={14} /> {reenviando ? "Enviando..." : "Enviar link de redefinição de senha"}
-          </button>
-        </div>
+      <div className="cartao-credenciais">
+        <div className="titulo-credenciais"><Icone nome="key" tamanho={16} /> Acesso do paciente</div>
+        <p className="texto-credenciais">
+          Aqui não guardamos nem mostramos a senha de ninguém — se o paciente esqueceu a senha,
+          envie um link novo pra ele definir uma senha nova.
+        </p>
+        <button className="botao-secundario" onClick={reenviarLinkSenha} disabled={reenviando}>
+          <Icone nome="send" tamanho={14} /> {reenviando ? "Enviando..." : "Enviar link de redefinição de senha"}
+        </button>
       </div>
     </div>
   );

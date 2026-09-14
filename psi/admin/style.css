@@ -637,6 +637,17 @@ button {
 .titulo-credenciais { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; }
 .texto-credenciais { font-size: 13px; color: var(--texto-suave); margin-bottom: 12px; }
 
+/* ── Perfil do paciente: tela cheia com abas ──────── */
+.cabecalho-perfil-paciente {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.botao-voltar-perfil { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.titulo-perfil-paciente { flex: 1; min-width: 200px; }
+.titulo-perfil-paciente h2 { font-size: 22px; font-weight: 700; }
+.abas-perfil-paciente { margin-bottom: 22px; flex-wrap: wrap; }
+.acoes-perfil-paciente { justify-content: flex-start; margin-top: 16px; }
+
 @media (max-width: 640px) {
   .grade-2col { grid-template-columns: 1fr; }
   .campo-largura-total { grid-column: span 1; }
