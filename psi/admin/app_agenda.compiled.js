@@ -34,15 +34,19 @@ function TelaAgenda({
   const [conectado, setConectado] = useState(null); // null = ainda não sabemos
   const [mostrarForm, setMostrarForm] = useState(false);
   const [erro, setErro] = useState("");
+  const [semanaOffset, setSemanaOffset] = useState(0); // 0 = semana atual
+
+  // Busca uma janela larga (6 semanas pra trás, 12 pra frente) de uma vez,
+  // pra navegar entre semanas sem precisar recarregar toda hora.
   const carregarEventos = useCallback(async () => {
     setCarregando(true);
     setErro("");
     try {
       const agora = new Date();
       const inicio = new Date(agora);
-      inicio.setDate(inicio.getDate() - 1);
+      inicio.setDate(inicio.getDate() - 42);
       const fim = new Date(agora);
-      fim.setDate(fim.getDate() + 30);
+      fim.setDate(fim.getDate() + 84);
       const resultado = await chamarListarEventosAgenda({
         dataInicio: inicio.toISOString(),
         dataFim: fim.toISOString()
@@ -62,6 +66,10 @@ function TelaAgenda({
   useEffect(() => {
     carregarEventos();
   }, [carregarEventos]);
+  const {
+    inicioSemana,
+    dias
+  } = useMemo(() => montarSemana(eventos, semanaOffset), [eventos, semanaOffset]);
   if (carregando && conectado === null) {
     return /*#__PURE__*/React.createElement("div", {
       className: "conteudo"
@@ -86,20 +94,33 @@ function TelaAgenda({
   }, /*#__PURE__*/React.createElement("h2", null, "Agenda"), /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
     onClick: () => setMostrarForm(true)
-  }, "+ Nova Sess\xE3o")), erro && /*#__PURE__*/React.createElement("p", {
+  }, "+ Nova Sess\xE3o")), /*#__PURE__*/React.createElement("div", {
+    className: "navegador-semana"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-seta",
+    onClick: () => setSemanaOffset(s => s - 1)
+  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+    className: "rotulo-semana"
+  }, formatarPeriodoSemana(inicioSemana), semanaOffset !== 0 && /*#__PURE__*/React.createElement("button", {
+    className: "botao-hoje",
+    onClick: () => setSemanaOffset(0)
+  }, "Hoje")), /*#__PURE__*/React.createElement("button", {
+    className: "botao-seta",
+    onClick: () => setSemanaOffset(s => s + 1)
+  }, "\u203A")), erro && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
-  }, erro), !carregando && eventos.length === 0 && /*#__PURE__*/React.createElement("p", {
-    className: "texto-vazio"
-  }, "Nenhuma sess\xE3o nos pr\xF3ximos 30 dias."), eventos.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, erro), carregando && /*#__PURE__*/React.createElement("p", null, "Carregando..."), !carregando && /*#__PURE__*/React.createElement("div", {
     className: "grupos-agenda"
-  }, agruparPorDia(eventos).map(grupo => /*#__PURE__*/React.createElement("div", {
-    key: grupo.chave,
+  }, dias.map(dia => /*#__PURE__*/React.createElement("div", {
+    key: dia.chave,
     className: "cartao-dia"
   }, /*#__PURE__*/React.createElement("div", {
     className: "cabecalho-dia"
-  }, grupo.rotulo), /*#__PURE__*/React.createElement("ul", {
+  }, dia.rotulo), dia.eventos.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio-dia"
+  }, "Sem sess\xF5es") : /*#__PURE__*/React.createElement("ul", {
     className: "lista-eventos"
-  }, grupo.eventos.map(ev => /*#__PURE__*/React.createElement("li", {
+  }, dia.eventos.map(ev => /*#__PURE__*/React.createElement("li", {
     key: ev.id,
     className: "item-evento"
   }, /*#__PURE__*/React.createElement("div", {
@@ -150,25 +171,58 @@ function formatarRotuloDia(isoString) {
   }
 }
 
-// Agrupa a lista (já vem ordenada por data da própria function) em
-// blocos por dia, cada um com um rótulo amigável (Hoje/Amanhã/data).
-function agruparPorDia(eventos) {
-  const grupos = [];
+// Segunda-feira da semana atual, ajustada por semanaOffset (semanas
+// inteiras pra frente/trás). Sempre à meia-noite local.
+function obterInicioSemana(semanaOffset) {
+  const hoje = new Date();
+  const diaSemana = hoje.getDay(); // 0=domingo
+  const deslocamentoAteSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  inicio.setDate(inicio.getDate() + deslocamentoAteSegunda + semanaOffset * 7);
+  return inicio;
+}
+
+// Monta os 7 dias (segunda a domingo) da semana selecionada, cada um
+// já com seus eventos daquele dia (pode ser lista vazia).
+function montarSemana(eventos, semanaOffset) {
+  const inicioSemana = obterInicioSemana(semanaOffset);
   const porChave = {};
   for (const ev of eventos) {
-    const chave = (ev.inicio || "").slice(0, 10); // YYYY-MM-DD
-    if (!porChave[chave]) {
-      const grupo = {
-        chave,
-        rotulo: formatarRotuloDia(ev.inicio),
-        eventos: []
-      };
-      porChave[chave] = grupo;
-      grupos.push(grupo);
-    }
-    porChave[chave].eventos.push(ev);
+    const chave = (ev.inicio || "").slice(0, 10);
+    (porChave[chave] = porChave[chave] || []).push(ev);
   }
-  return grupos;
+  const dias = [];
+  for (let i = 0; i < 7; i++) {
+    const data = new Date(inicioSemana);
+    data.setDate(data.getDate() + i);
+    const chave = data.toISOString().slice(0, 10);
+    dias.push({
+      chave,
+      rotulo: formatarRotuloDia(data),
+      eventos: porChave[chave] || []
+    });
+  }
+  return {
+    inicioSemana,
+    dias
+  };
+}
+function formatarPeriodoSemana(inicioSemana) {
+  const fim = new Date(inicioSemana);
+  fim.setDate(fim.getDate() + 6);
+  const mesmomes = inicioSemana.getMonth() === fim.getMonth();
+  const opcoesInicio = mesmomes ? {
+    day: "2-digit"
+  } : {
+    day: "2-digit",
+    month: "short"
+  };
+  const inicioTxt = inicioSemana.toLocaleDateString("pt-BR", opcoesInicio);
+  const fimTxt = fim.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short"
+  });
+  return `${inicioTxt} – ${fimTxt}`;
 }
 function FormNovaSessao({
   aoFechar,

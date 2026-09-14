@@ -1,8 +1,6 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --primaria: #4338CA;
-  --primaria-escura: #3730A3;
   --fundo: #F8F9FC;
   --texto: #1F2937;
   --texto-suave: #6B7280;
@@ -175,7 +173,7 @@ button {
 
 .marca-barra-lateral {
   font-weight: 700;
-  color: var(--primaria);
+  color: var(--cor-marca);
   font-size: 18px;
   padding: 0 20px 20px;
 }
@@ -189,7 +187,7 @@ button {
   text-decoration: none;
   font-size: 14px;
 }
-.item-menu-ativo { background: var(--fundo); color: var(--primaria); font-weight: 600; border-right: 3px solid var(--primaria); }
+.item-menu-ativo { background: var(--fundo); color: var(--cor-marca); font-weight: 600; border-right: 3px solid var(--cor-marca); }
 
 .rodape-barra-lateral { padding: 16px 20px; border-top: 1px solid var(--borda); }
 .email-usuario { font-size: 12px; color: var(--texto-suave); margin-bottom: 8px; word-break: break-all; }
@@ -209,8 +207,8 @@ button {
 }
 .cabecalho-secao h2 { font-size: 22px; }
 
-.botao-primario { background: var(--primaria); color: white; }
-.botao-primario:hover { background: var(--primaria-escura); }
+.botao-primario { background: var(--cor-marca); color: white; }
+.botao-primario:hover { background: var(--cor-marca-escura); }
 .botao-primario:disabled { opacity: 0.6; cursor: default; }
 
 .botao-secundario { background: var(--fundo); color: var(--texto); border: 1px solid var(--borda) !important; }
@@ -226,12 +224,15 @@ button {
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-top: 3px solid var(--cor-marca);
 }
 .tabela-pacientes th {
   text-align: left;
   font-size: 12px;
   text-transform: uppercase;
-  color: var(--texto-suave);
+  letter-spacing: 0.03em;
+  color: var(--cor-marca);
+  background: var(--fundo);
   padding: 12px 16px;
   border-bottom: 1px solid var(--borda);
 }
@@ -286,6 +287,43 @@ button {
 }
 .cartao-conectar h2 { margin-bottom: 12px; }
 .cartao-conectar p { color: var(--texto-suave); font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+
+.navegador-semana {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.botao-seta {
+  background: var(--branco);
+  border: 1px solid var(--borda) !important;
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  font-size: 16px;
+  color: var(--cor-marca);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.botao-seta:hover { background: var(--fundo); }
+.rotulo-semana {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  min-width: 140px;
+}
+.botao-hoje {
+  background: var(--fundo);
+  color: var(--cor-marca);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.botao-hoje:hover { background: var(--borda); }
+
+.texto-vazio-dia { padding: 12px 18px; font-size: 13px; color: var(--texto-suave); }
 
 .grupos-agenda { display: flex; flex-direction: column; gap: 20px; max-width: 720px; }
 
