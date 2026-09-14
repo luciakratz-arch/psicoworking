@@ -123,7 +123,7 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
           <span>{configClinica.nome}</span>
         </div>
       ) : (
-        <div className="logo-plataforma marca-barra-lateral">PsiCoWorking</div>
+        <div className="logo-plataforma-negativa marca-barra-lateral">PsiCoWorking</div>
       )}
       <nav>
         {itens.map((item) => (
@@ -139,7 +139,11 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
         ))}
       </nav>
       <div className="rodape-barra-lateral">
-        <div className="avatar-usuario">{usuario.email.charAt(0).toUpperCase()}</div>
+        {configClinica?.fotoUrl ? (
+          <img src={configClinica.fotoUrl} alt="Sua foto" className="avatar-usuario avatar-usuario-foto" />
+        ) : (
+          <div className="avatar-usuario">{usuario.email.charAt(0).toUpperCase()}</div>
+        )}
         <div className="rodape-info">
           <p className="email-usuario">{usuario.email}</p>
           <button className="botao-sair" onClick={logout}>
@@ -148,7 +152,7 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
         </div>
       </div>
       <div className="selo-rodape">
-        <div className="logo-plataforma">PsiCoWorking</div>
+        <div className="logo-plataforma-negativa">PsiCoWorking</div>
       </div>
     </aside>
   );

@@ -172,83 +172,104 @@ button {
 .layout-admin { display: flex; min-height: 100vh; background: var(--fundo); }
 
 .barra-lateral {
-  width: 248px;
-  background: var(--branco);
-  border-right: 1px solid var(--borda);
+  width: 260px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(255,255,255,0.10), transparent 45%),
+    linear-gradient(165deg, var(--cor-marca-clara) 0%, var(--cor-marca) 45%, var(--cor-marca-escura) 100%);
+  color: rgba(255,255,255,0.92);
   display: flex;
   flex-direction: column;
-  padding: 24px 0 0;
+  padding: 26px 0 0;
   flex-shrink: 0;
+  box-shadow: 2px 0 24px rgba(0,0,0,0.08);
 }
 
 .marca-barra-lateral {
   padding: 0 24px 24px;
 }
 
+/* Versão negativa (branca) da marca — usada sobre fundo colorido,
+   conforme o Manual de Identidade Visual PsiCoWorking. */
+.logo-plataforma-negativa {
+  display: inline-block;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: rgba(255,255,255,0.95);
+}
+
 /* Selo fixo "PsiCoWorking" no rodapé do menu — sempre visível, mesmo
    quando a marca da clínica ocupa o topo (pedido da usuária). */
 .selo-rodape {
-  padding: 12px 24px 16px;
-  border-top: 1px solid var(--borda);
+  padding: 14px 24px 18px;
+  border-top: 1px solid rgba(255,255,255,0.16);
 }
-.selo-rodape .logo-plataforma { font-size: 14px; }
+.selo-rodape .logo-plataforma-negativa { font-size: 13px; opacity: 0.75; }
 
 .marca-barra-lateral-clinica {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 0 24px 24px;
-  border-bottom: 1px solid var(--borda);
-  margin-bottom: 12px;
+  gap: 12px;
+  padding: 0 24px 22px;
+  border-bottom: 1px solid rgba(255,255,255,0.18);
+  margin-bottom: 14px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 15.5px;
+  color: white;
 }
 
 .avatar-marca, .avatar-usuario {
-  width: 38px; height: 38px;
-  border-radius: 10px;
-  background: var(--cor-marca);
-  color: white;
+  width: 40px; height: 40px;
+  border-radius: 11px;
+  background: rgba(255,255,255,0.92);
+  color: var(--cor-marca-escura);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16px;
   flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
-.avatar-usuario { border-radius: 50%; width: 34px; height: 34px; font-size: 13px; }
+.avatar-usuario { border-radius: 50%; width: 36px; height: 36px; font-size: 14px; }
+.avatar-usuario-foto { object-fit: cover; }
 
-.barra-lateral nav { flex: 1; padding: 4px 12px; display: flex; flex-direction: column; gap: 2px; }
+.barra-lateral nav { flex: 1; padding: 4px 14px; display: flex; flex-direction: column; gap: 3px; }
 
 .item-menu {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  color: var(--texto-suave);
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  color: rgba(255,255,255,0.72);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
-  transition: background .12s;
+  transition: background .12s, color .12s;
 }
-.item-menu:hover { background: var(--fundo); }
-.item-menu-ativo, .item-menu-ativo:hover { background: var(--cor-marca); color: white; }
-.item-menu-ativo .icone-lucide { color: white; }
+.item-menu:hover { background: rgba(255,255,255,0.10); color: white; }
+.item-menu-ativo, .item-menu-ativo:hover {
+  background: rgba(255,255,255,0.95);
+  color: var(--cor-marca-escura);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
 
 .icone-lucide { flex-shrink: 0; }
-.item-menu .icone-lucide { color: var(--texto-suave); }
-.item-menu-ativo .icone-lucide { color: white; }
+.item-menu .icone-lucide { color: rgba(255,255,255,0.72); }
+.item-menu-ativo .icone-lucide { color: var(--cor-marca-escura); }
 
 .rodape-barra-lateral {
-  padding: 16px 20px;
+  padding: 18px 22px;
   margin-top: 12px;
-  border-top: 1px solid var(--borda);
+  border-top: 1px solid rgba(255,255,255,0.16);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
 }
 .rodape-info { min-width: 0; flex: 1; }
-.email-usuario { font-size: 12px; color: var(--texto-suave); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.botao-sair { display: flex; align-items: center; gap: 5px; background: none; color: var(--erro); padding: 0; font-size: 12px; font-weight: 600; }
+.email-usuario { font-size: 12px; color: rgba(255,255,255,0.8); margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.botao-sair { display: flex; align-items: center; gap: 5px; background: none; color: #FFD1D1; padding: 0; font-size: 12px; font-weight: 600; }
+.botao-sair:hover { color: white; }
 
 .area-principal { flex: 1; padding: 36px 40px; min-width: 0; }
 
@@ -440,6 +461,7 @@ button {
 .valor-cor { font-size: 13px; color: var(--texto-suave); font-family: monospace; }
 
 .preview-logo { max-width: 140px; max-height: 80px; border-radius: 8px; margin-bottom: 10px; display: block; }
+.preview-foto { width: 72px; height: 72px; object-fit: cover; border-radius: 50%; margin-bottom: 10px; display: block; }
 .dica-campo { font-size: 12px; color: var(--texto-suave); margin-top: 6px; }
 .mensagem-sucesso { color: var(--sucesso); font-size: 13px; margin-top: 10px; }
 

@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-//  app_config.js — Configurações (nome, logo, cor primária)
+//  app_config.js — Configurações (nome, foto, logo, cor primária)
 //
 //  Guarda em psi_config/{psi_id} (já protegido pelo firestore.rules:
 //  leitura pública, escrita só da equipe daquela clínica).
-//  A logo vai para Storage em logos/{psi_id}/... (storage.rules).
+//  Foto e logo vão pro Storage em logos/{psi_id}/... (storage.rules).
 // ═══════════════════════════════════════════════════════════════
 
 const storage = firebase.storage();
@@ -12,7 +12,9 @@ function TelaConfiguracoes({ usuario }) {
   const [nome, setNome] = useState("");
   const [corPrimaria, setCorPrimaria] = useState("#6A2BD9");
   const [logoUrl, setLogoUrl] = useState("");
+  const [fotoUrl, setFotoUrl] = useState("");
   const [arquivoLogo, setArquivoLogo] = useState(null);
+  const [arquivoFoto, setArquivoFoto] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState("");
@@ -28,11 +30,19 @@ function TelaConfiguracoes({ usuario }) {
           setNome(dados.nome || "");
           setCorPrimaria(dados.corPrimaria || "#6A2BD9");
           setLogoUrl(dados.logoUrl || "");
+          setFotoUrl(dados.fotoUrl || "");
         }
         setCarregando(false);
       })
       .catch(() => setCarregando(false));
   }, [usuario.psiId]);
+
+  async function enviarArquivo(arquivo, nomeArquivo) {
+    const extensao = arquivo.name.split(".").pop();
+    const referencia = storage.ref(`logos/${usuario.psiId}/${nomeArquivo}.${extensao}`);
+    await referencia.put(arquivo);
+    return referencia.getDownloadURL();
+  }
 
   async function aoSalvar(evento) {
     evento.preventDefault();
@@ -40,21 +50,24 @@ function TelaConfiguracoes({ usuario }) {
     setMensagem("");
     setSalvando(true);
     try {
-      let urlFinal = logoUrl;
+      let urlLogoFinal = logoUrl;
+      let urlFotoFinal = fotoUrl;
 
       if (arquivoLogo) {
-        const extensao = arquivoLogo.name.split(".").pop();
-        const referencia = storage.ref(`logos/${usuario.psiId}/logo.${extensao}`);
-        await referencia.put(arquivoLogo);
-        urlFinal = await referencia.getDownloadURL();
-        setLogoUrl(urlFinal);
+        urlLogoFinal = await enviarArquivo(arquivoLogo, "logo");
+        setLogoUrl(urlLogoFinal);
+      }
+      if (arquivoFoto) {
+        urlFotoFinal = await enviarArquivo(arquivoFoto, "foto");
+        setFotoUrl(urlFotoFinal);
       }
 
       await db.collection("psi_config").doc(usuario.psiId).set(
         {
           nome,
           corPrimaria,
-          logoUrl: urlFinal,
+          logoUrl: urlLogoFinal,
+          fotoUrl: urlFotoFinal,
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -96,7 +109,16 @@ function TelaConfiguracoes({ usuario }) {
           <span className="valor-cor">{corPrimaria}</span>
         </div>
 
-        <label>Logo</label>
+        <label>Sua foto (aparece no seu perfil, no rodapé do menu)</label>
+        {fotoUrl && <img src={fotoUrl} alt="Foto atual" className="preview-foto" />}
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setArquivoFoto(e.target.files[0] || null)}
+        />
+        <p className="dica-campo">PNG ou JPG, até 3MB. Fica melhor uma foto quadrada.</p>
+
+        <label>Logo da clínica (aparece no topo do menu)</label>
         {logoUrl && <img src={logoUrl} alt="Logo atual" className="preview-logo" />}
         <input
           type="file"

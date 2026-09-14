@@ -119,7 +119,7 @@ function Sidebar({
   }) : /*#__PURE__*/React.createElement("div", {
     className: "avatar-marca"
   }, inicial), /*#__PURE__*/React.createElement("span", null, configClinica.nome)) : /*#__PURE__*/React.createElement("div", {
-    className: "logo-plataforma marca-barra-lateral"
+    className: "logo-plataforma-negativa marca-barra-lateral"
   }, "PsiCoWorking"), /*#__PURE__*/React.createElement("nav", null, itens.map(item => /*#__PURE__*/React.createElement("a", {
     key: item.id,
     className: "item-menu" + (telaAtiva === item.id ? " item-menu-ativo" : ""),
@@ -133,7 +133,11 @@ function Sidebar({
     tamanho: 17
   }), item.rotulo))), /*#__PURE__*/React.createElement("div", {
     className: "rodape-barra-lateral"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, configClinica?.fotoUrl ? /*#__PURE__*/React.createElement("img", {
+    src: configClinica.fotoUrl,
+    alt: "Sua foto",
+    className: "avatar-usuario avatar-usuario-foto"
+  }) : /*#__PURE__*/React.createElement("div", {
     className: "avatar-usuario"
   }, usuario.email.charAt(0).toUpperCase()), /*#__PURE__*/React.createElement("div", {
     className: "rodape-info"
@@ -148,7 +152,7 @@ function Sidebar({
   }), " Sair"))), /*#__PURE__*/React.createElement("div", {
     className: "selo-rodape"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "logo-plataforma"
+    className: "logo-plataforma-negativa"
   }, "PsiCoWorking")));
 }
 
