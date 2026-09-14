@@ -367,8 +367,9 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
 
       {aba === "perfil" && <AbaPerfilPaciente paciente={paciente} />}
       {aba === "modulos" && <AbaModulosPaciente paciente={paciente} />}
+      {aba === "questionarios" && <AbaQuestionariosPaciente usuario={usuario} paciente={paciente} />}
 
-      {aba !== "perfil" && aba !== "modulos" && (
+      {aba !== "perfil" && aba !== "modulos" && aba !== "questionarios" && (
         <div className="cartao-secao">
           <p className="texto-vazio">
             Essa aba ({ABAS_PACIENTE.find((a) => a.id === aba)?.rotulo}) ainda não foi construída — é uma das próximas etapas.
@@ -596,6 +597,162 @@ function AbaModulosPaciente({ paciente }) {
 
       {visualizando && (
         <VisualizarRecursoModal item={visualizando} aoFechar={() => setVisualizando(null)} />
+      )}
+    </div>
+  );
+}
+
+// ─── Questionários ───────────────────────────────────────────────
+// Diferente de Módulos (biblioteca compartilhada que a psicóloga
+// ativa/desativa por paciente), Questionários são instrumentos
+// clínicos individuais desse paciente específico (Anamnese, Entrevista
+// Clínica Inicial, Rastreamentos DSM-5 etc.) — no sistema real, cada
+// um é preenchido pelo próprio paciente num formulário público e
+// aparece aqui, só leitura, pra psicóloga consultar (ver
+// admin/questionarios.js: AbaQuestionarios, AbaAnamnese...).
+//
+// Como o Portal do Paciente do PsiCoWorking ainda não existe (é uma
+// etapa futura, maior, separada), esses formulários de autopreenchimento
+// também ainda não existem — por isso essas telas aparecem vazias por
+// enquanto, mesmo já prontas pra mostrar o resultado assim que a
+// coleta existir. Começamos pela Anamnese, que é a mais simples
+// (só leitura, sem pontuação); as outras (Entrevista Clínica,
+// Rastreamento Bipolar/Borderline, Sexual, Alimentar, Neuro,
+// Dependência, Jogos) ficam como "em construção" por enquanto.
+
+const QUESTIONARIOS_DISPONIVEIS = [
+  { id: "anamnese", rotulo: "Anamnese", icone: "clipboard-list", desc: "Marcos do desenvolvimento, histórico clínico e familiar.", pronto: true },
+  { id: "entrevista", rotulo: "Entrevista Clínica Inicial", icone: "brain", desc: "Perfil etário, escalas de observação e hipóteses diagnósticas DSM-5.", pronto: false },
+  { id: "rastreamento", rotulo: "Rastreamento Bipolar / Borderline", icone: "bar-chart-2", desc: "Avaliação diferencial DSM-5, com laudo comparativo.", pronto: false },
+  { id: "sexual", rotulo: "Rastreamento de Saúde Sexual", icone: "heart", desc: "Rastreamento confidencial, respondido só pelo paciente.", pronto: false },
+  { id: "alimentar", rotulo: "Hábitos Alimentares", icone: "utensils", desc: "Rastreamento de padrões e comportamentos alimentares.", pronto: false },
+  { id: "neuro", rotulo: "Funcionamento e Comportamento", icone: "activity", desc: "Rastreamento de atenção, agitação e interação social.", pronto: false },
+  { id: "dependencia", rotulo: "Dependência Química e Substâncias", icone: "triangle-alert", desc: "Rastreamento DSM-5 para Transtornos por Uso de Substâncias.", pronto: false },
+  { id: "jogos", rotulo: "Jogos e Apostas", icone: "dice-5", desc: "Rastreamento de Gaming e Gambling Disorder (DSM-5 / CID-11).", pronto: false },
+];
+
+function AbaQuestionariosPaciente({ usuario, paciente }) {
+  const [aberto, setAberto] = useState(null);
+
+  if (aberto === "anamnese") {
+    return <AbaAnamneseView usuario={usuario} paciente={paciente} aoVoltar={() => setAberto(null)} />;
+  }
+
+  return (
+    <div>
+      <p className="subtitulo-pagina" style={{ marginBottom: 16 }}>Selecione um questionário para visualizar.</p>
+      <div className="grade-cartoes-recursos">
+        {QUESTIONARIOS_DISPONIVEIS.map((q) => (
+          <div
+            key={q.id}
+            className="cartao-recurso"
+            style={{ cursor: q.pronto ? "pointer" : "default", opacity: q.pronto ? 1 : 0.6 }}
+            onClick={() => q.pronto && setAberto(q.id)}
+          >
+            <div className="cabecalho-cartao-recurso">
+              <div className="icone-cartao-recurso" style={{ "--cor-cat": "var(--cor-marca)" }}>
+                <Icone nome={q.icone} tamanho={20} />
+              </div>
+              <div className="titulo-cartao-recurso">{q.rotulo}</div>
+            </div>
+            <p className="descricao-cartao-recurso">{q.desc}</p>
+            {!q.pronto && <span className="texto-vazio" style={{ fontSize: 11.5 }}>Em construção</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AbaAnamneseView({ usuario, paciente, aoVoltar }) {
+  const [anamnese, setAnamnese] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    db.collection("clinica_anamneses")
+      .where("psi_id", "==", usuario.psiId)
+      .where("pacienteId", "==", paciente.id)
+      .limit(1)
+      .get()
+      .then((snap) => {
+        if (!snap.empty) setAnamnese({ id: snap.docs[0].id, ...snap.docs[0].data() });
+        setCarregando(false);
+      })
+      .catch(() => setCarregando(false));
+  }, [usuario.psiId, paciente.id]);
+
+  const LABELS = {
+    perfil: "Perfil", informanteTipo: "Quem respondeu", nomeRespondente: "Nome do respondente",
+    parentescoRespondente: "Parentesco", queixa: "Queixa Principal",
+    gestacaoPlanejada: "Gestação planejada", tipoParto: "Tipo de parto",
+    idadeGestacional: "Idade gestacional", choroNascer: "Chorou ao nascer",
+    sustCabeca: "Firmou a cabeça", sentou: "Sentou sozinho", engatinhou: "Engatinhou",
+    caminhou: "Caminhou", lateralidade: "Lateralidade", balbucio: "Balbucio",
+    primeirasParalavras: "Primeiras palavras", frasesSimples: "Frases simples",
+    clarezaFala: "Clareza da fala", contatoVisual: "Contato visual",
+    sorrisoSocial: "Sorriso social", padraOSono: "Padrão de sono",
+    padraoAlimentar: "Padrão alimentar", desfralDiurno: "Desfralde diurno",
+    desfralNoturno: "Desfralde noturno", idadeEscola: "Idade na escola",
+    adaptacaoEscola: "Adaptação escolar", repetencia: "Repetência",
+    facilidades: "Facilidades", dificuldades: "Dificuldades",
+    foco: "Atenção/Foco", organizacao: "Organização", memoria: "Memória",
+    convulsoes: "Convulsões/Desmaios", medicacoes: "Medicações",
+    historicoFamiliar: "Histórico familiar", obsFinais: "Observações finais",
+    escolaridade: "Escolaridade", profissao: "Profissão", comQuemMora: "Com quem mora",
+    contextoEncaminhamento: "Contexto do encaminhamento", inicioQueixa: "Início dos sintomas",
+    evolucaoQueixa: "Evolução", usoAlcoolDrogas: "Uso de álcool/drogas",
+    orientacao: "Orientação", atencao: "Atenção",
+    decisoes: "Tomada de decisões", avdBasicas: "Higiene/vestir",
+    avdFinanceiro: "Gestão financeira", avdSair: "Sair sozinho",
+    doencasCronicas: "Doenças crônicas", quedas: "Quedas frequentes",
+    marcha: "Alteração de marcha", tremores: "Tremores", confusaoNoturna: "Confusão noturna",
+  };
+  const IGNORAR = ["id", "psi_id", "pacienteId", "pacienteNome", "tipo", "criadoEm", "perfil", "informanteTipo", "nomeRespondente", "parentescoRespondente"];
+
+  return (
+    <div>
+      <button className="botao-secundario botao-voltar-perfil" onClick={aoVoltar} style={{ marginBottom: 16 }}>
+        <Icone nome="arrow-left" tamanho={15} /> Voltar para Questionários
+      </button>
+
+      {carregando && <p>Carregando...</p>}
+
+      {!carregando && !anamnese && (
+        <div className="cartao-secao">
+          <p className="texto-vazio">
+            Nenhuma anamnese encontrada para {paciente.nome}. Ela é preenchida pelo próprio paciente num
+            formulário público — o Portal do Paciente do PsiCoWorking ainda não tem essa etapa pronta, então
+            por enquanto não há como o paciente enviar essa resposta ainda.
+          </p>
+        </div>
+      )}
+
+      {!carregando && anamnese && (
+        <div className="cartao-secao">
+          <div className="cabecalho-secao-lanc" style={{ marginBottom: 16 }}>
+            <span className="etiqueta-categoria-recurso" style={{ "--cor-cat": "var(--cor-marca)", "--bg-cat": "var(--marca-plataforma-lavanda)" }}>
+              {anamnese.perfil === "infantil" ? "Infantil/Neurodesenvolvimento" : "Adulto/Idoso"}
+            </span>
+          </div>
+
+          {anamnese.queixa && (
+            <div className="aviso-preview-paciente" style={{ display: "block" }}>
+              <strong>Queixa Principal</strong>
+              <p style={{ margin: "4px 0 0" }}>{anamnese.queixa}</p>
+            </div>
+          )}
+
+          <div className="grade-2col" style={{ marginTop: 16 }}>
+            {Object.entries(anamnese)
+              .filter(([k, v]) => !IGNORAR.includes(k) && v && String(v).trim())
+              .map(([k, v]) => (
+                <div key={k} className="campo-largura-total">
+                  <label>{LABELS[k] || k}</label>
+                  <p className="texto-visualizar-recurso">{String(v)}</p>
+                </div>
+              ))}
+          </div>
+        </div>
       )}
     </div>
   );

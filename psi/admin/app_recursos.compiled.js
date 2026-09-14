@@ -157,6 +157,10 @@ function TelaRecursos({
     return () => cancelamentos.forEach(c => c());
   }, []);
   const filtrados = itens.filter(it => {
+    // "avaliacao" (Anamnese, Entrevista Clínica, Rastreamentos DSM-5...)
+    // não é ferramenta de biblioteca compartilhada — é questionário
+    // individual do paciente, mora na aba Questionários do perfil dele.
+    if (aba === "ferramentas" && it.categoria === "avaliacao") return false;
     const titulo = it.titulo || it.nome || "";
     return !busca || titulo.toLowerCase().includes(busca.toLowerCase());
   });

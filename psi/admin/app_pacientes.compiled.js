@@ -399,7 +399,10 @@ function PerfilPaciente({
     paciente: paciente
   }), aba === "modulos" && /*#__PURE__*/React.createElement(AbaModulosPaciente, {
     paciente: paciente
-  }), aba !== "perfil" && aba !== "modulos" && /*#__PURE__*/React.createElement("div", {
+  }), aba === "questionarios" && /*#__PURE__*/React.createElement(AbaQuestionariosPaciente, {
+    usuario: usuario,
+    paciente: paciente
+  }), aba !== "perfil" && aba !== "modulos" && aba !== "questionarios" && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
@@ -648,4 +651,240 @@ function AbaModulosPaciente({
     item: visualizando,
     aoFechar: () => setVisualizando(null)
   }));
+}
+
+// ─── Questionários ───────────────────────────────────────────────
+// Diferente de Módulos (biblioteca compartilhada que a psicóloga
+// ativa/desativa por paciente), Questionários são instrumentos
+// clínicos individuais desse paciente específico (Anamnese, Entrevista
+// Clínica Inicial, Rastreamentos DSM-5 etc.) — no sistema real, cada
+// um é preenchido pelo próprio paciente num formulário público e
+// aparece aqui, só leitura, pra psicóloga consultar (ver
+// admin/questionarios.js: AbaQuestionarios, AbaAnamnese...).
+//
+// Como o Portal do Paciente do PsiCoWorking ainda não existe (é uma
+// etapa futura, maior, separada), esses formulários de autopreenchimento
+// também ainda não existem — por isso essas telas aparecem vazias por
+// enquanto, mesmo já prontas pra mostrar o resultado assim que a
+// coleta existir. Começamos pela Anamnese, que é a mais simples
+// (só leitura, sem pontuação); as outras (Entrevista Clínica,
+// Rastreamento Bipolar/Borderline, Sexual, Alimentar, Neuro,
+// Dependência, Jogos) ficam como "em construção" por enquanto.
+
+const QUESTIONARIOS_DISPONIVEIS = [{
+  id: "anamnese",
+  rotulo: "Anamnese",
+  icone: "clipboard-list",
+  desc: "Marcos do desenvolvimento, histórico clínico e familiar.",
+  pronto: true
+}, {
+  id: "entrevista",
+  rotulo: "Entrevista Clínica Inicial",
+  icone: "brain",
+  desc: "Perfil etário, escalas de observação e hipóteses diagnósticas DSM-5.",
+  pronto: false
+}, {
+  id: "rastreamento",
+  rotulo: "Rastreamento Bipolar / Borderline",
+  icone: "bar-chart-2",
+  desc: "Avaliação diferencial DSM-5, com laudo comparativo.",
+  pronto: false
+}, {
+  id: "sexual",
+  rotulo: "Rastreamento de Saúde Sexual",
+  icone: "heart",
+  desc: "Rastreamento confidencial, respondido só pelo paciente.",
+  pronto: false
+}, {
+  id: "alimentar",
+  rotulo: "Hábitos Alimentares",
+  icone: "utensils",
+  desc: "Rastreamento de padrões e comportamentos alimentares.",
+  pronto: false
+}, {
+  id: "neuro",
+  rotulo: "Funcionamento e Comportamento",
+  icone: "activity",
+  desc: "Rastreamento de atenção, agitação e interação social.",
+  pronto: false
+}, {
+  id: "dependencia",
+  rotulo: "Dependência Química e Substâncias",
+  icone: "triangle-alert",
+  desc: "Rastreamento DSM-5 para Transtornos por Uso de Substâncias.",
+  pronto: false
+}, {
+  id: "jogos",
+  rotulo: "Jogos e Apostas",
+  icone: "dice-5",
+  desc: "Rastreamento de Gaming e Gambling Disorder (DSM-5 / CID-11).",
+  pronto: false
+}];
+function AbaQuestionariosPaciente({
+  usuario,
+  paciente
+}) {
+  const [aberto, setAberto] = useState(null);
+  if (aberto === "anamnese") {
+    return /*#__PURE__*/React.createElement(AbaAnamneseView, {
+      usuario: usuario,
+      paciente: paciente,
+      aoVoltar: () => setAberto(null)
+    });
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "subtitulo-pagina",
+    style: {
+      marginBottom: 16
+    }
+  }, "Selecione um question\xE1rio para visualizar."), /*#__PURE__*/React.createElement("div", {
+    className: "grade-cartoes-recursos"
+  }, QUESTIONARIOS_DISPONIVEIS.map(q => /*#__PURE__*/React.createElement("div", {
+    key: q.id,
+    className: "cartao-recurso",
+    style: {
+      cursor: q.pronto ? "pointer" : "default",
+      opacity: q.pronto ? 1 : 0.6
+    },
+    onClick: () => q.pronto && setAberto(q.id)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-cartao-recurso"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "icone-cartao-recurso",
+    style: {
+      "--cor-cat": "var(--cor-marca)"
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: q.icone,
+    tamanho: 20
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "titulo-cartao-recurso"
+  }, q.rotulo)), /*#__PURE__*/React.createElement("p", {
+    className: "descricao-cartao-recurso"
+  }, q.desc), !q.pronto && /*#__PURE__*/React.createElement("span", {
+    className: "texto-vazio",
+    style: {
+      fontSize: 11.5
+    }
+  }, "Em constru\xE7\xE3o")))));
+}
+function AbaAnamneseView({
+  usuario,
+  paciente,
+  aoVoltar
+}) {
+  const [anamnese, setAnamnese] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  useEffect(() => {
+    db.collection("clinica_anamneses").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).limit(1).get().then(snap => {
+      if (!snap.empty) setAnamnese({
+        id: snap.docs[0].id,
+        ...snap.docs[0].data()
+      });
+      setCarregando(false);
+    }).catch(() => setCarregando(false));
+  }, [usuario.psiId, paciente.id]);
+  const LABELS = {
+    perfil: "Perfil",
+    informanteTipo: "Quem respondeu",
+    nomeRespondente: "Nome do respondente",
+    parentescoRespondente: "Parentesco",
+    queixa: "Queixa Principal",
+    gestacaoPlanejada: "Gestação planejada",
+    tipoParto: "Tipo de parto",
+    idadeGestacional: "Idade gestacional",
+    choroNascer: "Chorou ao nascer",
+    sustCabeca: "Firmou a cabeça",
+    sentou: "Sentou sozinho",
+    engatinhou: "Engatinhou",
+    caminhou: "Caminhou",
+    lateralidade: "Lateralidade",
+    balbucio: "Balbucio",
+    primeirasParalavras: "Primeiras palavras",
+    frasesSimples: "Frases simples",
+    clarezaFala: "Clareza da fala",
+    contatoVisual: "Contato visual",
+    sorrisoSocial: "Sorriso social",
+    padraOSono: "Padrão de sono",
+    padraoAlimentar: "Padrão alimentar",
+    desfralDiurno: "Desfralde diurno",
+    desfralNoturno: "Desfralde noturno",
+    idadeEscola: "Idade na escola",
+    adaptacaoEscola: "Adaptação escolar",
+    repetencia: "Repetência",
+    facilidades: "Facilidades",
+    dificuldades: "Dificuldades",
+    foco: "Atenção/Foco",
+    organizacao: "Organização",
+    memoria: "Memória",
+    convulsoes: "Convulsões/Desmaios",
+    medicacoes: "Medicações",
+    historicoFamiliar: "Histórico familiar",
+    obsFinais: "Observações finais",
+    escolaridade: "Escolaridade",
+    profissao: "Profissão",
+    comQuemMora: "Com quem mora",
+    contextoEncaminhamento: "Contexto do encaminhamento",
+    inicioQueixa: "Início dos sintomas",
+    evolucaoQueixa: "Evolução",
+    usoAlcoolDrogas: "Uso de álcool/drogas",
+    orientacao: "Orientação",
+    atencao: "Atenção",
+    decisoes: "Tomada de decisões",
+    avdBasicas: "Higiene/vestir",
+    avdFinanceiro: "Gestão financeira",
+    avdSair: "Sair sozinho",
+    doencasCronicas: "Doenças crônicas",
+    quedas: "Quedas frequentes",
+    marcha: "Alteração de marcha",
+    tremores: "Tremores",
+    confusaoNoturna: "Confusão noturna"
+  };
+  const IGNORAR = ["id", "psi_id", "pacienteId", "pacienteNome", "tipo", "criadoEm", "perfil", "informanteTipo", "nomeRespondente", "parentescoRespondente"];
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario botao-voltar-perfil",
+    onClick: aoVoltar,
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 15
+  }), " Voltar para Question\xE1rios"), carregando && /*#__PURE__*/React.createElement("p", null, "Carregando..."), !carregando && !anamnese && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhuma anamnese encontrada para ", paciente.nome, ". Ela \xE9 preenchida pelo pr\xF3prio paciente num formul\xE1rio p\xFAblico \u2014 o Portal do Paciente do PsiCoWorking ainda n\xE3o tem essa etapa pronta, ent\xE3o por enquanto n\xE3o h\xE1 como o paciente enviar essa resposta ainda.")), !carregando && anamnese && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-secao-lanc",
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "etiqueta-categoria-recurso",
+    style: {
+      "--cor-cat": "var(--cor-marca)",
+      "--bg-cat": "var(--marca-plataforma-lavanda)"
+    }
+  }, anamnese.perfil === "infantil" ? "Infantil/Neurodesenvolvimento" : "Adulto/Idoso")), anamnese.queixa && /*#__PURE__*/React.createElement("div", {
+    className: "aviso-preview-paciente",
+    style: {
+      display: "block"
+    }
+  }, /*#__PURE__*/React.createElement("strong", null, "Queixa Principal"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0"
+    }
+  }, anamnese.queixa)), /*#__PURE__*/React.createElement("div", {
+    className: "grade-2col",
+    style: {
+      marginTop: 16
+    }
+  }, Object.entries(anamnese).filter(([k, v]) => !IGNORAR.includes(k) && v && String(v).trim()).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    className: "campo-largura-total"
+  }, /*#__PURE__*/React.createElement("label", null, LABELS[k] || k), /*#__PURE__*/React.createElement("p", {
+    className: "texto-visualizar-recurso"
+  }, String(v)))))));
 }

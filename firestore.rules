@@ -103,6 +103,13 @@ service cloud.firestore {
       allow read, update: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
     }
 
+    match /clinica_anamneses/{registroId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, create: if estaLogado() && carimboPapel() == 'paciente'
+                           && request.resource.data.psi_id == carimboClinica()
+                           && request.resource.data.pacienteId == request.auth.uid;
+    }
+
     match /clinica_tcc/{registroId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
