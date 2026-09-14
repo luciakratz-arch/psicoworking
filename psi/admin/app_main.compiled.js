@@ -15,7 +15,7 @@ function usarConexaoGoogleAgenda(usuario) {
     chamarConectarGoogleCalendar({
       codigoAutorizacao: codigo,
       redirectUri: window.location.origin + window.location.pathname
-    }).then(() => setStatus("ok")).catch(() => setStatus("erro"));
+    }).then(() => setStatus("ok")).catch(e => setStatus("erro: " + (e.message || JSON.stringify(e))));
   }, [usuario]);
   return status;
 }
@@ -77,9 +77,9 @@ function App() {
     configClinica: configClinica
   }), /*#__PURE__*/React.createElement("main", {
     className: "area-principal"
-  }, statusConexaoGoogle === "erro" && /*#__PURE__*/React.createElement("p", {
+  }, statusConexaoGoogle && statusConexaoGoogle.startsWith("erro") && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
-  }, "N\xE3o foi poss\xEDvel conectar o Google Agenda. Tente novamente."), telaAtiva === "pacientes" && /*#__PURE__*/React.createElement(TelaPacientes, {
+  }, "N\xE3o foi poss\xEDvel conectar o Google Agenda: ", statusConexaoGoogle), telaAtiva === "pacientes" && /*#__PURE__*/React.createElement(TelaPacientes, {
     usuario: usuario
   }), telaAtiva === "agenda" && /*#__PURE__*/React.createElement(TelaAgenda, {
     usuario: usuario

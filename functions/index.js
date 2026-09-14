@@ -173,30 +173,35 @@ exports.conectarGoogleCalendar = onCall(
       throw new HttpsError("invalid-argument", "Código de autorização do Google ausente.");
     }
 
-    const oauth2Client = new google.auth.OAuth2(
-      GOOGLE_CLIENT_ID.value(),
-      GOOGLE_CLIENT_SECRET.value(),
-      redirectUri
-    );
+    try {
+      const oauth2Client = new google.auth.OAuth2(
+        GOOGLE_CLIENT_ID.value(),
+        GOOGLE_CLIENT_SECRET.value(),
+        redirectUri
+      );
 
-    const { tokens } = await oauth2Client.getToken(codigoAutorizacao);
+      const { tokens } = await oauth2Client.getToken(codigoAutorizacao);
 
-    // Guardado numa coleção separada, sem regra de leitura para o
-    // client (ver firestore.rules: sem "match" para esta coleção
-    // = acesso negado por padrão). Só Cloud Functions acessam.
-    await db
-      .collection("clinica_google_tokens")
-      .doc(chamador.token.psi_id)
-      .set(tokens, { merge: true });
+      // Guardado numa coleção separada, sem regra de leitura para o
+      // client (ver firestore.rules: sem "match" para esta coleção
+      // = acesso negado por padrão). Só Cloud Functions acessam.
+      await db
+        .collection("clinica_google_tokens")
+        .doc(chamador.token.psi_id)
+        .set(tokens, { merge: true });
 
-    await db.collection("clinica_audit_log").add({
-      acao: "conectar_google_agenda",
-      psiId: chamador.token.psi_id,
-      executadoPor: chamador.uid,
-      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-    });
+      await db.collection("clinica_audit_log").add({
+        acao: "conectar_google_agenda",
+        psiId: chamador.token.psi_id,
+        executadoPor: chamador.uid,
+        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
 
-    return { ok: true };
+      return { ok: true };
+    } catch (e) {
+      console.error("Erro ao conectar Google Agenda:", e.response?.data || e.message || e);
+      throw new HttpsError("internal", "Falha ao trocar código pelo token: " + (e.message || "erro desconhecido"));
+    }
   }
 );
 

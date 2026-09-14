@@ -18,7 +18,7 @@ function usarConexaoGoogleAgenda(usuario) {
       redirectUri: window.location.origin + window.location.pathname,
     })
       .then(() => setStatus("ok"))
-      .catch(() => setStatus("erro"));
+      .catch((e) => setStatus("erro: " + (e.message || JSON.stringify(e))));
   }, [usuario]);
 
   return status;
@@ -88,9 +88,9 @@ function App() {
         configClinica={configClinica}
       />
       <main className="area-principal">
-        {statusConexaoGoogle === "erro" && (
+        {statusConexaoGoogle && statusConexaoGoogle.startsWith("erro") && (
           <p className="mensagem-erro">
-            Não foi possível conectar o Google Agenda. Tente novamente.
+            Não foi possível conectar o Google Agenda: {statusConexaoGoogle}
           </p>
         )}
         {telaAtiva === "pacientes" && <TelaPacientes usuario={usuario} />}
