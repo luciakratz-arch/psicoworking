@@ -106,6 +106,7 @@ function TelaFinanceiro({
   const [sessoesPacotes, setSessoesPacotes] = useState([]);
   const [mostrarPacote, setMostrarPacote] = useState(false);
   const [pacoteEditando, setPacoteEditando] = useState(null);
+  const [pacienteFoco, setPacienteFoco] = useState(null);
   useEffect(() => {
     const cancelar = db.collection("clinica_pacientes").where("psi_id", "==", usuario.psiId).onSnapshot(snap => setPacientes(snap.docs.map(d => ({
       id: d.id,
@@ -194,6 +195,19 @@ function TelaFinanceiro({
     if (!confirm("Excluir este lançamento?")) return;
     await db.collection("clinica_lancamentos").doc(id).delete();
   }
+  if (aba === "acompanhamento" && pacienteFoco) {
+    const pac = pacientes.find(p => p.id === pacienteFoco);
+    const pacotesPac = pacotes.filter(p => p.pacienteId === pacienteFoco);
+    const idsPacotesPac = pacotesPac.map(p => p.id);
+    const sessPac = sessoesPacotes.filter(s => s.pacienteId === pacienteFoco || idsPacotesPac.includes(s.pacoteId));
+    return /*#__PURE__*/React.createElement("div", {
+      className: "conteudo conteudo-larga"
+    }, /*#__PURE__*/React.createElement(ControleSessoes, {
+      paciente: pac,
+      sessoes: sessPac,
+      onVoltar: () => setPacienteFoco(null)
+    }));
+  }
   return /*#__PURE__*/React.createElement("div", {
     className: "conteudo conteudo-larga"
   }, /*#__PURE__*/React.createElement("div", {
@@ -202,7 +216,7 @@ function TelaFinanceiro({
     className: "subtitulo-pagina"
   }, "Lan\xE7amentos, pacotes e controle de sess\xF5es")), /*#__PURE__*/React.createElement("div", {
     className: "acoes-cabecalho"
-  }, aba === "pacotes" ? /*#__PURE__*/React.createElement("button", {
+  }, aba === "pacotes" && /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
     onClick: () => {
       setPacoteEditando(null);
@@ -211,7 +225,7 @@ function TelaFinanceiro({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "plus",
     tamanho: 16
-  }), " Novo Pacote") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+  }), " Novo Pacote"), aba === "lancamentos" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     className: "botao-perigo",
     onClick: () => {
       setLancEditando(null);
@@ -266,7 +280,7 @@ function TelaFinanceiro({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: a.icone,
     tamanho: 15
-  }), " ", a.rotulo))), aba !== "lancamentos" && aba !== "pacotes" && /*#__PURE__*/React.createElement("div", {
+  }), " ", a.rotulo))), aba !== "lancamentos" && aba !== "pacotes" && aba !== "acompanhamento" && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
@@ -278,6 +292,11 @@ function TelaFinanceiro({
       setPacoteEditando(p);
       setMostrarPacote(true);
     }
+  }), aba === "acompanhamento" && /*#__PURE__*/React.createElement(AcompanhamentoGeral, {
+    pacientes: pacientes,
+    pacotes: pacotes,
+    sessoes: sessoesPacotes,
+    aoAbrirPaciente: setPacienteFoco
   }), aba === "lancamentos" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "faixa-meses"
   }, mesesDoAno.map(m => /*#__PURE__*/React.createElement("button", {
@@ -1110,4 +1129,248 @@ function PacoteForm({
     className: "botao-primario",
     disabled: salvando
   }, salvando ? "Salvando..." : pacote ? "Salvar Alterações" : "Criar Pacote")))));
+}
+
+// ─── Acompanhamento Geral ───────────────────────────────────────
+// Lista de pacientes ativos com pacote, e o Controle de Sessões e
+// Frequência de cada um (portado do RelatorioFrequencia do sistema
+// real — sem a remarcação de data e sem a exclusão em lote, que
+// ficam para uma próxima etapa).
+
+function AcompanhamentoGeral({
+  pacientes,
+  pacotes,
+  sessoes,
+  aoAbrirPaciente
+}) {
+  const ativos = pacientes.filter(p => p.status === "ativo").filter(p => pacotes.some(pac => pac.pacienteId === p.id)).sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+  if (ativos.length === 0) {
+    return /*#__PURE__*/React.createElement("p", {
+      className: "texto-vazio"
+    }, "Nenhum paciente ativo com pacote cadastrado ainda.");
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "cartao-lista-pacientes"
+  }, ativos.map(pac => {
+    const sessPac = sessoes.filter(s => s.pacienteId === pac.id);
+    const pacotesPac = pacotes.filter(p => p.pacienteId === pac.id);
+    const total = sessPac.length;
+    const realizadas = sessPac.filter(s => s.status === "realizado" || s.status === "falta").length;
+    const recebido = sessPac.filter(s => s.pagamento === "pago").reduce((a, s) => a + (parseFloat(s.valorPago) || parseFloat(s.valorSessao) || 0), 0);
+    const aReceber = sessPac.filter(s => s.pagamento !== "pago").reduce((a, s) => a + (parseFloat(s.valorSessao) || 0), 0);
+    const pendentes = sessPac.filter(s => s.pagamento !== "pago").length;
+    return /*#__PURE__*/React.createElement("div", {
+      key: pac.id,
+      className: "linha-acompanhamento",
+      onClick: () => aoAbrirPaciente(pac.id)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "avatar-paciente"
+    }, (pac.nome || "?")[0].toUpperCase()), /*#__PURE__*/React.createElement("div", {
+      className: "info-lancamento"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "descricao-lancamento"
+    }, pac.nome), /*#__PURE__*/React.createElement("div", {
+      className: "detalhe-lancamento"
+    }, pacotesPac[0]?.recorrencia || "—", " \xB7 ", pacotesPac[0]?.horario || "—")), /*#__PURE__*/React.createElement("div", {
+      className: "metricas-acompanhamento"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "metrica"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "metrica-valor"
+    }, realizadas, "/", total), /*#__PURE__*/React.createElement("span", {
+      className: "metrica-rotulo"
+    }, "Sess\xF5es")), /*#__PURE__*/React.createElement("div", {
+      className: "metrica"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "metrica-valor metrica-receita"
+    }, fmtMoeda(recebido)), /*#__PURE__*/React.createElement("span", {
+      className: "metrica-rotulo"
+    }, "Recebido")), aReceber > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "metrica"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "metrica-valor metrica-pendente"
+    }, fmtMoeda(aReceber)), /*#__PURE__*/React.createElement("span", {
+      className: "metrica-rotulo"
+    }, "A Receber"))), /*#__PURE__*/React.createElement("span", {
+      className: "etiqueta-status-lanc " + (pendentes > 0 ? "etiqueta-pendente" : "etiqueta-recebido")
+    }, pendentes > 0 ? pendentes + " pendente(s)" : "✓ Em dia"), /*#__PURE__*/React.createElement(Icone, {
+      nome: "chevron-right",
+      tamanho: 16
+    }));
+  }));
+}
+const STATUS_SESSAO = {
+  agendado: {
+    rotulo: "Agendado",
+    cor: "var(--cor-marca)"
+  },
+  confirmado: {
+    rotulo: "Confirmado",
+    cor: "var(--sucesso)"
+  },
+  realizado: {
+    rotulo: "✓ Realizado",
+    cor: "var(--sucesso)"
+  },
+  falta: {
+    rotulo: "Falta",
+    cor: "#d97706"
+  },
+  cancelado: {
+    rotulo: "Cancelado",
+    cor: "var(--erro)"
+  }
+};
+function ControleSessoes({
+  paciente,
+  sessoes,
+  onVoltar
+}) {
+  const sessOrdenadas = [...sessoes].sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const porMes = {};
+  sessOrdenadas.forEach(s => {
+    const mes = s.data?.slice(0, 7) || "sem-data";
+    if (!porMes[mes]) porMes[mes] = [];
+    porMes[mes].push(s);
+  });
+  const meses = Object.keys(porMes).sort();
+  const totalValor = sessOrdenadas.reduce((a, s) => a + (parseFloat(s.valorSessao) || 0), 0);
+  const totalPago = sessOrdenadas.reduce((a, s) => a + (s.pagamento === "pago" ? parseFloat(s.valorPago) || parseFloat(s.valorSessao) || 0 : 0), 0);
+  async function atualizarStatus(s, status) {
+    await db.collection("clinica_sessoes").doc(s.id).update({
+      status
+    });
+  }
+  async function atualizarPagamento(s, pago) {
+    await db.collection("clinica_sessoes").doc(s.id).update({
+      pagamento: pago ? "pago" : "pendente",
+      formaPagamento: pago ? s.formaPagamento || "PIX" : "",
+      valorPago: pago ? parseFloat(s.valorSessao) || 0 : 0,
+      dataPagamento: pago ? new Date().toISOString().slice(0, 10) : ""
+    });
+  }
+  async function excluirSessao(s) {
+    if (!confirm("Excluir esta sessão?")) return;
+    await db.collection("clinica_sessoes").doc(s.id).delete();
+  }
+  function imprimir() {
+    const fmtD = d => d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit"
+    }) : "—";
+    const fmtM = m => {
+      const [y, mo] = m.split("-");
+      return new Date(y, mo - 1, 1).toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric"
+      });
+    };
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Resumo de Sessões — ${paciente?.nome || ""}</title>
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;padding:32px;max-width:680px;margin:0 auto}
+  .header{border-bottom:3px solid #7B00C4;margin-bottom:24px;padding-bottom:12px}
+  .mes-title{font-size:14px;font-weight:700;color:#7B00C4;margin:20px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#7B00C4;color:white;padding:7px 10px;text-align:left}
+  td{padding:7px 10px;border-bottom:1px solid #f3f4f6}
+  .totais{margin-top:24px;background:#f9fafb;border-radius:10px;padding:14px 20px;display:flex;justify-content:space-between}
+  @media print{@page{margin:1.5cm}}
+</style></head><body>
+<div class="header"><h2>${paciente?.nome || ""}</h2><div style="color:#6b7280;font-size:12px">Controle de Sessões e Frequência — gerado em ${new Date().toLocaleDateString("pt-BR")}</div></div>
+${meses.map(mes => `
+<div class="mes-title">${fmtM(mes)}</div>
+<table><thead><tr><th>Data</th><th>Horário</th><th>Status</th><th>Pagamento</th><th>Valor</th></tr></thead>
+<tbody>${porMes[mes].map(s => `<tr><td>${fmtD(s.data)}</td><td>${s.hora || "—"}</td><td>${STATUS_SESSAO[s.status]?.rotulo || s.status || "—"}</td><td>${s.pagamento === "pago" ? "Pago" : "Pendente"}</td><td>R$ ${(parseFloat(s.valorSessao) || 0).toFixed(2).replace(".", ",")}</td></tr>`).join("")}</tbody></table>`).join("")}
+<div class="totais"><div><strong>Total:</strong> R$ ${totalValor.toFixed(2).replace(".", ",")}</div><div><strong>Recebido:</strong> R$ ${totalPago.toFixed(2).replace(".", ",")}</div></div>
+</body></html>`;
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 500);
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "barra-controle-sessoes"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-voltar-sessoes",
+    onClick: onVoltar
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 15
+  }), " Voltar"), /*#__PURE__*/React.createElement("div", {
+    className: "titulo-controle-sessoes"
+  }, /*#__PURE__*/React.createElement("strong", null, paciente?.nome), /*#__PURE__*/React.createElement("span", null, "Controle de Sess\xF5es e Frequ\xEAncia")), /*#__PURE__*/React.createElement("button", {
+    className: "botao-imprimir-sessoes",
+    onClick: imprimir
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "printer",
+    tamanho: 15
+  }), " Imprimir / PDF")), /*#__PURE__*/React.createElement("div", {
+    className: "grade-resumo-mes"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cartao-resumo receita"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "rotulo-resumo"
+  }, "Total do(s) pacote(s)"), /*#__PURE__*/React.createElement("span", {
+    className: "valor-resumo"
+  }, fmtMoeda(totalValor))), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-resumo saldo"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "rotulo-resumo"
+  }, "Recebido"), /*#__PURE__*/React.createElement("span", {
+    className: "valor-resumo"
+  }, fmtMoeda(totalPago))), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-resumo despesa"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "rotulo-resumo"
+  }, "A Receber"), /*#__PURE__*/React.createElement("span", {
+    className: "valor-resumo"
+  }, fmtMoeda(Math.max(0, totalValor - totalPago))))), meses.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhuma sess\xE3o registrada ainda."), meses.map(mes => /*#__PURE__*/React.createElement("div", {
+    key: mes,
+    className: "grupo-status"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-secao-lanc"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "titulo-secao-lanc"
+  }, new Date(mes + "-15").toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-lista-pacientes"
+  }, porMes[mes].map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.id,
+    className: "linha-sessao"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "info-lancamento"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "descricao-lancamento"
+  }, "Sess\xE3o n\xBA ", s.numSessao || "—", " \xB7 ", s.data?.split("-").reverse().join("/"), s.hora ? " às " + s.hora : ""), /*#__PURE__*/React.createElement("div", {
+    className: "detalhe-lancamento"
+  }, fmtMoeda(s.valorSessao))), /*#__PURE__*/React.createElement("select", {
+    className: "select-status-sessao",
+    value: s.status || "agendado",
+    onChange: e => atualizarStatus(s, e.target.value),
+    style: {
+      color: STATUS_SESSAO[s.status]?.cor || "inherit"
+    }
+  }, Object.entries(STATUS_SESSAO).map(([v, o]) => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, o.rotulo))), s.pagamento === "pago" ? /*#__PURE__*/React.createElement("button", {
+    className: "etiqueta-status-lanc etiqueta-recebido",
+    onClick: () => atualizarPagamento(s, false)
+  }, "\u2713 Pago") : /*#__PURE__*/React.createElement("button", {
+    className: "etiqueta-status-lanc etiqueta-pendente",
+    onClick: () => atualizarPagamento(s, true)
+  }, "Marcar Pago"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-icone botao-icone-perigo",
+    onClick: () => excluirSessao(s),
+    title: "Excluir"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "trash-2",
+    tamanho: 15
+  }))))))));
 }

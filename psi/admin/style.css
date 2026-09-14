@@ -409,6 +409,53 @@ button {
   transition: width .2s;
 }
 
+/* ── Financeiro: Acompanhamento Geral ──────────── */
+.linha-acompanhamento {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--borda);
+  cursor: pointer;
+  transition: background .12s;
+}
+.linha-acompanhamento:last-child { border-bottom: none; }
+.linha-acompanhamento:hover { background: var(--fundo); }
+.metricas-acompanhamento { display: flex; gap: 20px; flex-wrap: wrap; }
+.metrica { text-align: center; min-width: 56px; }
+.metrica-valor { display: block; font-size: 14px; font-weight: 700; }
+.metrica-rotulo { font-size: 10px; color: var(--texto-suave); }
+.metrica-receita { color: var(--sucesso); }
+.metrica-pendente { color: #d97706; }
+
+/* ── Financeiro: Controle de Sessões (paciente) ── */
+.barra-controle-sessoes {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--cor-marca);
+  border-radius: 12px;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.botao-voltar-sessoes, .botao-imprimir-sessoes {
+  background: rgba(255,255,255,0.2); color: white; border: none !important;
+  padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+}
+.botao-voltar-sessoes:hover, .botao-imprimir-sessoes:hover { background: rgba(255,255,255,0.32); }
+.titulo-controle-sessoes { flex: 1; color: white; }
+.titulo-controle-sessoes strong { display: block; font-size: 16px; }
+.titulo-controle-sessoes span { font-size: 12px; opacity: 0.85; }
+
+.linha-sessao {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--borda);
+}
+.linha-sessao:last-child { border-bottom: none; }
+.select-status-sessao {
+  padding: 6px 10px; border: 1px solid var(--borda); border-radius: 8px;
+  font-size: 12px; font-weight: 600; background: var(--branco);
+}
+
 .aviso-modulo-futuro {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px;

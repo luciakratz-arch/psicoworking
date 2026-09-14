@@ -80,6 +80,7 @@ function TelaFinanceiro({ usuario }) {
   const [sessoesPacotes, setSessoesPacotes] = useState([]);
   const [mostrarPacote, setMostrarPacote] = useState(false);
   const [pacoteEditando, setPacoteEditando] = useState(null);
+  const [pacienteFoco, setPacienteFoco] = useState(null);
 
   useEffect(() => {
     const cancelar = db
@@ -175,6 +176,18 @@ function TelaFinanceiro({ usuario }) {
     await db.collection("clinica_lancamentos").doc(id).delete();
   }
 
+  if (aba === "acompanhamento" && pacienteFoco) {
+    const pac = pacientes.find((p) => p.id === pacienteFoco);
+    const pacotesPac = pacotes.filter((p) => p.pacienteId === pacienteFoco);
+    const idsPacotesPac = pacotesPac.map((p) => p.id);
+    const sessPac = sessoesPacotes.filter((s) => s.pacienteId === pacienteFoco || idsPacotesPac.includes(s.pacoteId));
+    return (
+      <div className="conteudo conteudo-larga">
+        <ControleSessoes paciente={pac} sessoes={sessPac} onVoltar={() => setPacienteFoco(null)} />
+      </div>
+    );
+  }
+
   return (
     <div className="conteudo conteudo-larga">
       <div className="cabecalho-secao">
@@ -183,11 +196,12 @@ function TelaFinanceiro({ usuario }) {
           <p className="subtitulo-pagina">Lançamentos, pacotes e controle de sessões</p>
         </div>
         <div className="acoes-cabecalho">
-          {aba === "pacotes" ? (
+          {aba === "pacotes" && (
             <button className="botao-primario" onClick={() => { setPacoteEditando(null); setMostrarPacote(true); }}>
               <Icone nome="plus" tamanho={16} /> Novo Pacote
             </button>
-          ) : (
+          )}
+          {aba === "lancamentos" && (
             <>
               <button className="botao-perigo" onClick={() => { setLancEditando(null); setMostrarDespesa(true); }}>
                 <Icone nome="minus-circle" tamanho={16} /> Nova Despesa
@@ -227,7 +241,7 @@ function TelaFinanceiro({ usuario }) {
         ))}
       </div>
 
-      {aba !== "lancamentos" && aba !== "pacotes" && (
+      {aba !== "lancamentos" && aba !== "pacotes" && aba !== "acompanhamento" && (
         <div className="cartao-secao">
           <p className="texto-vazio">
             Essa aba ({ABAS_FINANCEIRO.find((a) => a.id === aba)?.rotulo}) ainda não foi construída — é a próxima etapa combinada.
@@ -241,6 +255,15 @@ function TelaFinanceiro({ usuario }) {
           sessoes={sessoesPacotes}
           pacientes={pacientes}
           aoEditar={(p) => { setPacoteEditando(p); setMostrarPacote(true); }}
+        />
+      )}
+
+      {aba === "acompanhamento" && (
+        <AcompanhamentoGeral
+          pacientes={pacientes}
+          pacotes={pacotes}
+          sessoes={sessoesPacotes}
+          aoAbrirPaciente={setPacienteFoco}
         />
       )}
 
@@ -848,6 +871,202 @@ function PacoteForm({ usuario, pacientes, pacote, aoFechar }) {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ─── Acompanhamento Geral ───────────────────────────────────────
+// Lista de pacientes ativos com pacote, e o Controle de Sessões e
+// Frequência de cada um (portado do RelatorioFrequencia do sistema
+// real — sem a remarcação de data e sem a exclusão em lote, que
+// ficam para uma próxima etapa).
+
+function AcompanhamentoGeral({ pacientes, pacotes, sessoes, aoAbrirPaciente }) {
+  const ativos = pacientes
+    .filter((p) => p.status === "ativo")
+    .filter((p) => pacotes.some((pac) => pac.pacienteId === p.id))
+    .sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+
+  if (ativos.length === 0) {
+    return <p className="texto-vazio">Nenhum paciente ativo com pacote cadastrado ainda.</p>;
+  }
+
+  return (
+    <div className="cartao-lista-pacientes">
+      {ativos.map((pac) => {
+        const sessPac = sessoes.filter((s) => s.pacienteId === pac.id);
+        const pacotesPac = pacotes.filter((p) => p.pacienteId === pac.id);
+        const total = sessPac.length;
+        const realizadas = sessPac.filter((s) => s.status === "realizado" || s.status === "falta").length;
+        const recebido = sessPac.filter((s) => s.pagamento === "pago").reduce((a, s) => a + (parseFloat(s.valorPago) || parseFloat(s.valorSessao) || 0), 0);
+        const aReceber = sessPac.filter((s) => s.pagamento !== "pago").reduce((a, s) => a + (parseFloat(s.valorSessao) || 0), 0);
+        const pendentes = sessPac.filter((s) => s.pagamento !== "pago").length;
+        return (
+          <div key={pac.id} className="linha-acompanhamento" onClick={() => aoAbrirPaciente(pac.id)}>
+            <div className="avatar-paciente">{(pac.nome || "?")[0].toUpperCase()}</div>
+            <div className="info-lancamento">
+              <div className="descricao-lancamento">{pac.nome}</div>
+              <div className="detalhe-lancamento">{pacotesPac[0]?.recorrencia || "—"} · {pacotesPac[0]?.horario || "—"}</div>
+            </div>
+            <div className="metricas-acompanhamento">
+              <div className="metrica">
+                <span className="metrica-valor">{realizadas}/{total}</span>
+                <span className="metrica-rotulo">Sessões</span>
+              </div>
+              <div className="metrica">
+                <span className="metrica-valor metrica-receita">{fmtMoeda(recebido)}</span>
+                <span className="metrica-rotulo">Recebido</span>
+              </div>
+              {aReceber > 0 && (
+                <div className="metrica">
+                  <span className="metrica-valor metrica-pendente">{fmtMoeda(aReceber)}</span>
+                  <span className="metrica-rotulo">A Receber</span>
+                </div>
+              )}
+            </div>
+            <span className={"etiqueta-status-lanc " + (pendentes > 0 ? "etiqueta-pendente" : "etiqueta-recebido")}>
+              {pendentes > 0 ? pendentes + " pendente(s)" : "✓ Em dia"}
+            </span>
+            <Icone nome="chevron-right" tamanho={16} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const STATUS_SESSAO = {
+  agendado: { rotulo: "Agendado", cor: "var(--cor-marca)" },
+  confirmado: { rotulo: "Confirmado", cor: "var(--sucesso)" },
+  realizado: { rotulo: "✓ Realizado", cor: "var(--sucesso)" },
+  falta: { rotulo: "Falta", cor: "#d97706" },
+  cancelado: { rotulo: "Cancelado", cor: "var(--erro)" },
+};
+
+function ControleSessoes({ paciente, sessoes, onVoltar }) {
+  const sessOrdenadas = [...sessoes].sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const porMes = {};
+  sessOrdenadas.forEach((s) => {
+    const mes = s.data?.slice(0, 7) || "sem-data";
+    if (!porMes[mes]) porMes[mes] = [];
+    porMes[mes].push(s);
+  });
+  const meses = Object.keys(porMes).sort();
+
+  const totalValor = sessOrdenadas.reduce((a, s) => a + (parseFloat(s.valorSessao) || 0), 0);
+  const totalPago = sessOrdenadas.reduce((a, s) => a + (s.pagamento === "pago" ? (parseFloat(s.valorPago) || parseFloat(s.valorSessao) || 0) : 0), 0);
+
+  async function atualizarStatus(s, status) {
+    await db.collection("clinica_sessoes").doc(s.id).update({ status });
+  }
+  async function atualizarPagamento(s, pago) {
+    await db.collection("clinica_sessoes").doc(s.id).update({
+      pagamento: pago ? "pago" : "pendente",
+      formaPagamento: pago ? s.formaPagamento || "PIX" : "",
+      valorPago: pago ? (parseFloat(s.valorSessao) || 0) : 0,
+      dataPagamento: pago ? new Date().toISOString().slice(0, 10) : "",
+    });
+  }
+  async function excluirSessao(s) {
+    if (!confirm("Excluir esta sessão?")) return;
+    await db.collection("clinica_sessoes").doc(s.id).delete();
+  }
+
+  function imprimir() {
+    const fmtD = (d) => (d ? new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }) : "—");
+    const fmtM = (m) => { const [y, mo] = m.split("-"); return new Date(y, mo - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); };
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Resumo de Sessões — ${paciente?.nome || ""}</title>
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;padding:32px;max-width:680px;margin:0 auto}
+  .header{border-bottom:3px solid #7B00C4;margin-bottom:24px;padding-bottom:12px}
+  .mes-title{font-size:14px;font-weight:700;color:#7B00C4;margin:20px 0 8px;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#7B00C4;color:white;padding:7px 10px;text-align:left}
+  td{padding:7px 10px;border-bottom:1px solid #f3f4f6}
+  .totais{margin-top:24px;background:#f9fafb;border-radius:10px;padding:14px 20px;display:flex;justify-content:space-between}
+  @media print{@page{margin:1.5cm}}
+</style></head><body>
+<div class="header"><h2>${paciente?.nome || ""}</h2><div style="color:#6b7280;font-size:12px">Controle de Sessões e Frequência — gerado em ${new Date().toLocaleDateString("pt-BR")}</div></div>
+${meses.map((mes) => `
+<div class="mes-title">${fmtM(mes)}</div>
+<table><thead><tr><th>Data</th><th>Horário</th><th>Status</th><th>Pagamento</th><th>Valor</th></tr></thead>
+<tbody>${porMes[mes].map((s) => `<tr><td>${fmtD(s.data)}</td><td>${s.hora || "—"}</td><td>${STATUS_SESSAO[s.status]?.rotulo || s.status || "—"}</td><td>${s.pagamento === "pago" ? "Pago" : "Pendente"}</td><td>R$ ${(parseFloat(s.valorSessao) || 0).toFixed(2).replace(".", ",")}</td></tr>`).join("")}</tbody></table>`).join("")}
+<div class="totais"><div><strong>Total:</strong> R$ ${totalValor.toFixed(2).replace(".", ",")}</div><div><strong>Recebido:</strong> R$ ${totalPago.toFixed(2).replace(".", ",")}</div></div>
+</body></html>`;
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 500);
+  }
+
+  return (
+    <div>
+      <div className="barra-controle-sessoes">
+        <button className="botao-voltar-sessoes" onClick={onVoltar}>
+          <Icone nome="arrow-left" tamanho={15} /> Voltar
+        </button>
+        <div className="titulo-controle-sessoes">
+          <strong>{paciente?.nome}</strong>
+          <span>Controle de Sessões e Frequência</span>
+        </div>
+        <button className="botao-imprimir-sessoes" onClick={imprimir}>
+          <Icone nome="printer" tamanho={15} /> Imprimir / PDF
+        </button>
+      </div>
+
+      <div className="grade-resumo-mes">
+        <div className="cartao-resumo receita">
+          <span className="rotulo-resumo">Total do(s) pacote(s)</span>
+          <span className="valor-resumo">{fmtMoeda(totalValor)}</span>
+        </div>
+        <div className="cartao-resumo saldo">
+          <span className="rotulo-resumo">Recebido</span>
+          <span className="valor-resumo">{fmtMoeda(totalPago)}</span>
+        </div>
+        <div className="cartao-resumo despesa">
+          <span className="rotulo-resumo">A Receber</span>
+          <span className="valor-resumo">{fmtMoeda(Math.max(0, totalValor - totalPago))}</span>
+        </div>
+      </div>
+
+      {meses.length === 0 && <p className="texto-vazio">Nenhuma sessão registrada ainda.</p>}
+
+      {meses.map((mes) => (
+        <div key={mes} className="grupo-status">
+          <div className="cabecalho-secao-lanc">
+            <span className="titulo-secao-lanc">{new Date(mes + "-15").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}</span>
+          </div>
+          <div className="cartao-lista-pacientes">
+            {porMes[mes].map((s) => (
+              <div key={s.id} className="linha-sessao">
+                <div className="info-lancamento">
+                  <div className="descricao-lancamento">
+                    Sessão nº {s.numSessao || "—"} · {s.data?.split("-").reverse().join("/")}{s.hora ? " às " + s.hora : ""}
+                  </div>
+                  <div className="detalhe-lancamento">{fmtMoeda(s.valorSessao)}</div>
+                </div>
+                <select
+                  className="select-status-sessao"
+                  value={s.status || "agendado"}
+                  onChange={(e) => atualizarStatus(s, e.target.value)}
+                  style={{ color: STATUS_SESSAO[s.status]?.cor || "inherit" }}
+                >
+                  {Object.entries(STATUS_SESSAO).map(([v, o]) => <option key={v} value={v}>{o.rotulo}</option>)}
+                </select>
+                {s.pagamento === "pago" ? (
+                  <button className="etiqueta-status-lanc etiqueta-recebido" onClick={() => atualizarPagamento(s, false)}>✓ Pago</button>
+                ) : (
+                  <button className="etiqueta-status-lanc etiqueta-pendente" onClick={() => atualizarPagamento(s, true)}>Marcar Pago</button>
+                )}
+                <button className="botao-icone botao-icone-perigo" onClick={() => excluirSessao(s)} title="Excluir">
+                  <Icone nome="trash-2" tamanho={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
