@@ -95,8 +95,12 @@ function TelaLogin() {
     <div className="tela-login-split">
       <div className="painel-marca">
         <div className="painel-marca-conteudo">
-          <h1>PsiCoWorking</h1>
-          <p>A plataforma completa para organizar sua clínica de psicologia.</p>
+          {/* Este espaço em destaque é reservado para o nome/logo de
+              CADA psicóloga (via psi_config, ainda não construído).
+              Por enquanto mostra um texto de boas-vindas neutro. */}
+          <h1>Bem-vinda(o) de volta</h1>
+          <p>Acesse o painel e continue de onde parou.</p>
+          <div className="selo-plataforma">PsiCoWorking</div>
         </div>
       </div>
 

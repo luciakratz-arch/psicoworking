@@ -20,7 +20,7 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: 'DM Sans', system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--fundo);
   color: var(--texto);
 }
@@ -42,12 +42,25 @@ body {
 }
 .painel-marca-conteudo { max-width: 380px; }
 .painel-marca-conteudo h1 {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-style: italic;
-  font-size: 36px;
-  margin-bottom: 16px;
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 500;
+  font-size: 40px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
 }
-.painel-marca-conteudo p { font-size: 15px; opacity: 0.9; line-height: 1.6; }
+.painel-marca-conteudo p { font-size: 15px; opacity: 0.85; line-height: 1.6; margin-bottom: 40px; }
+
+.selo-plataforma {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  border-top: 1px solid rgba(255,255,255,0.3);
+  padding-top: 16px;
+}
 
 .painel-formulario {
   flex: 1;

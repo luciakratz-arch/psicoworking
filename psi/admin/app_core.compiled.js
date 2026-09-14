@@ -100,7 +100,9 @@ function TelaLogin() {
     className: "painel-marca"
   }, /*#__PURE__*/React.createElement("div", {
     className: "painel-marca-conteudo"
-  }, /*#__PURE__*/React.createElement("h1", null, "PsiCoWorking"), /*#__PURE__*/React.createElement("p", null, "A plataforma completa para organizar sua cl\xEDnica de psicologia."))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("h1", null, "Bem-vinda(o) de volta"), /*#__PURE__*/React.createElement("p", null, "Acesse o painel e continue de onde parou."), /*#__PURE__*/React.createElement("div", {
+    className: "selo-plataforma"
+  }, "PsiCoWorking"))), /*#__PURE__*/React.createElement("div", {
     className: "painel-formulario"
   }, /*#__PURE__*/React.createElement("form", {
     className: "cartao-login",
