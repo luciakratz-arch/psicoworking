@@ -361,7 +361,10 @@ const PREVIEWS_INTERATIVOS = {
 function VisualizarRecursoModal({ item, aoFechar }) {
   const cores = corDaCategoria(item.categoria);
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
+  const blocos = Array.isArray(item.blocos) ? item.blocos : [];
   const ComponentePreview = PREVIEWS_INTERATIVOS[item.formularioKey];
+  const temConteudoTexto = !!(item.conteudo || item.passos || item.texto);
+  const temAlgumPreview = !!ComponentePreview || paginas.length > 0 || blocos.length > 0 || temConteudoTexto;
 
   return (
     <div className="sobreposicao" onClick={aoFechar}>
@@ -371,41 +374,24 @@ function VisualizarRecursoModal({ item, aoFechar }) {
         </span>
         <h3>{item.titulo || item.nome}</h3>
 
-        {item.descricao && <p className="texto-visualizar-recurso">{item.descricao}</p>}
+        {item.descricao && !temConteudoTexto && <p className="texto-visualizar-recurso">{item.descricao}</p>}
 
         <div className="aviso-preview-paciente">
           <Icone nome="eye" tamanho={16} />
           <span><strong>Visualização do paciente</strong> — assim a ferramenta aparecerá na área do paciente.</span>
         </div>
 
-        {item.moral && (
-          <div className="cartao-secao">
-            <strong>Moral da história</strong>
-            <p className="texto-visualizar-recurso">{item.moral}</p>
-          </div>
+        {ComponentePreview && (
+          <div className="cartao-secao"><ComponentePreview /></div>
         )}
-        {paginas.length > 0 && (
-          <div className="cartao-secao">
-            <strong>Páginas ({paginas.length})</strong>
-            {paginas.map((pag, i) => (
-              <p key={i} className="texto-visualizar-recurso">
-                {typeof pag === "string" ? pag : pag.texto || JSON.stringify(pag)}
-              </p>
-            ))}
-          </div>
-        )}
-
-        {ComponentePreview ? (
-          <div className="cartao-secao">
-            <ComponentePreview />
-          </div>
-        ) : (
-          !item.moral && paginas.length === 0 && (
-            <p className="texto-vazio">
-              Pré-visualização interativa completa ainda não disponível para esta ferramenta — só os dados
-              cadastrados no catálogo por enquanto.
-            </p>
-          )
+        {!ComponentePreview && paginas.length > 0 && <PreviewFabula item={item} />}
+        {!ComponentePreview && paginas.length === 0 && blocos.length > 0 && <PreviewBlocosPsicoeducacao item={item} />}
+        {!ComponentePreview && paginas.length === 0 && blocos.length === 0 && temConteudoTexto && <PreviewConteudoTexto item={item} />}
+        {!temAlgumPreview && (
+          <p className="texto-vazio">
+            Pré-visualização interativa completa ainda não disponível para esta ferramenta — só os dados
+            cadastrados no catálogo por enquanto.
+          </p>
         )}
 
         <div className="acoes-modal">
@@ -543,6 +529,174 @@ function PreviewGestaoAnsiedade() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Preview: Fábula (página por página) ────────────────────────
+// Porta fiel do leitor de fábulas real (clinica/app.js, trecho
+// "Fábulas com campo paginas"). Passa as páginas uma a uma com barra
+// de progresso, mostra a moral e as perguntas de reflexão na última
+// página — sem gravar nada de verdade (mesmo motivo do preview de
+// Gestão da Ansiedade: não existe paciente real nessa tela).
+function PreviewFabula({ item }) {
+  const paginas = Array.isArray(item.paginas) ? item.paginas : [];
+  const perguntas = Array.isArray(item.perguntas) ? item.perguntas : [];
+  const [idx, setIdx] = useState(0);
+  const [respostas, setRespostas] = useState({});
+  const [msg, setMsg] = useState("");
+
+  if (paginas.length === 0) return null;
+  const pagina = paginas[idx];
+  const textoPagina = typeof pagina === "string" ? pagina : pagina?.texto || "";
+  const pct = Math.round(((idx + 1) / paginas.length) * 100);
+  const concluido = idx === paginas.length - 1;
+
+  return (
+    <div style={{ fontFamily: "Georgia, serif" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <div style={{ flex: 1, height: 5, background: "var(--marca-plataforma-lavanda)", borderRadius: 20, overflow: "hidden" }}>
+          <div style={{ width: pct + "%", height: "100%", background: "var(--cor-marca)", borderRadius: 20, transition: "width .4s ease" }} />
+        </div>
+        <span style={{ fontSize: 12, color: "var(--cor-marca)", fontWeight: 700, flexShrink: 0 }}>{idx + 1}/{paginas.length}</span>
+      </div>
+
+      <div style={{ background: "linear-gradient(145deg, var(--cor-marca-escura), var(--cor-marca))", borderRadius: 20, padding: "32px 26px", minHeight: 170, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ fontSize: 18, color: "white", lineHeight: 1.9, textAlign: "center", fontStyle: "italic", margin: 0 }}>{textoPagina}</p>
+      </div>
+
+      {concluido && item.moral && (
+        <div className="cartao-secao">
+          <strong>Moral da história</strong>
+          <p className="texto-visualizar-recurso">{item.moral}</p>
+        </div>
+      )}
+
+      {concluido && perguntas.length > 0 && (
+        <div className="cartao-secao">
+          <strong>💭 Para Refletir</strong>
+          {perguntas.map((p, i) => (
+            <div key={i} style={{ marginTop: 12 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{i + 1}. {p}</label>
+              <TextAreaVoz
+                className="campo-descricao"
+                rows={2}
+                value={respostas[i] || ""}
+                onChange={(e) => setRespostas((r) => ({ ...r, [i]: e.target.value }))}
+                placeholder="Escreva sua reflexão..."
+              />
+            </div>
+          ))}
+          <button
+            className="botao-primario"
+            style={{ width: "100%", justifyContent: "center", marginTop: 12 }}
+            onClick={() => { setMsg("✓ Reflexões salvas! (visualização — nada foi salvo de verdade)"); setTimeout(() => setMsg(""), 3000); }}
+          >
+            {msg || "Salvar minhas reflexões"}
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+        <button className="botao-secundario" style={{ flex: 1 }} disabled={idx === 0} onClick={() => setIdx((i) => Math.max(0, i - 1))}>
+          ← Anterior
+        </button>
+        {!concluido ? (
+          <button className="botao-primario" style={{ flex: 2, justifyContent: "center" }} onClick={() => setIdx((i) => Math.min(paginas.length - 1, i + 1))}>
+            Próxima página →
+          </button>
+        ) : (
+          <button className="botao-primario" style={{ flex: 2, justifyContent: "center" }} onClick={() => setIdx(0)}>
+            ✅ Concluído — Reler
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Preview: blocos de Psicoeducação ────────────────────────────
+// O sistema real tem um "construtor" de conteúdo por blocos (banner,
+// texto, card, lista, pergunta, checklist, gráficos...). Aqui cobrimos
+// os tipos mais comuns; um tipo ainda não coberto aparece identificado
+// em vez de simplesmente sumir, pra ficar claro o que falta portar.
+function PreviewBlocosPsicoeducacao({ item }) {
+  const blocos = Array.isArray(item.blocos) ? item.blocos : [];
+  if (blocos.length === 0) return null;
+
+  return (
+    <div>
+      {blocos.map((b, i) => {
+        switch (b.tipo) {
+          case "banner":
+            return (
+              <div key={i} style={{ background: b.cor || "var(--cor-marca)", borderRadius: 12, padding: 20, marginBottom: 14, color: "white", textAlign: "center" }}>
+                {b.emoji && <div style={{ fontSize: 32, marginBottom: 6 }}>{b.emoji}</div>}
+                <div style={{ fontWeight: 700, fontSize: 16 }}>{b.titulo}</div>
+              </div>
+            );
+          case "texto":
+            return <p key={i} className="texto-visualizar-recurso" style={{ marginBottom: 14 }}>{b.conteudo}</p>;
+          case "card":
+            return (
+              <div key={i} className="cartao-secao" style={{ marginBottom: 12 }}>
+                {b.icone && <div style={{ fontSize: 22, marginBottom: 4 }}>{b.icone}</div>}
+                <strong>{b.titulo}</strong>
+                <p className="texto-visualizar-recurso">{b.texto}</p>
+              </div>
+            );
+          case "lista":
+            return (
+              <ul key={i} style={{ marginBottom: 14, paddingLeft: 20 }}>
+                {(b.itens || []).map((it, j) => <li key={j} className="texto-visualizar-recurso">{it}</li>)}
+              </ul>
+            );
+          case "checklist":
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                {b.titulo && <strong style={{ display: "block", marginBottom: 8 }}>{b.titulo}</strong>}
+                {(b.itens || []).map((it, j) => (
+                  <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <input type="checkbox" disabled /> <span className="texto-visualizar-recurso">{it}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          case "pergunta":
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{b.pergunta}</label>
+                <textarea className="campo-descricao" rows={2} placeholder={b.placeholder || "Escreva aqui..."} readOnly />
+              </div>
+            );
+          default:
+            return (
+              <p key={i} className="texto-vazio" style={{ marginBottom: 14 }}>
+                [bloco do tipo "{b.tipo}" ainda não tem pré-visualização própria]
+              </p>
+            );
+        }
+      })}
+    </div>
+  );
+}
+
+// ─── Preview: conteúdo simples em texto ──────────────────────────
+// Cobre o formato mais antigo/simples de ferramenta ou psicoeducação:
+// só um texto corrido (campo conteudo/passos/texto), com a descrição
+// como "objetivo" em destaque quando existir.
+function PreviewConteudoTexto({ item }) {
+  const conteudo = item.conteudo || item.passos || item.texto || "";
+  if (!conteudo) return null;
+  return (
+    <div>
+      {item.descricao && (
+        <div className="aviso-preview-paciente" style={{ display: "block" }}>
+          <strong>🎯 Objetivo</strong>
+          <p style={{ margin: "4px 0 0" }}>{item.descricao}</p>
+        </div>
+      )}
+      <p className="texto-visualizar-recurso" style={{ whiteSpace: "pre-wrap" }}>{conteudo}</p>
     </div>
   );
 }

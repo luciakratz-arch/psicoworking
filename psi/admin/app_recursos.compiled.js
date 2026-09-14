@@ -477,7 +477,10 @@ function VisualizarRecursoModal({
 }) {
   const cores = corDaCategoria(item.categoria);
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
+  const blocos = Array.isArray(item.blocos) ? item.blocos : [];
   const ComponentePreview = PREVIEWS_INTERATIVOS[item.formularioKey];
+  const temConteudoTexto = !!(item.conteudo || item.passos || item.texto);
+  const temAlgumPreview = !!ComponentePreview || paginas.length > 0 || blocos.length > 0 || temConteudoTexto;
   return /*#__PURE__*/React.createElement("div", {
     className: "sobreposicao",
     onClick: aoFechar
@@ -490,25 +493,22 @@ function VisualizarRecursoModal({
       "--cor-cat": cores.cor,
       "--bg-cat": cores.bg
     }
-  }, formatarCategoria(item.categoria)), /*#__PURE__*/React.createElement("h3", null, item.titulo || item.nome), item.descricao && /*#__PURE__*/React.createElement("p", {
+  }, formatarCategoria(item.categoria)), /*#__PURE__*/React.createElement("h3", null, item.titulo || item.nome), item.descricao && !temConteudoTexto && /*#__PURE__*/React.createElement("p", {
     className: "texto-visualizar-recurso"
   }, item.descricao), /*#__PURE__*/React.createElement("div", {
     className: "aviso-preview-paciente"
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "eye",
     tamanho: 16
-  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Visualiza\xE7\xE3o do paciente"), " \u2014 assim a ferramenta aparecer\xE1 na \xE1rea do paciente.")), item.moral && /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Visualiza\xE7\xE3o do paciente"), " \u2014 assim a ferramenta aparecer\xE1 na \xE1rea do paciente.")), ComponentePreview && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
-  }, /*#__PURE__*/React.createElement("strong", null, "Moral da hist\xF3ria"), /*#__PURE__*/React.createElement("p", {
-    className: "texto-visualizar-recurso"
-  }, item.moral)), paginas.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "cartao-secao"
-  }, /*#__PURE__*/React.createElement("strong", null, "P\xE1ginas (", paginas.length, ")"), paginas.map((pag, i) => /*#__PURE__*/React.createElement("p", {
-    key: i,
-    className: "texto-visualizar-recurso"
-  }, typeof pag === "string" ? pag : pag.texto || JSON.stringify(pag)))), ComponentePreview ? /*#__PURE__*/React.createElement("div", {
-    className: "cartao-secao"
-  }, /*#__PURE__*/React.createElement(ComponentePreview, null)) : !item.moral && paginas.length === 0 && /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement(ComponentePreview, null)), !ComponentePreview && paginas.length > 0 && /*#__PURE__*/React.createElement(PreviewFabula, {
+    item: item
+  }), !ComponentePreview && paginas.length === 0 && blocos.length > 0 && /*#__PURE__*/React.createElement(PreviewBlocosPsicoeducacao, {
+    item: item
+  }), !ComponentePreview && paginas.length === 0 && blocos.length === 0 && temConteudoTexto && /*#__PURE__*/React.createElement(PreviewConteudoTexto, {
+    item: item
+  }), !temAlgumPreview && /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
   }, "Pr\xE9-visualiza\xE7\xE3o interativa completa ainda n\xE3o dispon\xEDvel para esta ferramenta \u2014 s\xF3 os dados cadastrados no cat\xE1logo por enquanto."), /*#__PURE__*/React.createElement("div", {
     className: "acoes-modal"
@@ -739,4 +739,295 @@ function PreviewGestaoAnsiedade() {
       confirmar("Salvo!");
     }
   }, msg || "Salvar respostas")));
+}
+
+// ─── Preview: Fábula (página por página) ────────────────────────
+// Porta fiel do leitor de fábulas real (clinica/app.js, trecho
+// "Fábulas com campo paginas"). Passa as páginas uma a uma com barra
+// de progresso, mostra a moral e as perguntas de reflexão na última
+// página — sem gravar nada de verdade (mesmo motivo do preview de
+// Gestão da Ansiedade: não existe paciente real nessa tela).
+function PreviewFabula({
+  item
+}) {
+  const paginas = Array.isArray(item.paginas) ? item.paginas : [];
+  const perguntas = Array.isArray(item.perguntas) ? item.perguntas : [];
+  const [idx, setIdx] = useState(0);
+  const [respostas, setRespostas] = useState({});
+  const [msg, setMsg] = useState("");
+  if (paginas.length === 0) return null;
+  const pagina = paginas[idx];
+  const textoPagina = typeof pagina === "string" ? pagina : pagina?.texto || "";
+  const pct = Math.round((idx + 1) / paginas.length * 100);
+  const concluido = idx === paginas.length - 1;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "Georgia, serif"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      height: 5,
+      background: "var(--marca-plataforma-lavanda)",
+      borderRadius: 20,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: pct + "%",
+      height: "100%",
+      background: "var(--cor-marca)",
+      borderRadius: 20,
+      transition: "width .4s ease"
+    }
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--cor-marca)",
+      fontWeight: 700,
+      flexShrink: 0
+    }
+  }, idx + 1, "/", paginas.length)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(145deg, var(--cor-marca-escura), var(--cor-marca))",
+      borderRadius: 20,
+      padding: "32px 26px",
+      minHeight: 170,
+      marginBottom: 18,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 18,
+      color: "white",
+      lineHeight: 1.9,
+      textAlign: "center",
+      fontStyle: "italic",
+      margin: 0
+    }
+  }, textoPagina)), concluido && item.moral && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("strong", null, "Moral da hist\xF3ria"), /*#__PURE__*/React.createElement("p", {
+    className: "texto-visualizar-recurso"
+  }, item.moral)), concluido && perguntas.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("strong", null, "\uD83D\uDCAD Para Refletir"), perguntas.map((p, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      display: "block",
+      marginBottom: 6
+    }
+  }, i + 1, ". ", p), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 2,
+    value: respostas[i] || "",
+    onChange: e => setRespostas(r => ({
+      ...r,
+      [i]: e.target.value
+    })),
+    placeholder: "Escreva sua reflex\xE3o..."
+  }))), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      marginTop: 12
+    },
+    onClick: () => {
+      setMsg("✓ Reflexões salvas! (visualização — nada foi salvo de verdade)");
+      setTimeout(() => setMsg(""), 3000);
+    }
+  }, msg || "Salvar minhas reflexões")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      flex: 1
+    },
+    disabled: idx === 0,
+    onClick: () => setIdx(i => Math.max(0, i - 1))
+  }, "\u2190 Anterior"), !concluido ? /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      flex: 2,
+      justifyContent: "center"
+    },
+    onClick: () => setIdx(i => Math.min(paginas.length - 1, i + 1))
+  }, "Pr\xF3xima p\xE1gina \u2192") : /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      flex: 2,
+      justifyContent: "center"
+    },
+    onClick: () => setIdx(0)
+  }, "\u2705 Conclu\xEDdo \u2014 Reler")));
+}
+
+// ─── Preview: blocos de Psicoeducação ────────────────────────────
+// O sistema real tem um "construtor" de conteúdo por blocos (banner,
+// texto, card, lista, pergunta, checklist, gráficos...). Aqui cobrimos
+// os tipos mais comuns; um tipo ainda não coberto aparece identificado
+// em vez de simplesmente sumir, pra ficar claro o que falta portar.
+function PreviewBlocosPsicoeducacao({
+  item
+}) {
+  const blocos = Array.isArray(item.blocos) ? item.blocos : [];
+  if (blocos.length === 0) return null;
+  return /*#__PURE__*/React.createElement("div", null, blocos.map((b, i) => {
+    switch (b.tipo) {
+      case "banner":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            background: b.cor || "var(--cor-marca)",
+            borderRadius: 12,
+            padding: 20,
+            marginBottom: 14,
+            color: "white",
+            textAlign: "center"
+          }
+        }, b.emoji && /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: 32,
+            marginBottom: 6
+          }
+        }, b.emoji), /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontWeight: 700,
+            fontSize: 16
+          }
+        }, b.titulo));
+      case "texto":
+        return /*#__PURE__*/React.createElement("p", {
+          key: i,
+          className: "texto-visualizar-recurso",
+          style: {
+            marginBottom: 14
+          }
+        }, b.conteudo);
+      case "card":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          className: "cartao-secao",
+          style: {
+            marginBottom: 12
+          }
+        }, b.icone && /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: 22,
+            marginBottom: 4
+          }
+        }, b.icone), /*#__PURE__*/React.createElement("strong", null, b.titulo), /*#__PURE__*/React.createElement("p", {
+          className: "texto-visualizar-recurso"
+        }, b.texto));
+      case "lista":
+        return /*#__PURE__*/React.createElement("ul", {
+          key: i,
+          style: {
+            marginBottom: 14,
+            paddingLeft: 20
+          }
+        }, (b.itens || []).map((it, j) => /*#__PURE__*/React.createElement("li", {
+          key: j,
+          className: "texto-visualizar-recurso"
+        }, it)));
+      case "checklist":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14
+          }
+        }, b.titulo && /*#__PURE__*/React.createElement("strong", {
+          style: {
+            display: "block",
+            marginBottom: 8
+          }
+        }, b.titulo), (b.itens || []).map((it, j) => /*#__PURE__*/React.createElement("div", {
+          key: j,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 6
+          }
+        }, /*#__PURE__*/React.createElement("input", {
+          type: "checkbox",
+          disabled: true
+        }), " ", /*#__PURE__*/React.createElement("span", {
+          className: "texto-visualizar-recurso"
+        }, it))));
+      case "pergunta":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14
+          }
+        }, /*#__PURE__*/React.createElement("label", {
+          style: {
+            fontSize: 13,
+            fontWeight: 600,
+            display: "block",
+            marginBottom: 6
+          }
+        }, b.pergunta), /*#__PURE__*/React.createElement("textarea", {
+          className: "campo-descricao",
+          rows: 2,
+          placeholder: b.placeholder || "Escreva aqui...",
+          readOnly: true
+        }));
+      default:
+        return /*#__PURE__*/React.createElement("p", {
+          key: i,
+          className: "texto-vazio",
+          style: {
+            marginBottom: 14
+          }
+        }, "[bloco do tipo \"", b.tipo, "\" ainda n\xE3o tem pr\xE9-visualiza\xE7\xE3o pr\xF3pria]");
+    }
+  }));
+}
+
+// ─── Preview: conteúdo simples em texto ──────────────────────────
+// Cobre o formato mais antigo/simples de ferramenta ou psicoeducação:
+// só um texto corrido (campo conteudo/passos/texto), com a descrição
+// como "objetivo" em destaque quando existir.
+function PreviewConteudoTexto({
+  item
+}) {
+  const conteudo = item.conteudo || item.passos || item.texto || "";
+  if (!conteudo) return null;
+  return /*#__PURE__*/React.createElement("div", null, item.descricao && /*#__PURE__*/React.createElement("div", {
+    className: "aviso-preview-paciente",
+    style: {
+      display: "block"
+    }
+  }, /*#__PURE__*/React.createElement("strong", null, "\uD83C\uDFAF Objetivo"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "4px 0 0"
+    }
+  }, item.descricao)), /*#__PURE__*/React.createElement("p", {
+    className: "texto-visualizar-recurso",
+    style: {
+      whiteSpace: "pre-wrap"
+    }
+  }, conteudo));
 }
