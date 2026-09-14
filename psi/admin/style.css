@@ -124,6 +124,18 @@ button {
 
 .mensagem-erro { color: var(--erro); font-size: 13px; margin-top: 10px; }
 
+.link-esqueci-senha {
+  display: block;
+  width: 100%;
+  background: none;
+  color: var(--cor-marca);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 12px 0 0;
+  text-align: center;
+}
+.link-esqueci-senha:hover { text-decoration: underline; }
+
 /* Tela central genérica (usada em "Carregando..." e "Acesso não permitido") */
 .tela-central {
   min-height: 100vh;

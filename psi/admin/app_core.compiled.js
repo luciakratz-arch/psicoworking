@@ -82,6 +82,7 @@ function TelaLogin() {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [mensagemRecuperacao, setMensagemRecuperacao] = useState("");
   async function aoEnviar(evento) {
     evento.preventDefault();
     setErro("");
@@ -92,6 +93,20 @@ function TelaLogin() {
       setErro("E-mail ou senha incorretos.");
     } finally {
       setEnviando(false);
+    }
+  }
+  async function aoEsquecerSenha() {
+    setErro("");
+    setMensagemRecuperacao("");
+    if (!email) {
+      setErro("Digite seu e-mail acima primeiro, depois clique em \"Esqueci minha senha\".");
+      return;
+    }
+    try {
+      await auth.sendPasswordResetEmail(email);
+      setMensagemRecuperacao("Enviamos um e-mail para " + email + " com um link para você criar uma senha nova. Confira também a caixa de spam.");
+    } catch (e) {
+      setErro("Não foi possível enviar o e-mail de recuperação.");
     }
   }
   return /*#__PURE__*/React.createElement("div", {
@@ -121,8 +136,14 @@ function TelaLogin() {
     required: true
   }), erro && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
-  }, erro), /*#__PURE__*/React.createElement("button", {
+  }, erro), mensagemRecuperacao && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-sucesso"
+  }, mensagemRecuperacao), /*#__PURE__*/React.createElement("button", {
     type: "submit",
     disabled: enviando
-  }, enviando ? "Entrando..." : "Entrar"))));
+  }, enviando ? "Entrando..." : "Entrar"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "link-esqueci-senha",
+    onClick: aoEsquecerSenha
+  }, "Esqueci minha senha"))));
 }

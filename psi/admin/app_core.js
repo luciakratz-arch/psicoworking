@@ -77,6 +77,7 @@ function TelaLogin() {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [mensagemRecuperacao, setMensagemRecuperacao] = useState("");
 
   async function aoEnviar(evento) {
     evento.preventDefault();
@@ -88,6 +89,21 @@ function TelaLogin() {
       setErro("E-mail ou senha incorretos.");
     } finally {
       setEnviando(false);
+    }
+  }
+
+  async function aoEsquecerSenha() {
+    setErro("");
+    setMensagemRecuperacao("");
+    if (!email) {
+      setErro("Digite seu e-mail acima primeiro, depois clique em \"Esqueci minha senha\".");
+      return;
+    }
+    try {
+      await auth.sendPasswordResetEmail(email);
+      setMensagemRecuperacao("Enviamos um e-mail para " + email + " com um link para você criar uma senha nova. Confira também a caixa de spam.");
+    } catch (e) {
+      setErro("Não foi possível enviar o e-mail de recuperação.");
     }
   }
 
@@ -126,9 +142,14 @@ function TelaLogin() {
           />
 
           {erro && <p className="mensagem-erro">{erro}</p>}
+          {mensagemRecuperacao && <p className="mensagem-sucesso">{mensagemRecuperacao}</p>}
 
           <button type="submit" disabled={enviando}>
             {enviando ? "Entrando..." : "Entrar"}
+          </button>
+
+          <button type="button" className="link-esqueci-senha" onClick={aoEsquecerSenha}>
+            Esqueci minha senha
           </button>
         </form>
       </div>
