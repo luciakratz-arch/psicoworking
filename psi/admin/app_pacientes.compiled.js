@@ -397,7 +397,9 @@ function PerfilPaciente({
     tamanho: 15
   }), " ", a.rotulo))), aba === "perfil" && /*#__PURE__*/React.createElement(AbaPerfilPaciente, {
     paciente: paciente
-  }), aba !== "perfil" && /*#__PURE__*/React.createElement("div", {
+  }), aba === "modulos" && /*#__PURE__*/React.createElement(AbaModulosPaciente, {
+    paciente: paciente
+  }), aba !== "perfil" && aba !== "modulos" && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
@@ -470,4 +472,157 @@ function AbaPerfilPaciente({
     nome: "send",
     tamanho: 14
   }), " ", reenviando ? "Enviando..." : "Enviar link de redefinição de senha")));
+}
+
+// ─── Módulos ─────────────────────────────────────────────────────
+// Biblioteca de recursos terapêuticos (Ferramentas, Fábulas,
+// Psicoeducação) — é conteúdo compartilhado por toda a plataforma
+// (não é de uma clínica só), guardado em recursos_terapeuticos /
+// fabulas_terapeuticas / psicoeducacao_conteudos. Aqui a psicóloga
+// escolhe quais ficam ativados para este paciente. Simplificado em
+// relação ao sistema real: sem os "Módulos I-VI" com sugestões
+// cruzadas automáticas — ativa direto por item, agrupado por
+// categoria.
+
+function formatarCategoria(cat) {
+  return (cat || "outros").replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+}
+function ToggleModulo({
+  ativo,
+  onClick
+}) {
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "toggle-modulo" + (ativo ? " toggle-modulo-ativo" : ""),
+    onClick: onClick
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "toggle-modulo-bola"
+  }));
+}
+function AbaModulosPaciente({
+  paciente
+}) {
+  const [recursos, setRecursos] = useState([]);
+  const [fabulas, setFabulas] = useState([]);
+  const [psicoeducacoes, setPsicoeducacoes] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [config, setConfig] = useState(paciente.modulosConfig || {});
+  const [filtroTipo, setFiltroTipo] = useState("todas");
+  const [busca, setBusca] = useState("");
+  useEffect(() => {
+    Promise.all([db.collection("recursos_terapeuticos").get(), db.collection("fabulas_terapeuticas").get(), db.collection("psicoeducacao_conteudos").get()]).then(([r, f, p]) => {
+      setRecursos(r.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })));
+      setFabulas(f.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })));
+      setPsicoeducacoes(p.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })));
+      setCarregando(false);
+    }).catch(() => setCarregando(false));
+  }, []);
+  const itens = [...recursos.map(r => ({
+    ...r,
+    tipo: "ferramenta",
+    titulo: r.titulo || r.nome
+  })), ...fabulas.map(f => ({
+    ...f,
+    tipo: "fabula",
+    titulo: f.titulo || f.nome
+  })), ...psicoeducacoes.map(p => ({
+    ...p,
+    tipo: "psicoeducacao",
+    titulo: p.titulo || p.nome
+  }))];
+  const filtrados = itens.filter(it => {
+    const okTipo = filtroTipo === "todas" || it.tipo === filtroTipo;
+    const okBusca = !busca || (it.titulo || "").toLowerCase().includes(busca.toLowerCase());
+    return okTipo && okBusca;
+  });
+  const porCategoria = {};
+  filtrados.forEach(it => {
+    const cat = it.categoria || "outros";
+    (porCategoria[cat] = porCategoria[cat] || []).push(it);
+  });
+  const categorias = Object.keys(porCategoria).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  async function alternar(item) {
+    const atual = config[item.id] || {};
+    const novoAtivo = !atual.ativo;
+    const novaConfig = {
+      ...config,
+      [item.id]: novoAtivo ? {
+        ativo: true,
+        tipo: item.tipo,
+        titulo: item.titulo,
+        dataInicio: new Date().toISOString().slice(0, 10)
+      } : {
+        ...atual,
+        ativo: false
+      }
+    };
+    setConfig(novaConfig);
+    const ativos = Object.keys(novaConfig).filter(k => novaConfig[k]?.ativo);
+    try {
+      await db.collection("clinica_pacientes").doc(paciente.id).update({
+        modulosConfig: novaConfig,
+        modulosAtivos: ativos
+      });
+    } catch (e) {
+      alert("Erro ao salvar: " + e.message);
+    }
+  }
+  if (carregando) return /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Carregando biblioteca...");
+  if (itens.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "cartao-secao"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "texto-vazio"
+    }, "Nenhum recurso cadastrado ainda na biblioteca. Use a ferramenta de migra\xE7\xE3o de dados pra trazer o cat\xE1logo do sistema anterior (Ferramentas, F\xE1bulas e Psicoeduca\xE7\xE3o)."));
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "pills-status pills-filtro-modulos"
+  }, [["todas", "Todas"], ["ferramenta", "Ferramentas"], ["fabula", "Fábulas"], ["psicoeducacao", "Psicoeducação"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
+    key: v,
+    type: "button",
+    className: "pill-status" + (filtroTipo === v ? " pill-status-ativa" : ""),
+    onClick: () => setFiltroTipo(v)
+  }, l))), /*#__PURE__*/React.createElement("input", {
+    className: "campo-busca campo-busca-modulos",
+    placeholder: "Buscar por nome...",
+    value: busca,
+    onChange: e => setBusca(e.target.value)
+  }), categorias.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhum item encontrado."), categorias.map(cat => /*#__PURE__*/React.createElement("div", {
+    key: cat,
+    className: "grupo-status"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "titulo-grupo-status"
+  }, formatarCategoria(cat), " (", porCategoria[cat].length, ")"), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-lista-pacientes"
+  }, porCategoria[cat].map(item => {
+    const ativo = !!config[item.id]?.ativo;
+    return /*#__PURE__*/React.createElement("div", {
+      key: item.id,
+      className: "linha-modulo"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "info-lancamento"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "descricao-lancamento"
+    }, item.titulo), item.descricao && /*#__PURE__*/React.createElement("div", {
+      className: "detalhe-lancamento"
+    }, item.descricao), ativo && config[item.id]?.dataInicio && /*#__PURE__*/React.createElement("div", {
+      className: "detalhe-lancamento"
+    }, "Ativado em ", config[item.id].dataInicio.split("-").reverse().join("/"))), /*#__PURE__*/React.createElement(ToggleModulo, {
+      ativo: ativo,
+      onClick: () => alternar(item)
+    }));
+  })))));
 }

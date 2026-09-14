@@ -648,6 +648,27 @@ button {
 .abas-perfil-paciente { margin-bottom: 22px; flex-wrap: wrap; }
 .acoes-perfil-paciente { justify-content: flex-start; margin-top: 16px; }
 
+/* ── Perfil do paciente: aba Módulos ──────────────── */
+.pills-filtro-modulos { margin-bottom: 14px; }
+.campo-busca-modulos { width: 100%; margin-bottom: 22px; }
+.linha-modulo {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--borda);
+}
+.linha-modulo:last-child { border-bottom: none; }
+.toggle-modulo {
+  width: 44px; height: 24px; border-radius: 12px; border: none;
+  background: var(--borda); position: relative; flex-shrink: 0; transition: background .2s;
+}
+.toggle-modulo-ativo { background: var(--cor-marca); }
+.toggle-modulo-bola {
+  position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px; border-radius: 50%; background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: left .2s;
+}
+.toggle-modulo-ativo .toggle-modulo-bola { left: 22px; }
+
 @media (max-width: 640px) {
   .grade-2col { grid-template-columns: 1fr; }
   .campo-largura-total { grid-column: span 1; }

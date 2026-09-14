@@ -44,6 +44,13 @@ service cloud.firestore {
         && request.auth.uid == pacienteId;
     }
 
+    // Equipe de QUALQUER clínica (sem checar psi_id) — usada só para
+    // a biblioteca de recursos terapêuticos, que é compartilhada por
+    // toda a plataforma (não é dado de uma clínica só).
+    function ehEquipeDeAlgumaClinica() {
+      return estaLogado() && (carimboPapel() == 'psi' || carimboPapel() == 'secretaria');
+    }
+
     // ── Cadastro dos psicólogos (vitrine pública) ───────────────
     match /psi_profiles/{psiId} {
       allow read: if true; // nome, foto, especialidade — nada de paciente aqui
@@ -173,6 +180,20 @@ service cloud.firestore {
     match /clinica_orcamento_servicos/{servicoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+    }
+
+    // ── Biblioteca de recursos terapêuticos — compartilhada por toda
+    // a plataforma (não é psi_id, é conteúdo editorial da própria
+    // PsiCoWorking, igual um "catálogo"). Pacientes não leem direto
+    // daqui ainda — só a equipe, até o Portal do Paciente existir.
+    match /recursos_terapeuticos/{id} {
+      allow read, write: if ehEquipeDeAlgumaClinica();
+    }
+    match /fabulas_terapeuticas/{id} {
+      allow read, write: if ehEquipeDeAlgumaClinica();
+    }
+    match /psicoeducacao_conteudos/{id} {
+      allow read, write: if ehEquipeDeAlgumaClinica();
     }
 
     // ── Trilha de auditoria: só a Cloud Function grava, ninguém apaga ──

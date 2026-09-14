@@ -366,8 +366,9 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
       </div>
 
       {aba === "perfil" && <AbaPerfilPaciente paciente={paciente} />}
+      {aba === "modulos" && <AbaModulosPaciente paciente={paciente} />}
 
-      {aba !== "perfil" && (
+      {aba !== "perfil" && aba !== "modulos" && (
         <div className="cartao-secao">
           <p className="texto-vazio">
             Essa aba ({ABAS_PACIENTE.find((a) => a.id === aba)?.rotulo}) ainda não foi construída — é uma das próximas etapas.
@@ -432,6 +433,154 @@ function AbaPerfilPaciente({ paciente }) {
           <Icone nome="send" tamanho={14} /> {reenviando ? "Enviando..." : "Enviar link de redefinição de senha"}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Módulos ─────────────────────────────────────────────────────
+// Biblioteca de recursos terapêuticos (Ferramentas, Fábulas,
+// Psicoeducação) — é conteúdo compartilhado por toda a plataforma
+// (não é de uma clínica só), guardado em recursos_terapeuticos /
+// fabulas_terapeuticas / psicoeducacao_conteudos. Aqui a psicóloga
+// escolhe quais ficam ativados para este paciente. Simplificado em
+// relação ao sistema real: sem os "Módulos I-VI" com sugestões
+// cruzadas automáticas — ativa direto por item, agrupado por
+// categoria.
+
+function formatarCategoria(cat) {
+  return (cat || "outros").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+}
+
+function ToggleModulo({ ativo, onClick }) {
+  return (
+    <button type="button" className={"toggle-modulo" + (ativo ? " toggle-modulo-ativo" : "")} onClick={onClick}>
+      <span className="toggle-modulo-bola" />
+    </button>
+  );
+}
+
+function AbaModulosPaciente({ paciente }) {
+  const [recursos, setRecursos] = useState([]);
+  const [fabulas, setFabulas] = useState([]);
+  const [psicoeducacoes, setPsicoeducacoes] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [config, setConfig] = useState(paciente.modulosConfig || {});
+  const [filtroTipo, setFiltroTipo] = useState("todas");
+  const [busca, setBusca] = useState("");
+
+  useEffect(() => {
+    Promise.all([
+      db.collection("recursos_terapeuticos").get(),
+      db.collection("fabulas_terapeuticas").get(),
+      db.collection("psicoeducacao_conteudos").get(),
+    ])
+      .then(([r, f, p]) => {
+        setRecursos(r.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setFabulas(f.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setPsicoeducacoes(p.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setCarregando(false);
+      })
+      .catch(() => setCarregando(false));
+  }, []);
+
+  const itens = [
+    ...recursos.map((r) => ({ ...r, tipo: "ferramenta", titulo: r.titulo || r.nome })),
+    ...fabulas.map((f) => ({ ...f, tipo: "fabula", titulo: f.titulo || f.nome })),
+    ...psicoeducacoes.map((p) => ({ ...p, tipo: "psicoeducacao", titulo: p.titulo || p.nome })),
+  ];
+
+  const filtrados = itens.filter((it) => {
+    const okTipo = filtroTipo === "todas" || it.tipo === filtroTipo;
+    const okBusca = !busca || (it.titulo || "").toLowerCase().includes(busca.toLowerCase());
+    return okTipo && okBusca;
+  });
+
+  const porCategoria = {};
+  filtrados.forEach((it) => {
+    const cat = it.categoria || "outros";
+    (porCategoria[cat] = porCategoria[cat] || []).push(it);
+  });
+  const categorias = Object.keys(porCategoria).sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  async function alternar(item) {
+    const atual = config[item.id] || {};
+    const novoAtivo = !atual.ativo;
+    const novaConfig = {
+      ...config,
+      [item.id]: novoAtivo
+        ? { ativo: true, tipo: item.tipo, titulo: item.titulo, dataInicio: new Date().toISOString().slice(0, 10) }
+        : { ...atual, ativo: false },
+    };
+    setConfig(novaConfig);
+    const ativos = Object.keys(novaConfig).filter((k) => novaConfig[k]?.ativo);
+    try {
+      await db.collection("clinica_pacientes").doc(paciente.id).update({
+        modulosConfig: novaConfig,
+        modulosAtivos: ativos,
+      });
+    } catch (e) {
+      alert("Erro ao salvar: " + e.message);
+    }
+  }
+
+  if (carregando) return <p className="texto-vazio">Carregando biblioteca...</p>;
+
+  if (itens.length === 0) {
+    return (
+      <div className="cartao-secao">
+        <p className="texto-vazio">
+          Nenhum recurso cadastrado ainda na biblioteca. Use a ferramenta de migração de dados pra trazer o
+          catálogo do sistema anterior (Ferramentas, Fábulas e Psicoeducação).
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="pills-status pills-filtro-modulos">
+        {[
+          ["todas", "Todas"],
+          ["ferramenta", "Ferramentas"],
+          ["fabula", "Fábulas"],
+          ["psicoeducacao", "Psicoeducação"],
+        ].map(([v, l]) => (
+          <button key={v} type="button" className={"pill-status" + (filtroTipo === v ? " pill-status-ativa" : "")} onClick={() => setFiltroTipo(v)}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <input
+        className="campo-busca campo-busca-modulos"
+        placeholder="Buscar por nome..."
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+      />
+
+      {categorias.length === 0 && <p className="texto-vazio">Nenhum item encontrado.</p>}
+
+      {categorias.map((cat) => (
+        <div key={cat} className="grupo-status">
+          <div className="titulo-grupo-status">{formatarCategoria(cat)} ({porCategoria[cat].length})</div>
+          <div className="cartao-lista-pacientes">
+            {porCategoria[cat].map((item) => {
+              const ativo = !!config[item.id]?.ativo;
+              return (
+                <div key={item.id} className="linha-modulo">
+                  <div className="info-lancamento">
+                    <div className="descricao-lancamento">{item.titulo}</div>
+                    {item.descricao && <div className="detalhe-lancamento">{item.descricao}</div>}
+                    {ativo && config[item.id]?.dataInicio && (
+                      <div className="detalhe-lancamento">Ativado em {config[item.id].dataInicio.split("-").reverse().join("/")}</div>
+                    )}
+                  </div>
+                  <ToggleModulo ativo={ativo} onClick={() => alternar(item)} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
