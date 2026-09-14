@@ -331,6 +331,62 @@ button {
   color: var(--texto-suave);
 }
 
+/* ── Financeiro ────────────────────────────── */
+.seletor-ano { display: flex; gap: 8px; margin-bottom: 16px; }
+.botao-ano { background: var(--branco); color: var(--texto-suave); border: 1px solid var(--borda) !important; font-size: 13px; padding: 7px 16px; }
+.botao-ano-ativo, .botao-ano-ativo:hover { background: var(--cor-marca); color: white; border-color: var(--cor-marca) !important; }
+
+.abas-financeiro { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--borda); flex-wrap: wrap; }
+.aba-financeiro {
+  background: none; color: var(--texto-suave); font-size: 13px; font-weight: 500;
+  padding: 10px 14px; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent !important;
+}
+.aba-financeiro-ativa, .aba-financeiro-ativa:hover { color: var(--cor-marca); border-bottom: 2px solid var(--cor-marca) !important; background: none; }
+
+.faixa-meses { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.botao-mes { background: var(--branco); color: var(--texto-suave); border: 1px solid var(--borda) !important; font-size: 13px; padding: 7px 14px; text-transform: capitalize; }
+.botao-mes-ativo, .botao-mes-ativo:hover { background: var(--cor-marca); color: white; border-color: var(--cor-marca) !important; }
+
+.filtro-tipo-lanc { display: flex; gap: 8px; margin-bottom: 16px; }
+
+.grade-resumo-mes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.cartao-resumo { border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+.cartao-resumo.receita { background: #ECFDF5; }
+.cartao-resumo.despesa { background: #FEF2F2; }
+.cartao-resumo.saldo { background: var(--marca-plataforma-lavanda); }
+.rotulo-resumo { font-size: 12px; color: var(--texto-suave); }
+.cartao-resumo.receita .valor-resumo { color: var(--sucesso); }
+.cartao-resumo.despesa .valor-resumo { color: var(--erro); }
+.cartao-resumo.saldo .valor-resumo { color: var(--cor-marca-escura); }
+.valor-resumo { font-size: 20px; font-weight: 700; }
+
+.cabecalho-secao-lanc { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.titulo-secao-lanc { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.titulo-secao-receita, .total-secao-receita { color: var(--sucesso); }
+.titulo-secao-despesa, .total-secao-despesa { color: var(--erro); }
+.total-secao-lanc { font-weight: 700; font-size: 13px; }
+
+.linha-lancamento {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--borda);
+}
+.linha-lancamento:last-child { border-bottom: none; }
+.info-lancamento { flex: 1; min-width: 0; }
+.descricao-lancamento { font-size: 14px; font-weight: 500; }
+.detalhe-lancamento { font-size: 12px; color: var(--texto-suave); margin-top: 2px; }
+.etiqueta-status-lanc { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+.etiqueta-pendente { background: #FEF3C7; color: #92400E; }
+.etiqueta-recebido, .etiqueta-pago { background: #DCFCE7; color: var(--sucesso); }
+.valor-lancamento { font-weight: 700; font-size: 14px; min-width: 90px; text-align: right; }
+.valor-receita { color: var(--sucesso); }
+.valor-despesa { color: var(--erro); }
+.botao-icone {
+  background: none; color: var(--texto-suave); padding: 6px; border-radius: 6px;
+}
+.botao-icone:hover { background: var(--fundo); }
+.botao-icone-perigo:hover { background: #FEE2E2; color: var(--erro); }
+
 .aviso-modulo-futuro {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px;

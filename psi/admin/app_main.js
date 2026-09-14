@@ -97,6 +97,7 @@ function App() {
           <TelaDashboard usuario={usuario} aoAbrirPaciente={() => setTelaAtiva("pacientes")} />
         )}
         {telaAtiva === "pacientes" && <TelaPacientes usuario={usuario} />}
+        {telaAtiva === "financeiro" && <TelaFinanceiro usuario={usuario} />}
         {telaAtiva === "agenda" && <TelaAgenda usuario={usuario} />}
         {telaAtiva === "configuracoes" && <TelaConfiguracoes usuario={usuario} />}
       </main>
@@ -111,6 +112,7 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
   const itens = [
     { id: "dashboard", rotulo: "Dashboard", icone: "layout-dashboard" },
     { id: "pacientes", rotulo: "Pacientes", icone: "users" },
+    { id: "financeiro", rotulo: "Financeiro", icone: "circle-dollar-sign" },
     { id: "agenda", rotulo: "Agenda", icone: "calendar-days" },
     { id: "configuracoes", rotulo: "Configurações", icone: "settings" },
   ];

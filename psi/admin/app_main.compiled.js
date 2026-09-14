@@ -84,6 +84,8 @@ function App() {
     aoAbrirPaciente: () => setTelaAtiva("pacientes")
   }), telaAtiva === "pacientes" && /*#__PURE__*/React.createElement(TelaPacientes, {
     usuario: usuario
+  }), telaAtiva === "financeiro" && /*#__PURE__*/React.createElement(TelaFinanceiro, {
+    usuario: usuario
   }), telaAtiva === "agenda" && /*#__PURE__*/React.createElement(TelaAgenda, {
     usuario: usuario
   }), telaAtiva === "configuracoes" && /*#__PURE__*/React.createElement(TelaConfiguracoes, {
@@ -106,6 +108,10 @@ function Sidebar({
     id: "pacientes",
     rotulo: "Pacientes",
     icone: "users"
+  }, {
+    id: "financeiro",
+    rotulo: "Financeiro",
+    icone: "circle-dollar-sign"
   }, {
     id: "agenda",
     rotulo: "Agenda",
