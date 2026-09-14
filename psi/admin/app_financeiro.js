@@ -65,6 +65,98 @@ function fmtMoeda(v) {
   return (v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Configuração padrão de comissões — cada clínica tem a sua, em
+// clinica_config/{psi_id} (coleção protegida, nunca pública, ao
+// contrário de psi_config que é lida pelo site público).
+const CONFIG_COMISSAO_PADRAO = {
+  nomeSecretaria: "", salarioFixo: 0, percPrimeira: 10, percRecorrente: 5,
+  valorSupervisaoSocial: 40, valorEstagiariaSocial: 20,
+};
+
+// Registra a comissão da secretária sobre uma venda (pacote/sessão avulsa).
+// Só gera algo se a clínica tiver secretária configurada — clínicas sem
+// secretária (a maioria no início) não veem nenhuma comissão.
+async function registrarComissao(usuario, config, { tipo, valor, pacienteNome, tipoVenda, pacoteId = null }) {
+  if (!config?.nomeSecretaria) return;
+  const perc = tipoVenda === "primeira" ? (parseFloat(config.percPrimeira) || 0) : (parseFloat(config.percRecorrente) || 0);
+  if (perc <= 0) return;
+  const valorComissao = parseFloat((valor * (perc / 100)).toFixed(2));
+  await db.collection("clinica_comissoes").add({
+    psi_id: usuario.psiId,
+    tipo, tipoVenda, perc,
+    valorBase: valor, valorComissao,
+    pacienteNome, pacoteId,
+    responsavel: config.nomeSecretaria,
+    mesRef: new Date().toISOString().slice(0, 7),
+    status: "pendente",
+    criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// Registra o repasse devido a uma parceira numa venda em parceria.
+async function registrarRepasseParceria(usuario, { parceira, valorTotal, pacienteNome, pacoteId }) {
+  const perc = parseFloat(parceira.percentual) || 0;
+  const valorComissao = parseFloat((valorTotal * (perc / 100)).toFixed(2));
+  if (valorComissao <= 0) return;
+  await db.collection("clinica_comissoes").add({
+    psi_id: usuario.psiId,
+    tipo: "Repasse Parceria", perc,
+    valorBase: valorTotal, valorComissao,
+    pacienteNome, pacoteId,
+    responsavel: parceira.nome,
+    mesRef: new Date().toISOString().slice(0, 7),
+    status: "pendente",
+    criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// Projeto Social: lança o valor de supervisão recebido e a comissão
+// da estagiária responsável (mesmo padrão do sistema real: R$40/R$20
+// por padrão, editável em Configuração de Comissões).
+async function registrarComissaoSocial(usuario, config, parceiras, { pacienteNome, pacoteId, dataInicio }) {
+  const vSupervisao = parseFloat(config?.valorSupervisaoSocial) || 40;
+  const vEstagiaria = parseFloat(config?.valorEstagiariaSocial) || 20;
+  const estagiaria = parceiras.find((p) => p.tipo === "estagiaria");
+  const nomeEst = estagiaria?.nome || "Estagiária";
+  const mesRef = (dataInicio || new Date().toISOString().slice(0, 10)).slice(0, 7);
+  const batch = db.batch();
+  batch.set(db.collection("clinica_lancamentos").doc(), {
+    psi_id: usuario.psiId,
+    tipo_lancamento: "social",
+    tipo: `${pacienteNome || ""} — Projeto Social`,
+    descricao: `${pacienteNome || ""} — Projeto Social`,
+    pacienteNome: pacienteNome || "",
+    valor: vSupervisao, data: dataInicio, formaPag: "PIX", status: "pendente",
+    origem: "pacote-social",
+    criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  batch.set(db.collection("clinica_comissoes").doc(), {
+    psi_id: usuario.psiId,
+    tipo: "Social — Estagiária",
+    tipoVenda: "primeira", perc: 0,
+    valorBase: vSupervisao, valorComissao: vEstagiaria,
+    pacienteNome: pacienteNome || "",
+    responsavel: nomeEst, pacoteId,
+    mesRef, status: "pendente",
+    criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  await batch.commit();
+}
+
+function mesesUltimos12() {
+  const arr = [];
+  const hoje = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    arr.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return arr;
+}
+function mesLabelCurto(m) {
+  try { return new Date(m + "-15").toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }); }
+  catch (e) { return m; }
+}
+
 function TelaFinanceiro({ usuario }) {
   const [aba, setAba] = useState("lancamentos");
   const [pacientes, setPacientes] = useState([]);
@@ -81,6 +173,8 @@ function TelaFinanceiro({ usuario }) {
   const [mostrarPacote, setMostrarPacote] = useState(false);
   const [pacoteEditando, setPacoteEditando] = useState(null);
   const [pacienteFoco, setPacienteFoco] = useState(null);
+  const [configComissao, setConfigComissao] = useState({ ...CONFIG_COMISSAO_PADRAO });
+  const [parceiras, setParceiras] = useState([]);
 
   useEffect(() => {
     const cancelar = db
@@ -123,6 +217,29 @@ function TelaFinanceiro({ usuario }) {
       .collection("clinica_sessoes")
       .where("psi_id", "==", usuario.psiId)
       .onSnapshot((snap) => setSessoesPacotes(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    return cancelar;
+  }, [usuario.psiId]);
+
+  useEffect(() => {
+    const cancelar = db
+      .collection("clinica_config")
+      .doc(usuario.psiId)
+      .onSnapshot((doc) => {
+        const dados = doc.exists ? doc.data().comissoes || {} : {};
+        setConfigComissao({ ...CONFIG_COMISSAO_PADRAO, ...dados });
+      });
+    return cancelar;
+  }, [usuario.psiId]);
+
+  useEffect(() => {
+    const cancelar = db
+      .collection("clinica_parceiras")
+      .where("psi_id", "==", usuario.psiId)
+      .onSnapshot((snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        docs.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
+        setParceiras(docs);
+      });
     return cancelar;
   }, [usuario.psiId]);
 
@@ -241,7 +358,7 @@ function TelaFinanceiro({ usuario }) {
         ))}
       </div>
 
-      {aba !== "lancamentos" && aba !== "pacotes" && aba !== "acompanhamento" && (
+      {aba !== "lancamentos" && aba !== "pacotes" && aba !== "acompanhamento" && aba !== "comissoes" && (
         <div className="cartao-secao">
           <p className="texto-vazio">
             Essa aba ({ABAS_FINANCEIRO.find((a) => a.id === aba)?.rotulo}) ainda não foi construída — é a próxima etapa combinada.
@@ -265,6 +382,10 @@ function TelaFinanceiro({ usuario }) {
           sessoes={sessoesPacotes}
           aoAbrirPaciente={setPacienteFoco}
         />
+      )}
+
+      {aba === "comissoes" && (
+        <ComissoesTab usuario={usuario} config={configComissao} parceiras={parceiras} />
       )}
 
       {aba === "lancamentos" && (
@@ -338,6 +459,8 @@ function TelaFinanceiro({ usuario }) {
           usuario={usuario}
           pacientes={pacientes}
           pacote={pacoteEditando}
+          config={configComissao}
+          parceiras={parceiras}
           aoFechar={() => { setMostrarPacote(false); setPacoteEditando(null); }}
         />
       )}
@@ -657,7 +780,7 @@ function ListaPacotes({ pacotes, sessoes, pacientes, aoEditar }) {
   );
 }
 
-function PacoteForm({ usuario, pacientes, pacote, aoFechar }) {
+function PacoteForm({ usuario, pacientes, pacote, config, parceiras, aoFechar }) {
   const [form, setForm] = useState(
     pacote
       ? { ...pacote, totalSessoes: String(pacote.totalSessoes || ""), valorSessao: String(pacote.valorSessao || "") }
@@ -666,6 +789,7 @@ function PacoteForm({ usuario, pacientes, pacote, aoFechar }) {
           dataInicio: new Date().toISOString().slice(0, 10), horario: "", diasSemana: [],
           modalidade: "Online", tipoAtendimento: "particular",
           statusPag: "pendente", formaPag: "PIX", dataPagamento: "", obs: "",
+          parceiraId: "", percParceiro: "",
         }
   );
   const [salvando, setSalvando] = useState(false);
@@ -675,20 +799,30 @@ function PacoteForm({ usuario, pacientes, pacote, aoFechar }) {
   const total = parseInt(form.totalSessoes) || 0;
   const valorSessao = parseFloat(form.valorSessao) || 0;
   const valorTotal = total * valorSessao;
+  const temSecretaria = !!(config?.nomeSecretaria);
+  const parceirasDisponiveis = parceiras.filter((p) => p.tipo !== "estagiaria");
 
   function alternarDia(dia) {
     const atual = form.diasSemana || [];
     setForm({ ...form, diasSemana: atual.includes(dia) ? atual.filter((d) => d !== dia) : [...atual, dia] });
   }
 
-  async function salvar(evento) {
+  function salvar(evento) {
     evento.preventDefault();
+    executarSalvar(null);
+  }
+
+  async function executarSalvar(tipoVenda) {
     if (!form.pacienteId || !form.totalSessoes || !form.dataInicio) {
       setErro("Paciente, nº de sessões e data de início são obrigatórios.");
       return;
     }
     if (precisaDias && (!form.diasSemana || form.diasSemana.length === 0)) {
       setErro("Selecione os dias da semana.");
+      return;
+    }
+    if (form.tipoAtendimento === "parceria" && !form.parceiraId) {
+      setErro("Selecione a parceira para a venda em parceria.");
       return;
     }
     setErro("");
@@ -757,6 +891,31 @@ function PacoteForm({ usuario, pacientes, pacote, aoFechar }) {
       });
       await batch.commit();
 
+      // ── Comissão da secretária (só se houver secretária configurada) ──
+      if (form.tipoAtendimento === "particular" && tipoVenda && jaPago) {
+        await registrarComissao(usuario, config, {
+          tipo: "Pacote", valor: valorTotal, pacienteNome: pac?.nome || "", tipoVenda, pacoteId: pacRef.id,
+        });
+      }
+
+      // ── Repasse de parceria ──
+      if (form.tipoAtendimento === "parceria") {
+        const parceiraEsc = parceiras.find((p) => p.id === form.parceiraId);
+        if (parceiraEsc) {
+          await registrarRepasseParceria(usuario, {
+            parceira: { ...parceiraEsc, percentual: form.percParceiro || parceiraEsc.percentual },
+            valorTotal, pacienteNome: pac?.nome || "", pacoteId: pacRef.id,
+          });
+        }
+      }
+
+      // ── Projeto Social: lança supervisão + comissão da estagiária ──
+      if (form.tipoAtendimento === "social") {
+        await registrarComissaoSocial(usuario, config, parceiras, {
+          pacienteNome: pac?.nome || "", pacoteId: pacRef.id, dataInicio: form.dataInicio,
+        });
+      }
+
       aoFechar();
     } catch (e) {
       setErro(e.message || "Não foi possível salvar o pacote.");
@@ -784,6 +943,22 @@ function PacoteForm({ usuario, pacientes, pacote, aoFechar }) {
               </button>
             ))}
           </div>
+
+          {form.tipoAtendimento === "parceria" && (
+            <div className="grade-2col">
+              <div>
+                <label>Parceira *</label>
+                <select value={form.parceiraId || ""} onChange={(e) => { const p = parceirasDisponiveis.find((x) => x.id === e.target.value); setForm({ ...form, parceiraId: e.target.value, percParceiro: p?.percentual || "" }); }} required>
+                  <option value="">Selecione</option>
+                  {parceirasDisponiveis.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label>Repasse (%)</label>
+                <input type="number" step="0.1" value={form.percParceiro || ""} onChange={(e) => setForm({ ...form, percParceiro: e.target.value })} />
+              </div>
+            </div>
+          )}
 
           <div className="grade-2col">
             <div>
@@ -867,7 +1042,21 @@ function PacoteForm({ usuario, pacientes, pacote, aoFechar }) {
 
           <div className="acoes-modal">
             <button type="button" className="botao-secundario" onClick={aoFechar}>Cancelar</button>
-            <button type="submit" className="botao-primario" disabled={salvando}>{salvando ? "Salvando..." : pacote ? "Salvar Alterações" : "Criar Pacote"}</button>
+            {!pacote && form.tipoAtendimento === "particular" && temSecretaria ? (
+              <>
+                <button type="button" className="botao-secundario" disabled={salvando} onClick={() => executarSalvar(null)} title="Sem comissão — para lançamentos passados">
+                  📋 Sem Comissão
+                </button>
+                <button type="button" className="botao-primario" disabled={salvando} onClick={() => executarSalvar("primeira")} title={`${config.percPrimeira}% de comissão`}>
+                  🌟 Primeira Venda
+                </button>
+                <button type="button" className="botao-primario" disabled={salvando} onClick={() => executarSalvar("recorrente")} title={`${config.percRecorrente}% de comissão`}>
+                  🔁 Recorrente
+                </button>
+              </>
+            ) : (
+              <button type="submit" className="botao-primario" disabled={salvando}>{salvando ? "Salvando..." : pacote ? "Salvar Alterações" : "Criar Pacote"}</button>
+            )}
           </div>
         </form>
       </div>
@@ -1067,6 +1256,274 @@ ${meses.map((mes) => `
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Comissões ───────────────────────────────────────────────────
+// Versão adaptada ao multi-clínica do sistema real de comissões: uma
+// secretária (opcional, salário fixo + % por venda) e parceiras ou
+// estagiárias (repasse por %). Fora do escopo por enquanto: as
+// ferramentas de auditoria/higienização de dados legados, que eram
+// específicas do histórico da Dra. Lucia e não fazem sentido para uma
+// clínica nova.
+
+function ComissoesTab({ usuario, config, parceiras }) {
+  const [comissoes, setComissoes] = useState([]);
+  const [mesSel, setMesSel] = useState(() => new Date().toISOString().slice(0, 7));
+  const [editandoConfig, setEditandoConfig] = useState(false);
+  const [formConfig, setFormConfig] = useState(config);
+  const [salvandoConfig, setSalvandoConfig] = useState(false);
+  const [mostrarParceira, setMostrarParceira] = useState(false);
+  const [parceiraEditando, setParceiraEditando] = useState(null);
+
+  useEffect(() => {
+    const cancelar = db
+      .collection("clinica_comissoes")
+      .where("psi_id", "==", usuario.psiId)
+      .onSnapshot((snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        docs.sort((a, b) => (b.criadoEm?.toMillis?.() || 0) - (a.criadoEm?.toMillis?.() || 0));
+        setComissoes(docs);
+      });
+    return cancelar;
+  }, [usuario.psiId]);
+
+  async function salvarConfig() {
+    setSalvandoConfig(true);
+    try {
+      await db.collection("clinica_config").doc(usuario.psiId).set({
+        psi_id: usuario.psiId,
+        comissoes: {
+          nomeSecretaria: formConfig.nomeSecretaria || "",
+          salarioFixo: parseFloat(formConfig.salarioFixo) || 0,
+          percPrimeira: parseFloat(formConfig.percPrimeira) || 0,
+          percRecorrente: parseFloat(formConfig.percRecorrente) || 0,
+          valorSupervisaoSocial: parseFloat(formConfig.valorSupervisaoSocial) || 0,
+          valorEstagiariaSocial: parseFloat(formConfig.valorEstagiariaSocial) || 0,
+        },
+      }, { merge: true });
+      setEditandoConfig(false);
+    } finally {
+      setSalvandoConfig(false);
+    }
+  }
+
+  async function marcarPago(c) {
+    await db.collection("clinica_comissoes").doc(c.id).update({ status: "pago", dataPagamento: new Date().toISOString().slice(0, 10) });
+  }
+
+  async function excluirParceira(id) {
+    if (!confirm("Remover esta parceira/estagiária?")) return;
+    await db.collection("clinica_parceiras").doc(id).delete();
+  }
+
+  const comissoesMes = comissoes.filter((c) => (c.mesRef || "") === mesSel);
+  const comissoesSecretaria = comissoesMes.filter((c) => c.tipo !== "Repasse Parceria" && c.tipo !== "Social — Estagiária");
+  const totalComissaoSecretaria = comissoesSecretaria.reduce((a, c) => a + (parseFloat(c.valorComissao) || 0), 0);
+  const totalAPagarSecretaria = (parseFloat(config.salarioFixo) || 0) + totalComissaoSecretaria;
+
+  return (
+    <div>
+      <div className="cartao-secao">
+        <div className="cabecalho-secao-lanc">
+          <span className="titulo-secao-lanc">Configuração de Comissões</span>
+          {!editandoConfig && (
+            <button className="botao-icone" onClick={() => { setFormConfig(config); setEditandoConfig(true); }} title="Editar">
+              <Icone nome="pencil" tamanho={15} />
+            </button>
+          )}
+        </div>
+
+        {!editandoConfig ? (
+          <p className="texto-vazio">
+            {config.nomeSecretaria
+              ? `Secretária: ${config.nomeSecretaria} · ${fmtMoeda(config.salarioFixo)} fixo + ${config.percPrimeira}% (1ª venda) / ${config.percRecorrente}% (recorrente)`
+              : "Nenhuma secretária configurada — os botões de comissão só aparecem depois de configurar."}
+          </p>
+        ) : (
+          <>
+            <div className="grade-2col">
+              <div>
+                <label>Nome da Secretária <span className="opcional">(opcional)</span></label>
+                <input value={formConfig.nomeSecretaria || ""} onChange={(e) => setFormConfig({ ...formConfig, nomeSecretaria: e.target.value })} placeholder="Deixe em branco se não houver" />
+              </div>
+              <div>
+                <label>Salário Fixo (R$)</label>
+                <input type="number" step="0.01" value={formConfig.salarioFixo} onChange={(e) => setFormConfig({ ...formConfig, salarioFixo: e.target.value })} />
+              </div>
+              <div>
+                <label>% Primeira Venda</label>
+                <input type="number" step="0.1" value={formConfig.percPrimeira} onChange={(e) => setFormConfig({ ...formConfig, percPrimeira: e.target.value })} />
+              </div>
+              <div>
+                <label>% Venda Recorrente</label>
+                <input type="number" step="0.1" value={formConfig.percRecorrente} onChange={(e) => setFormConfig({ ...formConfig, percRecorrente: e.target.value })} />
+              </div>
+              <div>
+                <label>Valor Supervisão Social (R$)</label>
+                <input type="number" step="0.01" value={formConfig.valorSupervisaoSocial} onChange={(e) => setFormConfig({ ...formConfig, valorSupervisaoSocial: e.target.value })} />
+              </div>
+              <div>
+                <label>Valor Estagiária Social (R$)</label>
+                <input type="number" step="0.01" value={formConfig.valorEstagiariaSocial} onChange={(e) => setFormConfig({ ...formConfig, valorEstagiariaSocial: e.target.value })} />
+              </div>
+            </div>
+            <div className="acoes-modal">
+              <button className="botao-secundario" onClick={() => setEditandoConfig(false)}>Cancelar</button>
+              <button className="botao-primario" disabled={salvandoConfig} onClick={salvarConfig}>{salvandoConfig ? "Salvando..." : "Salvar"}</button>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="faixa-meses" style={{ marginTop: 20 }}>
+        {mesesUltimos12().map((m) => (
+          <button key={m} className={"botao-mes" + (m === mesSel ? " botao-mes-ativo" : "")} onClick={() => setMesSel(m)}>
+            {mesLabelCurto(m)}
+          </button>
+        ))}
+      </div>
+
+      {config.nomeSecretaria && (
+        <div className="grade-resumo-mes">
+          <div className="cartao-resumo saldo">
+            <span className="rotulo-resumo">A pagar — {config.nomeSecretaria}</span>
+            <span className="valor-resumo">{fmtMoeda(totalAPagarSecretaria)}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="grupo-status">
+        <div className="cabecalho-secao-lanc">
+          <span className="titulo-secao-lanc">Comissões e Repasses do Mês</span>
+        </div>
+        {comissoesMes.length === 0 ? (
+          <p className="texto-vazio">Nenhuma comissão registrada neste mês.</p>
+        ) : (
+          <div className="cartao-lista-pacientes">
+            {comissoesMes.map((c) => (
+              <div key={c.id} className="linha-lancamento">
+                <div className="info-lancamento">
+                  <div className="descricao-lancamento">
+                    {c.tipo}{c.responsavel ? " — " + c.responsavel : ""}{c.pacienteNome ? " · " + c.pacienteNome : ""}
+                  </div>
+                  <div className="detalhe-lancamento">
+                    {c.tipoVenda === "primeira" ? "Primeira venda" : c.tipoVenda === "recorrente" ? "Recorrente" : ""}
+                    {c.perc ? ` · ${c.perc}%` : ""}
+                  </div>
+                </div>
+                <span className={"etiqueta-status-lanc " + (c.status === "pago" ? "etiqueta-recebido" : "etiqueta-pendente")}>
+                  {c.status === "pago" ? "✓ Pago" : "Pendente"}
+                </span>
+                <span className="valor-lancamento valor-receita">{fmtMoeda(c.valorComissao)}</span>
+                {c.status !== "pago" && (
+                  <button className="botao-secundario" onClick={() => marcarPago(c)}>Marcar Pago</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="grupo-status">
+        <div className="cabecalho-secao-lanc">
+          <span className="titulo-secao-lanc">Parceiras e Estagiárias</span>
+          <button className="botao-icone" onClick={() => { setParceiraEditando(null); setMostrarParceira(true); }} title="Adicionar">
+            <Icone nome="plus" tamanho={15} />
+          </button>
+        </div>
+        {parceiras.length === 0 ? (
+          <p className="texto-vazio">Nenhuma parceira ou estagiária cadastrada.</p>
+        ) : (
+          <div className="cartao-lista-pacientes">
+            {parceiras.map((p) => (
+              <div key={p.id} className="linha-lancamento">
+                <div className="info-lancamento">
+                  <div className="descricao-lancamento">{p.nome}</div>
+                  <div className="detalhe-lancamento">
+                    {p.tipo === "estagiaria" ? "Estagiária" : "Parceira"} · {p.percentual}%{p.pix ? " · PIX: " + p.pix : ""}
+                  </div>
+                </div>
+                <button className="botao-icone" onClick={() => { setParceiraEditando(p); setMostrarParceira(true); }} title="Editar">
+                  <Icone nome="pencil" tamanho={15} />
+                </button>
+                <button className="botao-icone botao-icone-perigo" onClick={() => excluirParceira(p.id)} title="Excluir">
+                  <Icone nome="trash-2" tamanho={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {mostrarParceira && (
+        <FormParceira
+          usuario={usuario}
+          parceira={parceiraEditando}
+          aoFechar={() => { setMostrarParceira(false); setParceiraEditando(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FormParceira({ usuario, parceira, aoFechar }) {
+  const [form, setForm] = useState(parceira || { nome: "", percentual: "70", pix: "", tipo: "parceira" });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function salvar(evento) {
+    evento.preventDefault();
+    if (!form.nome) { setErro("Nome é obrigatório."); return; }
+    setErro("");
+    setSalvando(true);
+    try {
+      const dados = { nome: form.nome, percentual: parseFloat(form.percentual) || 0, pix: form.pix || "", tipo: form.tipo || "parceira" };
+      if (parceira) {
+        await db.collection("clinica_parceiras").doc(parceira.id).update(dados);
+      } else {
+        await db.collection("clinica_parceiras").add({ ...dados, psi_id: usuario.psiId, criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+      aoFechar();
+    } catch (e) {
+      setErro(e.message || "Não foi possível salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="sobreposicao" onClick={aoFechar}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>{parceira ? "Editar" : "Nova"} Parceira / Estagiária</h3>
+        <form onSubmit={salvar}>
+          <label>Nome *</label>
+          <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
+
+          <label>Tipo</label>
+          <div className="pills-status">
+            {[["parceira", "Parceira"], ["estagiaria", "Estagiária"]].map(([v, l]) => (
+              <button key={v} type="button" className={"pill-status" + (form.tipo === v ? " pill-status-ativa" : "")} onClick={() => setForm({ ...form, tipo: v })}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          <label>Percentual padrão de repasse (%)</label>
+          <input type="number" step="0.1" value={form.percentual} onChange={(e) => setForm({ ...form, percentual: e.target.value })} />
+
+          <label>Chave PIX <span className="opcional">(opcional)</span></label>
+          <input value={form.pix || ""} onChange={(e) => setForm({ ...form, pix: e.target.value })} />
+
+          {erro && <p className="mensagem-erro">{erro}</p>}
+
+          <div className="acoes-modal">
+            <button type="button" className="botao-secundario" onClick={aoFechar}>Cancelar</button>
+            <button type="submit" className="botao-primario" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
