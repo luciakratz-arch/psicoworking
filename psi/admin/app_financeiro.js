@@ -877,14 +877,14 @@ function PacoteForm({ usuario, pacientes, pacote, config, parceiras, aoFechar })
       });
 
       const jaPago = form.statusPag === "recebido";
+      const refsSessoes = datas.map((data, i) => ({ ref: db.collection("clinica_sessoes").doc(), data, numSessao: i + 1 }));
       const batch = db.batch();
-      datas.forEach((data, i) => {
-        const ref = db.collection("clinica_sessoes").doc();
+      refsSessoes.forEach(({ ref, data, numSessao }) => {
         batch.set(ref, {
           psi_id: usuario.psiId,
           pacienteId: form.pacienteId, pacienteNome: pac?.nome || "",
           data, hora: form.horario, duracao: "50", tipo: "Psicoterapia",
-          status: "agendado", numSessao: i + 1, pacoteId: pacRef.id,
+          status: "agendado", numSessao, pacoteId: pacRef.id,
           valorSessao, pagamento: jaPago ? "pago" : "pendente",
           valorPago: jaPago ? valorSessao : 0,
           formaPagamento: form.formaPag,
@@ -894,6 +894,35 @@ function PacoteForm({ usuario, pacientes, pacote, config, parceiras, aoFechar })
         });
       });
       await batch.commit();
+
+      // ── Sincroniza cada sessão com o Google Agenda conectado ──
+      // (a Agenda do PsiCoWorking é só o Google Agenda — ver app_agenda.js
+      // — então "aparecer na agenda" significa virar evento de verdade lá).
+      // Se a psicóloga ainda não conectou o Google Agenda, o pacote é
+      // criado normalmente mesmo assim, só sem sincronizar.
+      try {
+        const horaStr = form.horario || "09:00";
+        for (const { ref, data, numSessao } of refsSessoes) {
+          const inicio = new Date(`${data}T${horaStr}:00`);
+          const fim = new Date(inicio.getTime() + 50 * 60000);
+          const resultado = await chamarCriarEventoAgenda({
+            titulo: `${pac?.nome || "Paciente"} — Sessão ${numSessao}/${total}`,
+            descricao: form.obs || "",
+            inicio: inicio.toISOString(),
+            fim: fim.toISOString(),
+          });
+          if (resultado?.data?.eventoId) {
+            await ref.update({ eventoGoogleId: resultado.data.eventoId });
+          }
+        }
+      } catch (eAgenda) {
+        if (eAgenda.code === "functions/failed-precondition") {
+          alert("Pacote criado! Só não entrou no Google Agenda porque ela ainda não está conectada — conecte em \"Agenda\" para as próximas sessões aparecerem lá também.");
+        } else {
+          console.warn("Falha ao sincronizar sessões com o Google Agenda:", eAgenda);
+          alert("Pacote criado, mas não foi possível sincronizar todas as sessões com o Google Agenda agora. Elas continuam salvas normalmente no PsiCoWorking.");
+        }
+      }
 
       // ── Comissão da secretária (só se houver secretária configurada) ──
       if (form.tipoAtendimento === "particular" && tipoVenda && jaPago) {
