@@ -11,6 +11,57 @@
 const CATS_DESPESA_CLINICA = ["Aluguel", "Condomínio", "Energia / Água", "Telefone / Internet", "Salário Secretária", "Contador / Impostos", "Marketing", "Equipamentos", "Materiais", "Ferramentas de IA", "Cursos e Capacitação", "Musicoterapia", "Manutenção", "Outros"];
 const FORMAS_PAG_CLINICA = ["PIX", "Cartão de Crédito", "Cartão de Débito", "Dinheiro", "Depósito", "Transferência", "Outro"];
 const TIPOS_RECEITA = ["Consulta", "Avaliação", "Sessão Avulsa", "Outro"];
+const RECORRENCIAS = ["Semanal (1x/semana)", "2x por semana", "3x por semana", "Quinzenal", "Mensal", "Sessão única"];
+const DIAS_SEMANA_LABEL = {
+  0: "Dom",
+  1: "Seg",
+  2: "Ter",
+  3: "Qua",
+  4: "Qui",
+  5: "Sex",
+  6: "Sáb"
+};
+const TIPOS_ATENDIMENTO = [{
+  valor: "particular",
+  rotulo: "Particular",
+  icone: "banknote"
+}, {
+  valor: "social",
+  rotulo: "Social",
+  icone: "leaf"
+}, {
+  valor: "parceria",
+  rotulo: "Parceria",
+  icone: "handshake"
+}];
+
+// Gera as datas das sessões de um pacote a partir da recorrência —
+// mesma lógica do sistema original.
+function gerarDatasPacote(dataInicio, recorrencia, total, diasSemana) {
+  if (recorrencia === "Sessão única") return [dataInicio];
+  const datas = [];
+  if (["Semanal (1x/semana)", "Quinzenal", "Mensal"].includes(recorrencia)) {
+    let atual = new Date(dataInicio + "T00:00:00");
+    while (datas.length < total) {
+      datas.push(atual.toISOString().split("T")[0]);
+      if (recorrencia === "Semanal (1x/semana)") atual.setDate(atual.getDate() + 7);else if (recorrencia === "Quinzenal") atual.setDate(atual.getDate() + 14);else atual.setMonth(atual.getMonth() + 1);
+    }
+    return datas.slice(0, total);
+  }
+  // 2x ou 3x por semana — sempre inclui a data de início como 1ª sessão
+  const dias = (diasSemana || []).map(Number).sort();
+  if (!dias.length) return [];
+  datas.push(dataInicio);
+  let atual = new Date(dataInicio + "T00:00:00");
+  atual.setDate(atual.getDate() + 1);
+  const fim = new Date(atual);
+  fim.setFullYear(fim.getFullYear() + 2);
+  while (datas.length < total && atual < fim) {
+    if (dias.includes(atual.getDay())) datas.push(atual.toISOString().split("T")[0]);
+    atual.setDate(atual.getDate() + 1);
+  }
+  return datas.slice(0, total);
+}
 const ABAS_FINANCEIRO = [{
   id: "lancamentos",
   rotulo: "Lançamentos",
@@ -51,6 +102,10 @@ function TelaFinanceiro({
   const [mostrarNovo, setMostrarNovo] = useState(false);
   const [mostrarDespesa, setMostrarDespesa] = useState(false);
   const [lancEditando, setLancEditando] = useState(null);
+  const [pacotes, setPacotes] = useState([]);
+  const [sessoesPacotes, setSessoesPacotes] = useState([]);
+  const [mostrarPacote, setMostrarPacote] = useState(false);
+  const [pacoteEditando, setPacoteEditando] = useState(null);
   useEffect(() => {
     const cancelar = db.collection("clinica_pacientes").where("psi_id", "==", usuario.psiId).onSnapshot(snap => setPacientes(snap.docs.map(d => ({
       id: d.id,
@@ -68,6 +123,24 @@ function TelaFinanceiro({
       setLancamentos(docs);
       setCarregando(false);
     }, () => setCarregando(false));
+    return cancelar;
+  }, [usuario.psiId]);
+  useEffect(() => {
+    const cancelar = db.collection("clinica_pacotes").where("psi_id", "==", usuario.psiId).onSnapshot(snap => {
+      const docs = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+      docs.sort((a, b) => (b.criadoEm?.toMillis?.() || 0) - (a.criadoEm?.toMillis?.() || 0));
+      setPacotes(docs);
+    });
+    return cancelar;
+  }, [usuario.psiId]);
+  useEffect(() => {
+    const cancelar = db.collection("clinica_sessoes").where("psi_id", "==", usuario.psiId).onSnapshot(snap => setSessoesPacotes(snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }))));
     return cancelar;
   }, [usuario.psiId]);
   function nomePaciente(id) {
@@ -129,7 +202,16 @@ function TelaFinanceiro({
     className: "subtitulo-pagina"
   }, "Lan\xE7amentos, pacotes e controle de sess\xF5es")), /*#__PURE__*/React.createElement("div", {
     className: "acoes-cabecalho"
-  }, /*#__PURE__*/React.createElement("button", {
+  }, aba === "pacotes" ? /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: () => {
+      setPacoteEditando(null);
+      setMostrarPacote(true);
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "plus",
+    tamanho: 16
+  }), " Novo Pacote") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     className: "botao-perigo",
     onClick: () => {
       setLancEditando(null);
@@ -147,7 +229,7 @@ function TelaFinanceiro({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "plus",
     tamanho: 16
-  }), " Novo Lan\xE7amento"))), /*#__PURE__*/React.createElement("div", {
+  }), " Novo Lan\xE7amento")))), /*#__PURE__*/React.createElement("div", {
     className: "seletor-ano"
   }, anosDisp.map(a => /*#__PURE__*/React.createElement("button", {
     key: a,
@@ -167,8 +249,8 @@ function TelaFinanceiro({
     icone: "clock"
   }), /*#__PURE__*/React.createElement(CartaoStat, {
     titulo: "Pacotes ativos",
-    valor: "\u2014",
-    legenda: "em breve",
+    valor: pacotes.filter(p => p.status === "ativo").length,
+    legenda: "em andamento",
     icone: "package"
   }), /*#__PURE__*/React.createElement(CartaoStat, {
     titulo: `Lançamentos (${mesLabel(mesFiltroEfetivo)})`,
@@ -184,11 +266,19 @@ function TelaFinanceiro({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: a.icone,
     tamanho: 15
-  }), " ", a.rotulo))), aba !== "lancamentos" && /*#__PURE__*/React.createElement("div", {
+  }), " ", a.rotulo))), aba !== "lancamentos" && aba !== "pacotes" && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
-  }, "Essa aba (", ABAS_FINANCEIRO.find(a => a.id === aba)?.rotulo, ") ainda n\xE3o foi constru\xEDda \u2014 \xE9 a pr\xF3xima etapa combinada.")), aba === "lancamentos" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "Essa aba (", ABAS_FINANCEIRO.find(a => a.id === aba)?.rotulo, ") ainda n\xE3o foi constru\xEDda \u2014 \xE9 a pr\xF3xima etapa combinada.")), aba === "pacotes" && /*#__PURE__*/React.createElement(ListaPacotes, {
+    pacotes: pacotes,
+    sessoes: sessoesPacotes,
+    pacientes: pacientes,
+    aoEditar: p => {
+      setPacoteEditando(p);
+      setMostrarPacote(true);
+    }
+  }), aba === "lancamentos" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "faixa-meses"
   }, mesesDoAno.map(m => /*#__PURE__*/React.createElement("button", {
     key: m,
@@ -250,6 +340,14 @@ function TelaFinanceiro({
     aoFechar: () => {
       setMostrarDespesa(false);
       setLancEditando(null);
+    }
+  }), mostrarPacote && /*#__PURE__*/React.createElement(PacoteForm, {
+    usuario: usuario,
+    pacientes: pacientes,
+    pacote: pacoteEditando,
+    aoFechar: () => {
+      setMostrarPacote(false);
+      setPacoteEditando(null);
     }
   }));
 }
@@ -623,4 +721,393 @@ function FormDespesa({
     className: "botao-primario",
     disabled: salvando
   }, salvando ? "Salvando..." : "Salvar")))));
+}
+
+// ─── Pacotes & Sessões ──────────────────────────────────────────
+// Portado do salvarPacote() do sistema real — sem comissão, repasse
+// de parceria ou e-mail automático (fora do escopo por enquanto).
+
+const MODALIDADES_PACOTE = ["Online", "Presencial"];
+function ListaPacotes({
+  pacotes,
+  sessoes,
+  pacientes,
+  aoEditar
+}) {
+  async function excluirPacote(pacote) {
+    if (!confirm("Excluir este pacote e todas as sessões vinculadas a ele?")) return;
+    const batch = db.batch();
+    batch.delete(db.collection("clinica_pacotes").doc(pacote.id));
+    sessoes.filter(s => s.pacoteId === pacote.id).forEach(s => batch.delete(db.collection("clinica_sessoes").doc(s.id)));
+    const lancSnap = await db.collection("clinica_lancamentos").where("pacoteId", "==", pacote.id).get();
+    lancSnap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+  if (pacotes.length === 0) {
+    return /*#__PURE__*/React.createElement("p", {
+      className: "texto-vazio"
+    }, "Nenhum pacote cadastrado ainda.");
+  }
+  const porPaciente = {};
+  pacotes.forEach(p => {
+    const chave = p.pacienteId || "sem-paciente";
+    if (!porPaciente[chave]) porPaciente[chave] = [];
+    porPaciente[chave].push(p);
+  });
+  return /*#__PURE__*/React.createElement("div", null, Object.entries(porPaciente).map(([pacienteId, lista]) => {
+    const nome = pacientes.find(p => p.id === pacienteId)?.nome || lista[0].pacienteNome || "Paciente";
+    return /*#__PURE__*/React.createElement("div", {
+      key: pacienteId,
+      className: "grupo-status"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "cabecalho-secao-lanc"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "titulo-secao-lanc"
+    }, nome)), /*#__PURE__*/React.createElement("div", {
+      className: "cartao-lista-pacientes"
+    }, lista.map(pac => {
+      const sessoesPac = sessoes.filter(s => s.pacoteId === pac.id);
+      const realizadas = sessoesPac.filter(s => s.status === "realizada" || s.pagamento === "pago").length;
+      const total = pac.totalSessoes || sessoesPac.length || 1;
+      const pct = Math.min(100, Math.round(realizadas / total * 100));
+      return /*#__PURE__*/React.createElement("div", {
+        key: pac.id,
+        className: "cartao-pacote"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "info-pacote"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "descricao-lancamento"
+      }, "Pacote de ", pac.totalSessoes, " sess\xF5es \u2014 ", pac.recorrencia), /*#__PURE__*/React.createElement("div", {
+        className: "detalhe-lancamento"
+      }, "In\xEDcio ", pac.dataInicio?.split("-").reverse().join("/"), " · ", TIPOS_ATENDIMENTO.find(t => t.valor === pac.tipoAtendimento)?.rotulo || "Particular", pac.horario ? " · " + pac.horario : ""), /*#__PURE__*/React.createElement("div", {
+        className: "barra-progresso"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "barra-progresso-preenchimento",
+        style: {
+          width: pct + "%"
+        }
+      })), /*#__PURE__*/React.createElement("div", {
+        className: "detalhe-lancamento"
+      }, realizadas, " de ", total, " sess\xF5es realizadas")), /*#__PURE__*/React.createElement("span", {
+        className: "etiqueta-status-lanc etiqueta-" + (pac.statusPag || "pendente")
+      }, pac.statusPag === "recebido" ? "✓ Recebido" : "Pendente"), /*#__PURE__*/React.createElement("span", {
+        className: "valor-lancamento valor-receita"
+      }, fmtMoeda(pac.valorTotal)), /*#__PURE__*/React.createElement("button", {
+        className: "botao-icone",
+        onClick: () => aoEditar(pac),
+        title: "Editar"
+      }, /*#__PURE__*/React.createElement(Icone, {
+        nome: "pencil",
+        tamanho: 15
+      })), /*#__PURE__*/React.createElement("button", {
+        className: "botao-icone botao-icone-perigo",
+        onClick: () => excluirPacote(pac),
+        title: "Excluir"
+      }, /*#__PURE__*/React.createElement(Icone, {
+        nome: "trash-2",
+        tamanho: 15
+      })));
+    })));
+  }));
+}
+function PacoteForm({
+  usuario,
+  pacientes,
+  pacote,
+  aoFechar
+}) {
+  const [form, setForm] = useState(pacote ? {
+    ...pacote,
+    totalSessoes: String(pacote.totalSessoes || ""),
+    valorSessao: String(pacote.valorSessao || "")
+  } : {
+    pacienteId: "",
+    totalSessoes: "",
+    valorSessao: "",
+    recorrencia: RECORRENCIAS[0],
+    dataInicio: new Date().toISOString().slice(0, 10),
+    horario: "",
+    diasSemana: [],
+    modalidade: "Online",
+    tipoAtendimento: "particular",
+    statusPag: "pendente",
+    formaPag: "PIX",
+    dataPagamento: "",
+    obs: ""
+  });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const precisaDias = ["2x por semana", "3x por semana"].includes(form.recorrencia);
+  const total = parseInt(form.totalSessoes) || 0;
+  const valorSessao = parseFloat(form.valorSessao) || 0;
+  const valorTotal = total * valorSessao;
+  function alternarDia(dia) {
+    const atual = form.diasSemana || [];
+    setForm({
+      ...form,
+      diasSemana: atual.includes(dia) ? atual.filter(d => d !== dia) : [...atual, dia]
+    });
+  }
+  async function salvar(evento) {
+    evento.preventDefault();
+    if (!form.pacienteId || !form.totalSessoes || !form.dataInicio) {
+      setErro("Paciente, nº de sessões e data de início são obrigatórios.");
+      return;
+    }
+    if (precisaDias && (!form.diasSemana || form.diasSemana.length === 0)) {
+      setErro("Selecione os dias da semana.");
+      return;
+    }
+    setErro("");
+    setSalvando(true);
+    try {
+      const pac = pacientes.find(p => p.id === form.pacienteId);
+      if (pacote) {
+        // Edição: atualiza os dados do pacote (não regera as sessões já criadas)
+        await db.collection("clinica_pacotes").doc(pacote.id).update({
+          pacienteId: form.pacienteId,
+          pacienteNome: pac?.nome || "",
+          totalSessoes: total,
+          valorSessao,
+          valorTotal,
+          recorrencia: form.recorrencia,
+          dataInicio: form.dataInicio,
+          horario: form.horario,
+          modalidade: form.modalidade,
+          tipoAtendimento: form.tipoAtendimento,
+          statusPag: form.statusPag,
+          formaPag: form.formaPag,
+          dataPagamento: form.dataPagamento,
+          obs: form.obs
+        });
+        aoFechar();
+        return;
+      }
+      const datas = gerarDatasPacote(form.dataInicio, form.recorrencia, total, form.diasSemana);
+      const pacRef = await db.collection("clinica_pacotes").add({
+        psi_id: usuario.psiId,
+        pacienteId: form.pacienteId,
+        pacienteNome: pac?.nome || "",
+        totalSessoes: total,
+        valorSessao,
+        valorTotal,
+        recorrencia: form.recorrencia,
+        dataInicio: form.dataInicio,
+        horario: form.horario,
+        diasSemana: form.diasSemana || [],
+        modalidade: form.modalidade,
+        tipoAtendimento: form.tipoAtendimento,
+        statusPag: form.statusPag,
+        formaPag: form.formaPag,
+        dataPagamento: form.dataPagamento,
+        obs: form.obs,
+        status: "ativo",
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      const mesInicio = new Date(form.dataInicio + "T00:00:00").toLocaleDateString("pt-BR", {
+        month: "long",
+        year: "numeric"
+      });
+      const descricaoLanc = `${pac?.nome || "Paciente"} — Pacote ${total} Sessões — ${mesInicio.charAt(0).toUpperCase() + mesInicio.slice(1)}`;
+      await db.collection("clinica_lancamentos").add({
+        psi_id: usuario.psiId,
+        tipo_lancamento: "pacote",
+        pacoteId: pacRef.id,
+        pacienteId: form.pacienteId,
+        pacienteNome: pac?.nome || "",
+        tipo: descricaoLanc,
+        descricao: descricaoLanc,
+        valor: valorTotal,
+        data: form.dataInicio,
+        formaPag: form.formaPag,
+        status: form.statusPag,
+        dataPagamento: form.dataPagamento,
+        obs: form.obs,
+        totalSessoes: total,
+        valorSessao,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      const jaPago = form.statusPag === "recebido";
+      const batch = db.batch();
+      datas.forEach((data, i) => {
+        const ref = db.collection("clinica_sessoes").doc();
+        batch.set(ref, {
+          psi_id: usuario.psiId,
+          pacienteId: form.pacienteId,
+          pacienteNome: pac?.nome || "",
+          data,
+          hora: form.horario,
+          duracao: "50",
+          tipo: "Psicoterapia",
+          status: "agendado",
+          numSessao: i + 1,
+          pacoteId: pacRef.id,
+          valorSessao,
+          pagamento: jaPago ? "pago" : "pendente",
+          valorPago: jaPago ? valorSessao : 0,
+          formaPagamento: form.formaPag,
+          dataPagamento: jaPago ? form.dataPagamento || new Date().toISOString().slice(0, 10) : "",
+          obs: "",
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      await batch.commit();
+      aoFechar();
+    } catch (e) {
+      setErro(e.message || "Não foi possível salvar o pacote.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sobreposicao",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("h3", null, pacote ? "Editar Pacote" : "Novo Pacote de Sessões"), /*#__PURE__*/React.createElement("form", {
+    onSubmit: salvar
+  }, /*#__PURE__*/React.createElement("label", null, "Paciente *"), /*#__PURE__*/React.createElement("select", {
+    value: form.pacienteId,
+    onChange: e => setForm({
+      ...form,
+      pacienteId: e.target.value
+    }),
+    required: true
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Selecione"), pacientes.map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.id
+  }, p.nome))), /*#__PURE__*/React.createElement("label", null, "Tipo de Atendimento"), /*#__PURE__*/React.createElement("div", {
+    className: "pills-status"
+  }, TIPOS_ATENDIMENTO.map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.valor,
+    type: "button",
+    className: "pill-status" + (form.tipoAtendimento === t.valor ? " pill-status-ativa" : ""),
+    onClick: () => setForm({
+      ...form,
+      tipoAtendimento: t.valor
+    })
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: t.icone,
+    tamanho: 14
+  }), " ", t.rotulo))), /*#__PURE__*/React.createElement("div", {
+    className: "grade-2col"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "N\xBA de Sess\xF5es *"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    value: form.totalSessoes,
+    onChange: e => setForm({
+      ...form,
+      totalSessoes: e.target.value
+    }),
+    required: true
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Recorr\xEAncia *"), /*#__PURE__*/React.createElement("select", {
+    value: form.recorrencia,
+    onChange: e => setForm({
+      ...form,
+      recorrencia: e.target.value
+    })
+  }, RECORRENCIAS.map(r => /*#__PURE__*/React.createElement("option", {
+    key: r
+  }, r))))), precisaDias && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Dias da Semana"), /*#__PURE__*/React.createElement("div", {
+    className: "pills-status"
+  }, Object.entries(DIAS_SEMANA_LABEL).map(([n, l]) => /*#__PURE__*/React.createElement("button", {
+    key: n,
+    type: "button",
+    className: "pill-status" + ((form.diasSemana || []).includes(Number(n)) ? " pill-status-ativa" : ""),
+    onClick: () => alternarDia(Number(n))
+  }, l)))), /*#__PURE__*/React.createElement("div", {
+    className: "grade-2col"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Data de In\xEDcio *"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: form.dataInicio,
+    onChange: e => setForm({
+      ...form,
+      dataInicio: e.target.value
+    }),
+    required: true
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Hor\xE1rio"), /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: form.horario || "",
+    onChange: e => setForm({
+      ...form,
+      horario: e.target.value
+    })
+  }))), /*#__PURE__*/React.createElement("label", null, "Modalidade"), /*#__PURE__*/React.createElement("select", {
+    value: form.modalidade,
+    onChange: e => setForm({
+      ...form,
+      modalidade: e.target.value
+    })
+  }, MODALIDADES_PACOTE.map(m => /*#__PURE__*/React.createElement("option", {
+    key: m
+  }, m))), /*#__PURE__*/React.createElement("div", {
+    className: "grade-2col"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Valor por Sess\xE3o (R$)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    step: "0.01",
+    value: form.valorSessao,
+    onChange: e => setForm({
+      ...form,
+      valorSessao: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Valor Total (autom\xE1tico)"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: fmtMoeda(valorTotal),
+    disabled: true
+  }))), /*#__PURE__*/React.createElement("label", null, "Status do Pagamento"), /*#__PURE__*/React.createElement("div", {
+    className: "pills-status"
+  }, [["pendente", "Pendente", "#F59E0B"], ["recebido", "Recebido", "var(--sucesso)"]].map(([v, l, c]) => /*#__PURE__*/React.createElement("button", {
+    key: v,
+    type: "button",
+    className: "pill-status" + (form.statusPag === v ? " pill-status-ativa" : ""),
+    style: {
+      "--cor-pill": c
+    },
+    onClick: () => setForm({
+      ...form,
+      statusPag: v
+    })
+  }, l))), /*#__PURE__*/React.createElement("div", {
+    className: "grade-2col"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Forma de Pagamento"), /*#__PURE__*/React.createElement("select", {
+    value: form.formaPag,
+    onChange: e => setForm({
+      ...form,
+      formaPag: e.target.value
+    })
+  }, FORMAS_PAG_CLINICA.map(f => /*#__PURE__*/React.createElement("option", {
+    key: f
+  }, f)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Data do Pagamento"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: form.dataPagamento || "",
+    onChange: e => setForm({
+      ...form,
+      dataPagamento: e.target.value
+    })
+  }))), /*#__PURE__*/React.createElement("label", null, "Observa\xE7\xF5es ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional)")), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 2,
+    value: form.obs || "",
+    onChange: e => setForm({
+      ...form,
+      obs: e.target.value
+    })
+  }), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: aoFechar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "botao-primario",
+    disabled: salvando
+  }, salvando ? "Salvando..." : pacote ? "Salvar Alterações" : "Criar Pacote")))));
 }

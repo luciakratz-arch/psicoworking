@@ -387,6 +387,28 @@ button {
 .botao-icone:hover { background: var(--fundo); }
 .botao-icone-perigo:hover { background: #FEE2E2; color: var(--erro); }
 
+/* ── Financeiro: Pacotes & Sessões ─────────────── */
+.cartao-pacote {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--borda);
+}
+.cartao-pacote:last-child { border-bottom: none; }
+.info-pacote { flex: 1; min-width: 0; }
+.barra-progresso {
+  background: var(--fundo);
+  border-radius: 6px;
+  height: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.barra-progresso-preenchimento {
+  background: var(--cor-marca);
+  height: 100%;
+  border-radius: 6px;
+  transition: width .2s;
+}
+
 .aviso-modulo-futuro {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px;
