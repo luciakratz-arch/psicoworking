@@ -2042,6 +2042,58 @@ const MODAL_COLS_ORCAMENTO = [{
   rotulo: "Estudante",
   cor: "#d97706"
 }];
+
+// Tabela de serviços real da Dra. Lucia Kratz, trazida do sistema
+// anterior (admin/app_financeiro.js, SERVICOS_PADRAO) só para import
+// manual — não é semeada automaticamente pra ninguém, cada clínica
+// nova começa com a tabela vazia (ver comentário acima). "adufg" (o
+// convênio dela) virou a coluna genérica "convenio", "aluno" virou
+// "estudante".
+const SERVICOS_IMPORTAR_LUCIA_KRATZ = [{
+  nome: "Psicoterapia",
+  particular: 250,
+  convenio: 225,
+  social: 175,
+  estudante: 125
+}, {
+  nome: "Psicoterapia Pacote",
+  particular: 220,
+  convenio: 200,
+  social: 154,
+  estudante: 110
+}, {
+  nome: "Avaliação Vocacional",
+  particular: 1500,
+  convenio: 1200,
+  social: 1050,
+  estudante: 750
+}, {
+  nome: "Avaliação Neuromodulação",
+  particular: 1800,
+  convenio: 1460,
+  social: 1260,
+  estudante: 900
+}, {
+  nome: "Avaliação Neuropsicológica",
+  particular: 3200,
+  convenio: 1600,
+  social: 2240,
+  estudante: 1600
+}, {
+  nome: "Sessões de Neuromodulação",
+  particular: 250,
+  convenio: 175,
+  social: 175,
+  estudante: 125,
+  obs: "O ideal é de 2 a 3 sessões por semana, dependendo do caso."
+}, {
+  nome: "Pacote Sessões Neuromodulação",
+  particular: 200,
+  convenio: 150,
+  social: 140,
+  estudante: 100,
+  obs: "O ideal é de 2 a 3 sessões por semana, dependendo do caso."
+}];
 function OrcamentoTab({
   usuario
 }) {
@@ -2081,6 +2133,26 @@ function OrcamentoTab({
   }, [usuario.psiId]);
   function toggleSelecionado(id) {
     setSelecionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+  const [importando, setImportando] = useState(false);
+  async function importarTabelaAnterior() {
+    if (!confirm(`Importar os ${SERVICOS_IMPORTAR_LUCIA_KRATZ.length} serviços do sistema anterior para esta clínica?`)) return;
+    setImportando(true);
+    try {
+      const batch = db.batch();
+      SERVICOS_IMPORTAR_LUCIA_KRATZ.forEach(s => {
+        const ref = db.collection("clinica_orcamento_servicos").doc();
+        batch.set(ref, {
+          ...s,
+          obs: s.obs || "",
+          psi_id: usuario.psiId,
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      await batch.commit();
+    } finally {
+      setImportando(false);
+    }
   }
   async function salvarServico() {
     if (!formServ.nome.trim()) {
@@ -2241,9 +2313,18 @@ function OrcamentoTab({
   }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
     onClick: salvarServico
-  }, "Salvar"))), servicos.length === 0 && !novoAberto ? /*#__PURE__*/React.createElement("p", {
-    className: "texto-vazio"
-  }, "Nenhum servi\xE7o cadastrado ainda \u2014 clique no + para adicionar o primeiro.") : /*#__PURE__*/React.createElement("div", {
+  }, "Salvar"))), servicos.length === 0 && !novoAberto ? /*#__PURE__*/React.createElement("div", {
+    className: "aviso-modulo-futuro",
+    style: {
+      flexDirection: "column",
+      alignItems: "flex-start",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Nenhum servi\xE7o cadastrado ainda \u2014 clique no + para adicionar o primeiro."), /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    disabled: importando,
+    onClick: importarTabelaAnterior
+  }, importando ? "Importando..." : "Importar tabela de serviços do sistema anterior (Dra. Lucia Kratz)")) : /*#__PURE__*/React.createElement("div", {
     className: "tabela-servicos-scroll"
   }, /*#__PURE__*/React.createElement("table", {
     className: "tabela-servicos"
