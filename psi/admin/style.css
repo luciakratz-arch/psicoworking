@@ -669,6 +669,20 @@ button {
 }
 .toggle-modulo-ativo .toggle-modulo-bola { left: 22px; }
 
+/* ── Recursos Terapêuticos ─────────────────────────── */
+.campo-busca-recursos { width: 100%; margin-bottom: 20px; }
+.grade-cartoes-recursos {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;
+}
+.cartao-recurso {
+  background: var(--branco); border: 1px solid var(--borda); border-radius: 12px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+}
+.titulo-cartao-recurso { font-weight: 600; font-size: 14px; }
+.descricao-cartao-recurso { font-size: 12.5px; color: var(--texto-suave); line-height: 1.5; margin: 0; }
+.acoes-cartao-recurso { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+.acoes-cartao-recurso .botao-secundario { flex: 1; font-size: 12px; padding: 7px 10px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+
 @media (max-width: 640px) {
   .grade-2col { grid-template-columns: 1fr; }
   .campo-largura-total { grid-column: span 1; }

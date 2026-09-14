@@ -86,6 +86,8 @@ function App() {
     usuario: usuario
   }), telaAtiva === "financeiro" && /*#__PURE__*/React.createElement(TelaFinanceiro, {
     usuario: usuario
+  }), telaAtiva === "recursos" && /*#__PURE__*/React.createElement(TelaRecursos, {
+    usuario: usuario
   }), telaAtiva === "agenda" && /*#__PURE__*/React.createElement(TelaAgenda, {
     usuario: usuario
   }), telaAtiva === "configuracoes" && /*#__PURE__*/React.createElement(TelaConfiguracoes, {
@@ -112,6 +114,10 @@ function Sidebar({
     id: "financeiro",
     rotulo: "Financeiro",
     icone: "circle-dollar-sign"
+  }, {
+    id: "recursos",
+    rotulo: "Recursos Terapêuticos",
+    icone: "wrench"
   }, {
     id: "agenda",
     rotulo: "Agenda",
