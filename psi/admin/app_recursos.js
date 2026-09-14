@@ -346,14 +346,22 @@ function EnviarRecursoModal({ usuario, item, tipo, aoFechar }) {
   );
 }
 
-// Visualização simples do item — como ainda não portamos o conteúdo
-// interativo de cada ferramenta (isso mora no Portal do Paciente,
-// que é uma etapa futura separada), aqui mostra os dados cadastrados:
-// título, categoria e descrição, e no caso das fábulas, a moral e as
-// páginas da história (quando existirem).
+// Preview de verdade — mostra a ferramenta tal como ela vai aparecer
+// pro paciente, igual ao modelo ("Visualização do paciente"). Aqui é
+// só demonstração: os botões de registrar/salvar nunca gravam nada de
+// verdade no banco (não existe um paciente real nessa tela), só
+// mostram a mensagem de confirmação. Cada ferramenta interativa
+// precisa ser portada uma de cada vez — Gestão da Ansiedade é a
+// primeira; as outras ainda caem no aviso "pré-visualização não
+// disponível" abaixo.
+const PREVIEWS_INTERATIVOS = {
+  "anxiety-management": PreviewGestaoAnsiedade,
+};
+
 function VisualizarRecursoModal({ item, aoFechar }) {
   const cores = corDaCategoria(item.categoria);
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
+  const ComponentePreview = PREVIEWS_INTERATIVOS[item.formularioKey];
 
   return (
     <div className="sobreposicao" onClick={aoFechar}>
@@ -364,6 +372,12 @@ function VisualizarRecursoModal({ item, aoFechar }) {
         <h3>{item.titulo || item.nome}</h3>
 
         {item.descricao && <p className="texto-visualizar-recurso">{item.descricao}</p>}
+
+        <div className="aviso-preview-paciente">
+          <Icone nome="eye" tamanho={16} />
+          <span><strong>Visualização do paciente</strong> — assim a ferramenta aparecerá na área do paciente.</span>
+        </div>
+
         {item.moral && (
           <div className="cartao-secao">
             <strong>Moral da história</strong>
@@ -381,10 +395,154 @@ function VisualizarRecursoModal({ item, aoFechar }) {
           </div>
         )}
 
+        {ComponentePreview ? (
+          <div className="cartao-secao">
+            <ComponentePreview />
+          </div>
+        ) : (
+          !item.moral && paginas.length === 0 && (
+            <p className="texto-vazio">
+              Pré-visualização interativa completa ainda não disponível para esta ferramenta — só os dados
+              cadastrados no catálogo por enquanto.
+            </p>
+          )
+        )}
+
         <div className="acoes-modal">
           <button className="botao-primario" onClick={aoFechar}>Fechar</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Preview: Gestão da Ansiedade ──────────────────────────────────
+// Porta fiel da ferramenta real (clinica/app.js, FerramentaGestaoAnsiedade),
+// com as 3 abas (Estresse, Tracking, Pensamentos). Diferença de propósito:
+// aqui os botões "Registrar"/"Salvar" NUNCA gravam nada no banco — é só
+// demonstração pra psicóloga ver como fica pro paciente, sem paciente
+// real nessa tela pra vincular o registro.
+function PreviewGestaoAnsiedade() {
+  const TECNICAS = [
+    { id: "resp", label: "Respiração Relaxada", desc: "Inspirar → Pausar → Expirar por 2 min" },
+    { id: "visao", label: "Visão Periférica", desc: "Mover os olhos da direita para a esquerda" },
+    { id: "musc", label: "Relaxamento Muscular", desc: "Contrair músculos 5s e relaxar com suspiro" },
+  ];
+  const ATIVIDADES = [
+    { id: "caminhada", label: "🚶 Caminhada" },
+    { id: "meditacao", label: "🧘 Meditação" },
+    { id: "diario", label: "📓 Diário" },
+    { id: "musica", label: "🎵 Música" },
+    { id: "alongamento", label: "🤸 Alongamento" },
+    { id: "agua", label: "💧 Hidratação" },
+  ];
+  const PERGUNTAS = [
+    "Qual situação está me deixando ansioso(a)?",
+    "Qual é o meu pensamento ansioso?",
+    "Tenho provas reais de que é 100% verdadeiro?",
+    "Quais evidências indicam que pode NÃO ser verdadeiro?",
+    "Qual a probabilidade real de que o pior aconteça?",
+    "O que eu diria a um amigo com esse mesmo pensamento?",
+    "Existe uma forma mais útil de ver essa situação?",
+    "Preocupar-me está me ajudando ou me machucando?",
+  ];
+  const DESC_ESTRESSE = { 1: "Em paz.", 2: "Otimista.", 3: "Calmo.", 4: "Confortável.", 5: "Neutro.", 6: "Estressando.", 7: "Estressado.", 8: "Irritado.", 9: "Tenso.", 10: "Em pânico." };
+
+  const [aba, setAba] = useState(0);
+  const [stress, setStress] = useState(5);
+  const [nota, setNota] = useState("");
+  const [track, setTrack] = useState({});
+  const [resp, setResp] = useState(Array(8).fill(""));
+  const [msg, setMsg] = useState("");
+
+  const corEstresse = stress <= 3 ? "var(--sucesso)" : stress <= 5 ? "#d97706" : stress <= 7 ? "#f97316" : "var(--erro)";
+
+  function confirmar(texto) {
+    setMsg("✓ " + texto + " (visualização — nada foi salvo de verdade)");
+    setTimeout(() => setMsg(""), 3000);
+  }
+
+  return (
+    <div>
+      <div className="abas-financeiro">
+        {["😰 Estresse", "✅ Tracking", "🧠 Pensamentos"].map((n, i) => (
+          <button key={i} className={"aba-financeiro" + (aba === i ? " aba-financeiro-ativa" : "")} onClick={() => setAba(i)}>
+            {n}
+          </button>
+        ))}
+      </div>
+
+      {aba === 0 && (
+        <div>
+          <div style={{ textAlign: "center", marginBottom: 16 }}>
+            <div style={{ fontSize: 56, fontWeight: 900, color: corEstresse, lineHeight: 1 }}>{stress}</div>
+            <div style={{ fontSize: 12, color: "var(--texto-suave)" }}>/10</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: corEstresse }}>{DESC_ESTRESSE[stress]}</div>
+          </div>
+          <input type="range" min={1} max={10} value={stress} onChange={(e) => setStress(+e.target.value)} style={{ width: "100%", accentColor: corEstresse, marginBottom: 14 }} />
+          <TextAreaVoz className="campo-descricao" rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Observações..." />
+          <button className="botao-primario" style={{ width: "100%", justifyContent: "center", marginTop: 12 }} onClick={() => { setNota(""); confirmar("Registrado!"); }}>
+            {msg || "Registrar"}
+          </button>
+        </div>
+      )}
+
+      {aba === 1 && (
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: "var(--cor-marca)" }}>Técnicas Anti-Ansiedade</div>
+          {TECNICAS.map((t) => (
+            <div
+              key={t.id}
+              className={"item-selecao-servico" + (track[t.id] ? " item-selecao-ativo" : "")}
+              style={{ marginBottom: 8, justifyContent: "flex-start", gap: 10 }}
+              onClick={() => setTrack((tr) => ({ ...tr, [t.id]: !tr[t.id] }))}
+            >
+              <span>{track[t.id] ? "✅" : "⭕"}</span>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{t.label}</div>
+                <div style={{ fontSize: 12, color: "var(--texto-suave)" }}>{t.desc}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{ fontWeight: 600, fontSize: 13, margin: "14px 0 10px", color: "var(--cor-marca)" }}>Atividades</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {ATIVIDADES.map((a) => (
+              <div
+                key={a.id}
+                className={"item-selecao-servico" + (track[a.id] ? " item-selecao-ativo" : "")}
+                style={{ justifyContent: "center" }}
+                onClick={() => setTrack((tr) => ({ ...tr, [a.id]: !tr[a.id] }))}
+              >
+                {a.label}
+              </div>
+            ))}
+          </div>
+          <button className="botao-primario" style={{ width: "100%", justifyContent: "center", marginTop: 14 }} onClick={() => { setTrack({}); confirmar("Tracking salvo!"); }}>
+            {msg || "Salvar tracking do dia"}
+          </button>
+        </div>
+      )}
+
+      {aba === 2 && (
+        <div>
+          <p className="texto-vazio" style={{ marginBottom: 14 }}>Responda cada pergunta com honestidade para questionar pensamentos ansiosos.</p>
+          {PERGUNTAS.map((p, i) => (
+            <div key={i} style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{i + 1}. {p}</label>
+              <TextAreaVoz
+                className="campo-descricao"
+                rows={2}
+                value={resp[i]}
+                onChange={(e) => { const r = [...resp]; r[i] = e.target.value; setResp(r); }}
+                placeholder="Sua resposta..."
+              />
+            </div>
+          ))}
+          <button className="botao-primario" style={{ width: "100%", justifyContent: "center" }} onClick={() => { setResp(Array(8).fill("")); confirmar("Salvo!"); }}>
+            {msg || "Salvar respostas"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

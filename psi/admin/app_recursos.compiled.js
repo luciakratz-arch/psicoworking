@@ -460,17 +460,24 @@ function EnviarRecursoModal({
   }, "Fechar")))));
 }
 
-// Visualização simples do item — como ainda não portamos o conteúdo
-// interativo de cada ferramenta (isso mora no Portal do Paciente,
-// que é uma etapa futura separada), aqui mostra os dados cadastrados:
-// título, categoria e descrição, e no caso das fábulas, a moral e as
-// páginas da história (quando existirem).
+// Preview de verdade — mostra a ferramenta tal como ela vai aparecer
+// pro paciente, igual ao modelo ("Visualização do paciente"). Aqui é
+// só demonstração: os botões de registrar/salvar nunca gravam nada de
+// verdade no banco (não existe um paciente real nessa tela), só
+// mostram a mensagem de confirmação. Cada ferramenta interativa
+// precisa ser portada uma de cada vez — Gestão da Ansiedade é a
+// primeira; as outras ainda caem no aviso "pré-visualização não
+// disponível" abaixo.
+const PREVIEWS_INTERATIVOS = {
+  "anxiety-management": PreviewGestaoAnsiedade
+};
 function VisualizarRecursoModal({
   item,
   aoFechar
 }) {
   const cores = corDaCategoria(item.categoria);
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
+  const ComponentePreview = PREVIEWS_INTERATIVOS[item.formularioKey];
   return /*#__PURE__*/React.createElement("div", {
     className: "sobreposicao",
     onClick: aoFechar
@@ -485,7 +492,12 @@ function VisualizarRecursoModal({
     }
   }, formatarCategoria(item.categoria)), /*#__PURE__*/React.createElement("h3", null, item.titulo || item.nome), item.descricao && /*#__PURE__*/React.createElement("p", {
     className: "texto-visualizar-recurso"
-  }, item.descricao), item.moral && /*#__PURE__*/React.createElement("div", {
+  }, item.descricao), /*#__PURE__*/React.createElement("div", {
+    className: "aviso-preview-paciente"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "eye",
+    tamanho: 16
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Visualiza\xE7\xE3o do paciente"), " \u2014 assim a ferramenta aparecer\xE1 na \xE1rea do paciente.")), item.moral && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("strong", null, "Moral da hist\xF3ria"), /*#__PURE__*/React.createElement("p", {
     className: "texto-visualizar-recurso"
@@ -494,10 +506,237 @@ function VisualizarRecursoModal({
   }, /*#__PURE__*/React.createElement("strong", null, "P\xE1ginas (", paginas.length, ")"), paginas.map((pag, i) => /*#__PURE__*/React.createElement("p", {
     key: i,
     className: "texto-visualizar-recurso"
-  }, typeof pag === "string" ? pag : pag.texto || JSON.stringify(pag)))), /*#__PURE__*/React.createElement("div", {
+  }, typeof pag === "string" ? pag : pag.texto || JSON.stringify(pag)))), ComponentePreview ? /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement(ComponentePreview, null)) : !item.moral && paginas.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Pr\xE9-visualiza\xE7\xE3o interativa completa ainda n\xE3o dispon\xEDvel para esta ferramenta \u2014 s\xF3 os dados cadastrados no cat\xE1logo por enquanto."), /*#__PURE__*/React.createElement("div", {
     className: "acoes-modal"
   }, /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
     onClick: aoFechar
   }, "Fechar"))));
+}
+
+// ─── Preview: Gestão da Ansiedade ──────────────────────────────────
+// Porta fiel da ferramenta real (clinica/app.js, FerramentaGestaoAnsiedade),
+// com as 3 abas (Estresse, Tracking, Pensamentos). Diferença de propósito:
+// aqui os botões "Registrar"/"Salvar" NUNCA gravam nada no banco — é só
+// demonstração pra psicóloga ver como fica pro paciente, sem paciente
+// real nessa tela pra vincular o registro.
+function PreviewGestaoAnsiedade() {
+  const TECNICAS = [{
+    id: "resp",
+    label: "Respiração Relaxada",
+    desc: "Inspirar → Pausar → Expirar por 2 min"
+  }, {
+    id: "visao",
+    label: "Visão Periférica",
+    desc: "Mover os olhos da direita para a esquerda"
+  }, {
+    id: "musc",
+    label: "Relaxamento Muscular",
+    desc: "Contrair músculos 5s e relaxar com suspiro"
+  }];
+  const ATIVIDADES = [{
+    id: "caminhada",
+    label: "🚶 Caminhada"
+  }, {
+    id: "meditacao",
+    label: "🧘 Meditação"
+  }, {
+    id: "diario",
+    label: "📓 Diário"
+  }, {
+    id: "musica",
+    label: "🎵 Música"
+  }, {
+    id: "alongamento",
+    label: "🤸 Alongamento"
+  }, {
+    id: "agua",
+    label: "💧 Hidratação"
+  }];
+  const PERGUNTAS = ["Qual situação está me deixando ansioso(a)?", "Qual é o meu pensamento ansioso?", "Tenho provas reais de que é 100% verdadeiro?", "Quais evidências indicam que pode NÃO ser verdadeiro?", "Qual a probabilidade real de que o pior aconteça?", "O que eu diria a um amigo com esse mesmo pensamento?", "Existe uma forma mais útil de ver essa situação?", "Preocupar-me está me ajudando ou me machucando?"];
+  const DESC_ESTRESSE = {
+    1: "Em paz.",
+    2: "Otimista.",
+    3: "Calmo.",
+    4: "Confortável.",
+    5: "Neutro.",
+    6: "Estressando.",
+    7: "Estressado.",
+    8: "Irritado.",
+    9: "Tenso.",
+    10: "Em pânico."
+  };
+  const [aba, setAba] = useState(0);
+  const [stress, setStress] = useState(5);
+  const [nota, setNota] = useState("");
+  const [track, setTrack] = useState({});
+  const [resp, setResp] = useState(Array(8).fill(""));
+  const [msg, setMsg] = useState("");
+  const corEstresse = stress <= 3 ? "var(--sucesso)" : stress <= 5 ? "#d97706" : stress <= 7 ? "#f97316" : "var(--erro)";
+  function confirmar(texto) {
+    setMsg("✓ " + texto + " (visualização — nada foi salvo de verdade)");
+    setTimeout(() => setMsg(""), 3000);
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "abas-financeiro"
+  }, ["😰 Estresse", "✅ Tracking", "🧠 Pensamentos"].map((n, i) => /*#__PURE__*/React.createElement("button", {
+    key: i,
+    className: "aba-financeiro" + (aba === i ? " aba-financeiro-ativa" : ""),
+    onClick: () => setAba(i)
+  }, n))), aba === 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 56,
+      fontWeight: 900,
+      color: corEstresse,
+      lineHeight: 1
+    }
+  }, stress), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--texto-suave)"
+    }
+  }, "/10"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: corEstresse
+    }
+  }, DESC_ESTRESSE[stress])), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: 1,
+    max: 10,
+    value: stress,
+    onChange: e => setStress(+e.target.value),
+    style: {
+      width: "100%",
+      accentColor: corEstresse,
+      marginBottom: 14
+    }
+  }), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 2,
+    value: nota,
+    onChange: e => setNota(e.target.value),
+    placeholder: "Observa\xE7\xF5es..."
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      marginTop: 12
+    },
+    onClick: () => {
+      setNota("");
+      confirmar("Registrado!");
+    }
+  }, msg || "Registrar")), aba === 1 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      marginBottom: 10,
+      color: "var(--cor-marca)"
+    }
+  }, "T\xE9cnicas Anti-Ansiedade"), TECNICAS.map(t => /*#__PURE__*/React.createElement("div", {
+    key: t.id,
+    className: "item-selecao-servico" + (track[t.id] ? " item-selecao-ativo" : ""),
+    style: {
+      marginBottom: 8,
+      justifyContent: "flex-start",
+      gap: 10
+    },
+    onClick: () => setTrack(tr => ({
+      ...tr,
+      [t.id]: !tr[t.id]
+    }))
+  }, /*#__PURE__*/React.createElement("span", null, track[t.id] ? "✅" : "⭕"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13
+    }
+  }, t.label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--texto-suave)"
+    }
+  }, t.desc)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      margin: "14px 0 10px",
+      color: "var(--cor-marca)"
+    }
+  }, "Atividades"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 8
+    }
+  }, ATIVIDADES.map(a => /*#__PURE__*/React.createElement("div", {
+    key: a.id,
+    className: "item-selecao-servico" + (track[a.id] ? " item-selecao-ativo" : ""),
+    style: {
+      justifyContent: "center"
+    },
+    onClick: () => setTrack(tr => ({
+      ...tr,
+      [a.id]: !tr[a.id]
+    }))
+  }, a.label))), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      marginTop: 14
+    },
+    onClick: () => {
+      setTrack({});
+      confirmar("Tracking salvo!");
+    }
+  }, msg || "Salvar tracking do dia")), aba === 2 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio",
+    style: {
+      marginBottom: 14
+    }
+  }, "Responda cada pergunta com honestidade para questionar pensamentos ansiosos."), PERGUNTAS.map((p, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      display: "block",
+      marginBottom: 6
+    }
+  }, i + 1, ". ", p), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 2,
+    value: resp[i],
+    onChange: e => {
+      const r = [...resp];
+      r[i] = e.target.value;
+      setResp(r);
+    },
+    placeholder: "Sua resposta..."
+  }))), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      width: "100%",
+      justifyContent: "center"
+    },
+    onClick: () => {
+      setResp(Array(8).fill(""));
+      confirmar("Salvo!");
+    }
+  }, msg || "Salvar respostas")));
 }

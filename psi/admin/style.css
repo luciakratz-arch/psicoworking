@@ -697,6 +697,12 @@ button {
 .acoes-cartao-recurso .botao-secundario { flex: 1; font-size: 12px; padding: 7px 10px; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .botao-enviar-recurso { width: 100%; justify-content: center; font-size: 12.5px; padding: 8px 10px; }
 .texto-visualizar-recurso { font-size: 13.5px; color: var(--texto-suave); line-height: 1.6; }
+.aviso-preview-paciente {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--marca-plataforma-lavanda); color: var(--cor-marca-escura);
+  border-radius: 10px; padding: 10px 14px; font-size: 12.5px;
+  margin: 14px 0;
+}
 
 @media (max-width: 640px) {
   .grade-2col { grid-template-columns: 1fr; }
