@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  REGRAS DE SEGURANÇA DO BANCO DE DADOS — PsicoWorking
+//  REGRAS DE SEGURANÇA DO BANCO DE DADOS — PsiCoWorking
 //
 //  PRINCÍPIO: o isolamento entre clínicas (psi_id) e o controle de
 //  papel de cada pessoa (role) NUNCA são decididos por um campo que

@@ -1,4 +1,4 @@
-# CLAUDE.md — PsicoWorking
+# CLAUDE.md — PsiCoWorking
 
 Leia este arquivo inteiro antes de qualquer edição. Estas regras são absolutas.
 
@@ -6,11 +6,11 @@ Leia este arquivo inteiro antes de qualquer edição. Estas regras são absoluta
 
 ## Identidade do Produto
 
-- **Produto:** PsicoWorking — plataforma SaaS white-label para psicólogos clínicos
+- **Produto:** PsiCoWorking — plataforma SaaS white-label para psicólogos clínicos
 - **Domínio:** `psicoworking.app.br`
 - **Proprietária / Admin Matriz:** Dra. Lucia Kratz — CRP 09/20590
 - **Empresa:** A!Equipe Desenvolvimento Humano e Cultural — CNPJ 07.242.408/0001-19
-- **Marca PsicoWorking:** identidade própria (não é a marca pessoal da Lucia)
+- **Marca PsiCoWorking:** identidade própria (não é a marca pessoal da Lucia)
 - **Marca da Lucia:** roxo `#7B00C4`, borboleta 🦋, Dancing Script — aparece apenas no Admin Matriz
 - **Firebase projeto:** `psicoworking` (projeto dedicado, separado do `entrevista-inicial`)
 - **Repositório:** `luciakratz-arch/psicoworking` (GitHub Pages)
@@ -24,7 +24,7 @@ Cada psicólogo contratante recebe:
 2. **Login do Psi** no próprio site → acessa o admin da clínica
 3. **Login do Paciente** no próprio site → acessa o portal do paciente
 4. Botão **"Instalar App"** (PWA — atalho na tela do celular)
-5. Botão **"← PsicoWorking"** → volta ao site central
+5. Botão **"← PsiCoWorking"** → volta ao site central
 6. **IA de personalização** — psicólogo sobe logo e/ou cola link do site → IA extrai cores, sugere paleta e gera texto do site institucional
 
 O **site central** (`psicoworking.app.br`) é a vitrine de todos os psicólogos cadastrados, com card de cada um mostrando nome, especialidade e ⭐ média de avaliações.
@@ -265,7 +265,7 @@ Acesso via `psicoworking.app.br/psi-[slug]/paciente/`
 - Seções: Hero, Sobre, Especialidades, Depoimentos anônimos, Contato
 - Dois botões de login: **"Área do Psi"** + **"Área do Paciente"**
 - Botão **"Instalar App"** (PWA)
-- Botão **"← PsicoWorking"** → `psicoworking.app.br`
+- Botão **"← PsiCoWorking"** → `psicoworking.app.br`
 - Cores, logo e textos vêm do `psi_config` — nunca hardcoded
 
 ---

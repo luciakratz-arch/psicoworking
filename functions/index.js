@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  CLOUD FUNCTIONS — PsicoWorking
+//  CLOUD FUNCTIONS — PsiCoWorking
 //
 //  Este arquivo roda do lado do Google (nunca no navegador do
 //  usuário). Responsabilidades:

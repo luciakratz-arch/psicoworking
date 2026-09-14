@@ -73,7 +73,7 @@ function Sidebar({
     className: "barra-lateral"
   }, /*#__PURE__*/React.createElement("div", {
     className: "marca-barra-lateral"
-  }, "PsicoWorking"), /*#__PURE__*/React.createElement("nav", null, /*#__PURE__*/React.createElement("a", {
+  }, "PsiCoWorking"), /*#__PURE__*/React.createElement("nav", null, /*#__PURE__*/React.createElement("a", {
     className: "item-menu" + (telaAtiva === "pacientes" ? " item-menu-ativo" : ""),
     href: "#",
     onClick: e => {

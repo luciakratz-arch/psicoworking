@@ -73,7 +73,7 @@ function App() {
 function Sidebar({ usuario, telaAtiva, aoTrocarTela }) {
   return (
     <aside className="barra-lateral">
-      <div className="marca-barra-lateral">PsicoWorking</div>
+      <div className="marca-barra-lateral">PsiCoWorking</div>
       <nav>
         <a
           className={"item-menu" + (telaAtiva === "pacientes" ? " item-menu-ativo" : "")}

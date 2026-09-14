@@ -95,7 +95,7 @@ function TelaLogin() {
     <div className="tela-login-split">
       <div className="painel-marca">
         <div className="painel-marca-conteudo">
-          <h1>PsicoWorking</h1>
+          <h1>PsiCoWorking</h1>
           <p>A plataforma completa para organizar sua clínica de psicologia.</p>
         </div>
       </div>

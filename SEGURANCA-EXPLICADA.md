@@ -25,7 +25,7 @@ No jeito que o projeto estava planejado originalmente:
 
 ## O que ainda falta (próximos passos recomendados)
 
-- [ ] Escrever a **Política de Privacidade** do PsicoWorking (documento legal, explicando pra pacientes e psicólogos o que é feito com os dados deles)
+- [ ] Escrever a **Política de Privacidade** do PsiCoWorking (documento legal, explicando pra pacientes e psicólogos o que é feito com os dados deles)
 - [ ] Colocar uma **tela de consentimento** no cadastro do paciente, perguntando se ele concorda com o uso dos dados
 - [ ] Criar um jeito do paciente **pedir a exclusão dos próprios dados**, se quiser (é um direito garantido por lei)
 - [ ] Definir quem é o **encarregado de proteção de dados** (pode ser você mesma ou alguém da equipe) — é uma exigência legal ter esse contato público
