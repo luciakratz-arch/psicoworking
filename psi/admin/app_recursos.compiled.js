@@ -37,6 +37,95 @@ const ABAS_RECURSOS = [{
   colecao: "psicoeducacao_conteudos",
   tipo: "psicoeducacao"
 }];
+
+// Cores por categoria, no espírito das macrocategorias do sistema
+// real (cada uma com uma cor de destaque + fundo claro). Categorias
+// que não estão no mapa caem numa paleta de reserva, sempre a mesma
+// cor pra mesma categoria (hash do nome), pra nunca ficar tudo cinza.
+const PALETA_CATEGORIAS = {
+  tcc: {
+    cor: "#7B00C4",
+    bg: "#f3e6ff"
+  },
+  ansiedade: {
+    cor: "#7B00C4",
+    bg: "#f3e6ff"
+  },
+  relaxamento: {
+    cor: "#0891b2",
+    bg: "#e0f2fe"
+  },
+  avaliacao: {
+    cor: "#6366f1",
+    bg: "#e0e7ff"
+  },
+  musicoterapia: {
+    cor: "#7B00C4",
+    bg: "#f3e6ff"
+  },
+  depressao: {
+    cor: "#db2777",
+    bg: "#fce7f3"
+  },
+  humor: {
+    cor: "#db2777",
+    bg: "#fce7f3"
+  },
+  habitos: {
+    cor: "#16a34a",
+    bg: "#dcfce7"
+  },
+  autocuidado: {
+    cor: "#16a34a",
+    bg: "#dcfce7"
+  },
+  relacionamentos: {
+    cor: "#0891b2",
+    bg: "#e0f2fe"
+  },
+  familia: {
+    cor: "#d97706",
+    bg: "#fef3c7"
+  },
+  outros: {
+    cor: "#6b7280",
+    bg: "#f3f4f6"
+  }
+};
+const PALETA_RESERVA = [{
+  cor: "#7B00C4",
+  bg: "#f3e6ff"
+}, {
+  cor: "#0891b2",
+  bg: "#e0f2fe"
+}, {
+  cor: "#db2777",
+  bg: "#fce7f3"
+}, {
+  cor: "#16a34a",
+  bg: "#dcfce7"
+}, {
+  cor: "#d97706",
+  bg: "#fef3c7"
+}, {
+  cor: "#6366f1",
+  bg: "#e0e7ff"
+}, {
+  cor: "#0d9488",
+  bg: "#ccfbf1"
+}];
+function corDaCategoria(categoria) {
+  const chave = (categoria || "outros").toLowerCase();
+  if (PALETA_CATEGORIAS[chave]) return PALETA_CATEGORIAS[chave];
+  let hash = 0;
+  for (let i = 0; i < chave.length; i++) hash = hash * 31 + chave.charCodeAt(i) >>> 0;
+  return PALETA_RESERVA[hash % PALETA_RESERVA.length];
+}
+const ICONE_POR_TIPO = {
+  ferramenta: "wrench",
+  fabula: "book-open",
+  psicoeducacao: "brain"
+};
 function TelaRecursos({
   usuario
 }) {
@@ -51,6 +140,7 @@ function TelaRecursos({
   const [mostrarForm, setMostrarForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
   const [enviarItem, setEnviarItem] = useState(null);
+  const [visualizando, setVisualizando] = useState(null);
   const abaAtual = ABAS_RECURSOS.find(a => a.id === aba);
   const itens = itensPorColecao[abaAtual.colecao] || [];
   useEffect(() => {
@@ -111,46 +201,73 @@ function TelaRecursos({
     onChange: e => setBusca(e.target.value)
   }), carregando && /*#__PURE__*/React.createElement("p", null, "Carregando..."), !carregando && categorias.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
-  }, "Nenhum item cadastrado ainda nesta aba. Use a ferramenta de migra\xE7\xE3o de dados (Passo 5) pra trazer o cat\xE1logo do sistema anterior, ou clique em \"Novo Item\" pra cadastrar direto."), categorias.map(cat => /*#__PURE__*/React.createElement("div", {
-    key: cat,
-    className: "grupo-status"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "titulo-grupo-status"
-  }, formatarCategoria(cat), " (", porCategoria[cat].length, ")"), /*#__PURE__*/React.createElement("div", {
-    className: "grade-cartoes-recursos"
-  }, porCategoria[cat].map(item => /*#__PURE__*/React.createElement("div", {
-    key: item.id,
-    className: "cartao-recurso"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "titulo-cartao-recurso"
-  }, item.titulo || item.nome), item.descricao && /*#__PURE__*/React.createElement("p", {
-    className: "descricao-cartao-recurso"
-  }, item.descricao), /*#__PURE__*/React.createElement("div", {
-    className: "acoes-cartao-recurso"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "botao-secundario",
-    onClick: () => setEnviarItem(item)
-  }, /*#__PURE__*/React.createElement(Icone, {
-    nome: "send",
-    tamanho: 14
-  }), " Enviar para paciente"), /*#__PURE__*/React.createElement("button", {
-    className: "botao-icone",
-    onClick: () => {
-      setItemEditando(item);
-      setMostrarForm(true);
-    },
-    title: "Editar"
-  }, /*#__PURE__*/React.createElement(Icone, {
-    nome: "pencil",
-    tamanho: 14
-  })), /*#__PURE__*/React.createElement("button", {
-    className: "botao-icone botao-icone-perigo",
-    onClick: () => excluirItem(item),
-    title: "Excluir"
-  }, /*#__PURE__*/React.createElement(Icone, {
-    nome: "trash-2",
-    tamanho: 14
-  })))))))), mostrarForm && /*#__PURE__*/React.createElement(FormRecurso, {
+  }, "Nenhum item cadastrado ainda nesta aba. Use a ferramenta de migra\xE7\xE3o de dados (Passo 5) pra trazer o cat\xE1logo do sistema anterior, ou clique em \"Novo Item\" pra cadastrar direto."), categorias.map(cat => {
+    const cores = corDaCategoria(cat);
+    return /*#__PURE__*/React.createElement("div", {
+      key: cat,
+      className: "grupo-status"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "titulo-grupo-status"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "etiqueta-categoria-recurso",
+      style: {
+        "--cor-cat": cores.cor,
+        "--bg-cat": cores.bg
+      }
+    }, formatarCategoria(cat)), "(", porCategoria[cat].length, ")"), /*#__PURE__*/React.createElement("div", {
+      className: "grade-cartoes-recursos"
+    }, porCategoria[cat].map(item => /*#__PURE__*/React.createElement("div", {
+      key: item.id,
+      className: "cartao-recurso",
+      style: {
+        "--cor-cat": cores.cor,
+        "--bg-cat": cores.bg
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "cabecalho-cartao-recurso"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "icone-cartao-recurso"
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: ICONE_POR_TIPO[abaAtual.tipo],
+      tamanho: 20
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "titulo-cartao-recurso"
+    }, item.titulo || item.nome)), item.descricao && /*#__PURE__*/React.createElement("p", {
+      className: "descricao-cartao-recurso"
+    }, item.descricao), /*#__PURE__*/React.createElement("div", {
+      className: "acoes-cartao-recurso"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "botao-secundario",
+      onClick: () => setVisualizando(item),
+      title: "Visualizar"
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "eye",
+      tamanho: 14
+    }), " Visualizar"), /*#__PURE__*/React.createElement("button", {
+      className: "botao-icone",
+      onClick: () => {
+        setItemEditando(item);
+        setMostrarForm(true);
+      },
+      title: "Editar"
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "pencil",
+      tamanho: 14
+    })), /*#__PURE__*/React.createElement("button", {
+      className: "botao-icone botao-icone-perigo",
+      onClick: () => excluirItem(item),
+      title: "Excluir"
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "trash-2",
+      tamanho: 14
+    }))), /*#__PURE__*/React.createElement("button", {
+      className: "botao-primario botao-enviar-recurso",
+      onClick: () => setEnviarItem(item)
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "send",
+      tamanho: 14
+    }), " Enviar para paciente")))));
+  }), mostrarForm && /*#__PURE__*/React.createElement(FormRecurso, {
     colecao: abaAtual.colecao,
     item: itemEditando,
     aoFechar: () => {
@@ -162,6 +279,9 @@ function TelaRecursos({
     item: enviarItem,
     tipo: abaAtual.tipo,
     aoFechar: () => setEnviarItem(null)
+  }), visualizando && /*#__PURE__*/React.createElement(VisualizarRecursoModal, {
+    item: visualizando,
+    aoFechar: () => setVisualizando(null)
   }));
 }
 function FormRecurso({
@@ -338,4 +458,46 @@ function EnviarRecursoModal({
     className: "botao-primario",
     onClick: aoFechar
   }, "Fechar")))));
+}
+
+// Visualização simples do item — como ainda não portamos o conteúdo
+// interativo de cada ferramenta (isso mora no Portal do Paciente,
+// que é uma etapa futura separada), aqui mostra os dados cadastrados:
+// título, categoria e descrição, e no caso das fábulas, a moral e as
+// páginas da história (quando existirem).
+function VisualizarRecursoModal({
+  item,
+  aoFechar
+}) {
+  const cores = corDaCategoria(item.categoria);
+  const paginas = Array.isArray(item.paginas) ? item.paginas : [];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sobreposicao",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal modal-largo",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "etiqueta-categoria-recurso",
+    style: {
+      "--cor-cat": cores.cor,
+      "--bg-cat": cores.bg
+    }
+  }, formatarCategoria(item.categoria)), /*#__PURE__*/React.createElement("h3", null, item.titulo || item.nome), item.descricao && /*#__PURE__*/React.createElement("p", {
+    className: "texto-visualizar-recurso"
+  }, item.descricao), item.moral && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("strong", null, "Moral da hist\xF3ria"), /*#__PURE__*/React.createElement("p", {
+    className: "texto-visualizar-recurso"
+  }, item.moral)), paginas.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("strong", null, "P\xE1ginas (", paginas.length, ")"), paginas.map((pag, i) => /*#__PURE__*/React.createElement("p", {
+    key: i,
+    className: "texto-visualizar-recurso"
+  }, typeof pag === "string" ? pag : pag.texto || JSON.stringify(pag)))), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: aoFechar
+  }, "Fechar"))));
 }

@@ -24,6 +24,44 @@ const ABAS_RECURSOS = [
   { id: "psicoeducacao", rotulo: "Psicoeducação", icone: "brain", colecao: "psicoeducacao_conteudos", tipo: "psicoeducacao" },
 ];
 
+// Cores por categoria, no espírito das macrocategorias do sistema
+// real (cada uma com uma cor de destaque + fundo claro). Categorias
+// que não estão no mapa caem numa paleta de reserva, sempre a mesma
+// cor pra mesma categoria (hash do nome), pra nunca ficar tudo cinza.
+const PALETA_CATEGORIAS = {
+  tcc: { cor: "#7B00C4", bg: "#f3e6ff" },
+  ansiedade: { cor: "#7B00C4", bg: "#f3e6ff" },
+  relaxamento: { cor: "#0891b2", bg: "#e0f2fe" },
+  avaliacao: { cor: "#6366f1", bg: "#e0e7ff" },
+  musicoterapia: { cor: "#7B00C4", bg: "#f3e6ff" },
+  depressao: { cor: "#db2777", bg: "#fce7f3" },
+  humor: { cor: "#db2777", bg: "#fce7f3" },
+  habitos: { cor: "#16a34a", bg: "#dcfce7" },
+  autocuidado: { cor: "#16a34a", bg: "#dcfce7" },
+  relacionamentos: { cor: "#0891b2", bg: "#e0f2fe" },
+  familia: { cor: "#d97706", bg: "#fef3c7" },
+  outros: { cor: "#6b7280", bg: "#f3f4f6" },
+};
+const PALETA_RESERVA = [
+  { cor: "#7B00C4", bg: "#f3e6ff" },
+  { cor: "#0891b2", bg: "#e0f2fe" },
+  { cor: "#db2777", bg: "#fce7f3" },
+  { cor: "#16a34a", bg: "#dcfce7" },
+  { cor: "#d97706", bg: "#fef3c7" },
+  { cor: "#6366f1", bg: "#e0e7ff" },
+  { cor: "#0d9488", bg: "#ccfbf1" },
+];
+
+function corDaCategoria(categoria) {
+  const chave = (categoria || "outros").toLowerCase();
+  if (PALETA_CATEGORIAS[chave]) return PALETA_CATEGORIAS[chave];
+  let hash = 0;
+  for (let i = 0; i < chave.length; i++) hash = (hash * 31 + chave.charCodeAt(i)) >>> 0;
+  return PALETA_RESERVA[hash % PALETA_RESERVA.length];
+}
+
+const ICONE_POR_TIPO = { ferramenta: "wrench", fabula: "book-open", psicoeducacao: "brain" };
+
 function TelaRecursos({ usuario }) {
   const [aba, setAba] = useState("ferramentas");
   const [itensPorColecao, setItensPorColecao] = useState({
@@ -36,6 +74,7 @@ function TelaRecursos({ usuario }) {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
   const [enviarItem, setEnviarItem] = useState(null);
+  const [visualizando, setVisualizando] = useState(null);
 
   const abaAtual = ABAS_RECURSOS.find((a) => a.id === aba);
   const itens = itensPorColecao[abaAtual.colecao] || [];
@@ -109,30 +148,46 @@ function TelaRecursos({ usuario }) {
         </p>
       )}
 
-      {categorias.map((cat) => (
-        <div key={cat} className="grupo-status">
-          <div className="titulo-grupo-status">{formatarCategoria(cat)} ({porCategoria[cat].length})</div>
-          <div className="grade-cartoes-recursos">
-            {porCategoria[cat].map((item) => (
-              <div key={item.id} className="cartao-recurso">
-                <div className="titulo-cartao-recurso">{item.titulo || item.nome}</div>
-                {item.descricao && <p className="descricao-cartao-recurso">{item.descricao}</p>}
-                <div className="acoes-cartao-recurso">
-                  <button className="botao-secundario" onClick={() => setEnviarItem(item)}>
+      {categorias.map((cat) => {
+        const cores = corDaCategoria(cat);
+        return (
+          <div key={cat} className="grupo-status">
+            <div className="titulo-grupo-status">
+              <span className="etiqueta-categoria-recurso" style={{ "--cor-cat": cores.cor, "--bg-cat": cores.bg }}>
+                {formatarCategoria(cat)}
+              </span>
+              ({porCategoria[cat].length})
+            </div>
+            <div className="grade-cartoes-recursos">
+              {porCategoria[cat].map((item) => (
+                <div key={item.id} className="cartao-recurso" style={{ "--cor-cat": cores.cor, "--bg-cat": cores.bg }}>
+                  <div className="cabecalho-cartao-recurso">
+                    <div className="icone-cartao-recurso">
+                      <Icone nome={ICONE_POR_TIPO[abaAtual.tipo]} tamanho={20} />
+                    </div>
+                    <div className="titulo-cartao-recurso">{item.titulo || item.nome}</div>
+                  </div>
+                  {item.descricao && <p className="descricao-cartao-recurso">{item.descricao}</p>}
+                  <div className="acoes-cartao-recurso">
+                    <button className="botao-secundario" onClick={() => setVisualizando(item)} title="Visualizar">
+                      <Icone nome="eye" tamanho={14} /> Visualizar
+                    </button>
+                    <button className="botao-icone" onClick={() => { setItemEditando(item); setMostrarForm(true); }} title="Editar">
+                      <Icone nome="pencil" tamanho={14} />
+                    </button>
+                    <button className="botao-icone botao-icone-perigo" onClick={() => excluirItem(item)} title="Excluir">
+                      <Icone nome="trash-2" tamanho={14} />
+                    </button>
+                  </div>
+                  <button className="botao-primario botao-enviar-recurso" onClick={() => setEnviarItem(item)}>
                     <Icone nome="send" tamanho={14} /> Enviar para paciente
                   </button>
-                  <button className="botao-icone" onClick={() => { setItemEditando(item); setMostrarForm(true); }} title="Editar">
-                    <Icone nome="pencil" tamanho={14} />
-                  </button>
-                  <button className="botao-icone botao-icone-perigo" onClick={() => excluirItem(item)} title="Excluir">
-                    <Icone nome="trash-2" tamanho={14} />
-                  </button>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {mostrarForm && (
         <FormRecurso
@@ -149,6 +204,10 @@ function TelaRecursos({ usuario }) {
           tipo={abaAtual.tipo}
           aoFechar={() => setEnviarItem(null)}
         />
+      )}
+
+      {visualizando && (
+        <VisualizarRecursoModal item={visualizando} aoFechar={() => setVisualizando(null)} />
       )}
     </div>
   );
@@ -282,6 +341,49 @@ function EnviarRecursoModal({ usuario, item, tipo, aoFechar }) {
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Visualização simples do item — como ainda não portamos o conteúdo
+// interativo de cada ferramenta (isso mora no Portal do Paciente,
+// que é uma etapa futura separada), aqui mostra os dados cadastrados:
+// título, categoria e descrição, e no caso das fábulas, a moral e as
+// páginas da história (quando existirem).
+function VisualizarRecursoModal({ item, aoFechar }) {
+  const cores = corDaCategoria(item.categoria);
+  const paginas = Array.isArray(item.paginas) ? item.paginas : [];
+
+  return (
+    <div className="sobreposicao" onClick={aoFechar}>
+      <div className="modal modal-largo" onClick={(e) => e.stopPropagation()}>
+        <span className="etiqueta-categoria-recurso" style={{ "--cor-cat": cores.cor, "--bg-cat": cores.bg }}>
+          {formatarCategoria(item.categoria)}
+        </span>
+        <h3>{item.titulo || item.nome}</h3>
+
+        {item.descricao && <p className="texto-visualizar-recurso">{item.descricao}</p>}
+        {item.moral && (
+          <div className="cartao-secao">
+            <strong>Moral da história</strong>
+            <p className="texto-visualizar-recurso">{item.moral}</p>
+          </div>
+        )}
+        {paginas.length > 0 && (
+          <div className="cartao-secao">
+            <strong>Páginas ({paginas.length})</strong>
+            {paginas.map((pag, i) => (
+              <p key={i} className="texto-visualizar-recurso">
+                {typeof pag === "string" ? pag : pag.texto || JSON.stringify(pag)}
+              </p>
+            ))}
+          </div>
+        )}
+
+        <div className="acoes-modal">
+          <button className="botao-primario" onClick={aoFechar}>Fechar</button>
+        </div>
       </div>
     </div>
   );

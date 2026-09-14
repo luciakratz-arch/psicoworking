@@ -671,17 +671,31 @@ button {
 
 /* ── Recursos Terapêuticos ─────────────────────────── */
 .campo-busca-recursos { width: 100%; margin-bottom: 20px; }
+.etiqueta-categoria-recurso {
+  display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 3px 10px; border-radius: 12px;
+  color: var(--cor-cat, var(--cor-marca)); background: var(--bg-cat, var(--fundo));
+  margin-bottom: 6px;
+}
 .grade-cartoes-recursos {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;
 }
 .cartao-recurso {
-  background: var(--branco); border: 1px solid var(--borda); border-radius: 12px;
-  padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+  background: var(--branco); border: 1.5px solid color-mix(in srgb, var(--cor-cat, var(--borda)) 35%, transparent);
+  border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+}
+.cabecalho-cartao-recurso { display: flex; align-items: center; gap: 10px; }
+.icone-cartao-recurso {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  background: var(--cor-cat, var(--cor-marca)); color: white;
+  display: flex; align-items: center; justify-content: center;
 }
 .titulo-cartao-recurso { font-weight: 600; font-size: 14px; }
-.descricao-cartao-recurso { font-size: 12.5px; color: var(--texto-suave); line-height: 1.5; margin: 0; }
-.acoes-cartao-recurso { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+.descricao-cartao-recurso { font-size: 12.5px; color: var(--texto-suave); line-height: 1.5; margin: 0; flex: 1; }
+.acoes-cartao-recurso { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--borda); padding-top: 10px; }
 .acoes-cartao-recurso .botao-secundario { flex: 1; font-size: 12px; padding: 7px 10px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+.botao-enviar-recurso { width: 100%; justify-content: center; font-size: 12.5px; padding: 8px 10px; }
+.texto-visualizar-recurso { font-size: 13.5px; color: var(--texto-suave); line-height: 1.6; }
 
 @media (max-width: 640px) {
   .grade-2col { grid-template-columns: 1fr; }
