@@ -11,7 +11,7 @@ function TelaConfiguracoes({
   usuario
 }) {
   const [nome, setNome] = useState("");
-  const [corPrimaria, setCorPrimaria] = useState("#7B00C4");
+  const [corPrimaria, setCorPrimaria] = useState("#6A2BD9");
   const [logoUrl, setLogoUrl] = useState("");
   const [arquivoLogo, setArquivoLogo] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -23,7 +23,7 @@ function TelaConfiguracoes({
       if (doc.exists) {
         const dados = doc.data();
         setNome(dados.nome || "");
-        setCorPrimaria(dados.corPrimaria || "#7B00C4");
+        setCorPrimaria(dados.corPrimaria || "#6A2BD9");
         setLogoUrl(dados.logoUrl || "");
       }
       setCarregando(false);

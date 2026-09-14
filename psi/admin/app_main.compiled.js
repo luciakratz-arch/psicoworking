@@ -145,7 +145,11 @@ function Sidebar({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "log-out",
     tamanho: 13
-  }), " Sair"))));
+  }), " Sair"))), /*#__PURE__*/React.createElement("div", {
+    className: "selo-rodape"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "logo-plataforma"
+  }, "PsiCoWorking")));
 }
 
 // Wrapper simples da biblioteca Lucide (CDN, sem lucide-react) —

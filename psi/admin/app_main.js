@@ -147,6 +147,9 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
           </button>
         </div>
       </div>
+      <div className="selo-rodape">
+        <div className="logo-plataforma">PsiCoWorking</div>
+      </div>
     </aside>
   );
 }
