@@ -24,10 +24,35 @@ function usarConexaoGoogleAgenda(usuario) {
   return status;
 }
 
+// Lê psi_config (nome, logo, cor) e já aplica a cor no CSS assim que
+// carrega — usado pra branding do próprio painel (o login, antes de
+// autenticar, ainda não sabe qual clínica é, ver CLAUDE.md).
+function usarConfiguracaoClinica(psiId) {
+  const [config, setConfig] = useState(null);
+
+  useEffect(() => {
+    if (!psiId) return;
+    const cancelar = db
+      .collection("psi_config")
+      .doc(psiId)
+      .onSnapshot((doc) => {
+        const dados = doc.exists ? doc.data() : {};
+        setConfig(dados);
+        if (dados.corPrimaria) {
+          document.documentElement.style.setProperty("--cor-marca", dados.corPrimaria);
+        }
+      });
+    return cancelar;
+  }, [psiId]);
+
+  return config;
+}
+
 function App() {
   const { usuario, carregando } = useUsuarioLogado();
   const [telaAtiva, setTelaAtiva] = useState("pacientes");
   const statusConexaoGoogle = usarConexaoGoogleAgenda(usuario);
+  const configClinica = usarConfiguracaoClinica(usuario && usuario.psiId);
 
   useEffect(() => {
     if (statusConexaoGoogle === "ok") setTelaAtiva("agenda");
@@ -56,7 +81,12 @@ function App() {
 
   return (
     <div className="layout-admin">
-      <Sidebar usuario={usuario} telaAtiva={telaAtiva} aoTrocarTela={setTelaAtiva} />
+      <Sidebar
+        usuario={usuario}
+        telaAtiva={telaAtiva}
+        aoTrocarTela={setTelaAtiva}
+        configClinica={configClinica}
+      />
       <main className="area-principal">
         {statusConexaoGoogle === "erro" && (
           <p className="mensagem-erro">
@@ -65,15 +95,25 @@ function App() {
         )}
         {telaAtiva === "pacientes" && <TelaPacientes usuario={usuario} />}
         {telaAtiva === "agenda" && <TelaAgenda usuario={usuario} />}
+        {telaAtiva === "configuracoes" && <TelaConfiguracoes usuario={usuario} />}
       </main>
     </div>
   );
 }
 
-function Sidebar({ usuario, telaAtiva, aoTrocarTela }) {
+function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
+  const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl);
+
   return (
     <aside className="barra-lateral">
-      <div className="marca-barra-lateral">PsiCoWorking</div>
+      {temMarca ? (
+        <div className="marca-barra-lateral-clinica">
+          {configClinica.logoUrl && <img src={configClinica.logoUrl} alt="Logo" className="logo-barra-lateral" />}
+          <span>{configClinica.nome}</span>
+        </div>
+      ) : (
+        <div className="logo-plataforma marca-barra-lateral">PsiCoWorking</div>
+      )}
       <nav>
         <a
           className={"item-menu" + (telaAtiva === "pacientes" ? " item-menu-ativo" : "")}
@@ -88,6 +128,13 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela }) {
           onClick={(e) => { e.preventDefault(); aoTrocarTela("agenda"); }}
         >
           Agenda
+        </a>
+        <a
+          className={"item-menu" + (telaAtiva === "configuracoes" ? " item-menu-ativo" : "")}
+          href="#"
+          onClick={(e) => { e.preventDefault(); aoTrocarTela("configuracoes"); }}
+        >
+          Configurações
         </a>
       </nav>
       <div className="rodape-barra-lateral">

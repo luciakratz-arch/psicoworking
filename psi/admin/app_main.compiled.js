@@ -19,6 +19,25 @@ function usarConexaoGoogleAgenda(usuario) {
   }, [usuario]);
   return status;
 }
+
+// Lê psi_config (nome, logo, cor) e já aplica a cor no CSS assim que
+// carrega — usado pra branding do próprio painel (o login, antes de
+// autenticar, ainda não sabe qual clínica é, ver CLAUDE.md).
+function usarConfiguracaoClinica(psiId) {
+  const [config, setConfig] = useState(null);
+  useEffect(() => {
+    if (!psiId) return;
+    const cancelar = db.collection("psi_config").doc(psiId).onSnapshot(doc => {
+      const dados = doc.exists ? doc.data() : {};
+      setConfig(dados);
+      if (dados.corPrimaria) {
+        document.documentElement.style.setProperty("--cor-marca", dados.corPrimaria);
+      }
+    });
+    return cancelar;
+  }, [psiId]);
+  return config;
+}
 function App() {
   const {
     usuario,
@@ -26,6 +45,7 @@ function App() {
   } = useUsuarioLogado();
   const [telaAtiva, setTelaAtiva] = useState("pacientes");
   const statusConexaoGoogle = usarConexaoGoogleAgenda(usuario);
+  const configClinica = usarConfiguracaoClinica(usuario && usuario.psiId);
   useEffect(() => {
     if (statusConexaoGoogle === "ok") setTelaAtiva("agenda");
   }, [statusConexaoGoogle]);
@@ -53,7 +73,8 @@ function App() {
   }, /*#__PURE__*/React.createElement(Sidebar, {
     usuario: usuario,
     telaAtiva: telaAtiva,
-    aoTrocarTela: setTelaAtiva
+    aoTrocarTela: setTelaAtiva,
+    configClinica: configClinica
   }), /*#__PURE__*/React.createElement("main", {
     className: "area-principal"
   }, statusConexaoGoogle === "erro" && /*#__PURE__*/React.createElement("p", {
@@ -62,17 +83,27 @@ function App() {
     usuario: usuario
   }), telaAtiva === "agenda" && /*#__PURE__*/React.createElement(TelaAgenda, {
     usuario: usuario
+  }), telaAtiva === "configuracoes" && /*#__PURE__*/React.createElement(TelaConfiguracoes, {
+    usuario: usuario
   })));
 }
 function Sidebar({
   usuario,
   telaAtiva,
-  aoTrocarTela
+  aoTrocarTela,
+  configClinica
 }) {
+  const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl);
   return /*#__PURE__*/React.createElement("aside", {
     className: "barra-lateral"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "marca-barra-lateral"
+  }, temMarca ? /*#__PURE__*/React.createElement("div", {
+    className: "marca-barra-lateral-clinica"
+  }, configClinica.logoUrl && /*#__PURE__*/React.createElement("img", {
+    src: configClinica.logoUrl,
+    alt: "Logo",
+    className: "logo-barra-lateral"
+  }), /*#__PURE__*/React.createElement("span", null, configClinica.nome)) : /*#__PURE__*/React.createElement("div", {
+    className: "logo-plataforma marca-barra-lateral"
   }, "PsiCoWorking"), /*#__PURE__*/React.createElement("nav", null, /*#__PURE__*/React.createElement("a", {
     className: "item-menu" + (telaAtiva === "pacientes" ? " item-menu-ativo" : ""),
     href: "#",
@@ -87,7 +118,14 @@ function Sidebar({
       e.preventDefault();
       aoTrocarTela("agenda");
     }
-  }, "Agenda")), /*#__PURE__*/React.createElement("div", {
+  }, "Agenda"), /*#__PURE__*/React.createElement("a", {
+    className: "item-menu" + (telaAtiva === "configuracoes" ? " item-menu-ativo" : ""),
+    href: "#",
+    onClick: e => {
+      e.preventDefault();
+      aoTrocarTela("configuracoes");
+    }
+  }, "Configura\xE7\xF5es")), /*#__PURE__*/React.createElement("div", {
     className: "rodape-barra-lateral"
   }, /*#__PURE__*/React.createElement("p", {
     className: "email-usuario"

@@ -1,0 +1,27 @@
+// ═══════════════════════════════════════════════════════════════
+//  REGRAS DE SEGURANÇA DO ARMAZENAMENTO — PsiCoWorking
+//
+//  Logos das clínicas: qualquer pessoa pode VER (são exibidas no
+//  site público), mas só a própria equipe daquela clínica pode
+//  enviar/trocar a logo dela.
+// ═══════════════════════════════════════════════════════════════
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /logos/{psiId}/{arquivo} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.token.psi_id == psiId
+        && (request.auth.token.role == 'psi' || request.auth.token.role == 'secretaria')
+        && request.resource.size < 3 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /{caminhoRestante=**} {
+      allow read, write: if false;
+    }
+  }
+}

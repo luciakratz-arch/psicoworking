@@ -292,6 +292,39 @@ button {
 
 .campo-descricao { min-height: 60px; resize: vertical; }
 
+/* ── Configurações ─────────────────────────── */
+.cartao-config {
+  background: var(--branco);
+  border-radius: 12px;
+  padding: 28px;
+  max-width: 460px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.cartao-config label { display: block; font-size: 13px; color: var(--texto-suave); margin: 16px 0 6px; }
+.cartao-config label:first-child { margin-top: 0; }
+.cartao-config input[type="text"],
+.cartao-config input:not([type]) { width: 100%; }
+.cartao-config button { margin-top: 24px; }
+
+.linha-cor { display: flex; align-items: center; gap: 12px; }
+.seletor-cor { width: 48px; height: 40px; padding: 2px; border: 1px solid var(--borda); border-radius: 8px; cursor: pointer; }
+.valor-cor { font-size: 13px; color: var(--texto-suave); font-family: monospace; }
+
+.preview-logo { max-width: 140px; max-height: 80px; border-radius: 8px; margin-bottom: 10px; display: block; }
+.dica-campo { font-size: 12px; color: var(--texto-suave); margin-top: 6px; }
+.mensagem-sucesso { color: var(--sucesso); font-size: 13px; margin-top: 10px; }
+
+/* Marca da clínica no menu, quando já configurada */
+.marca-barra-lateral-clinica {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px 20px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.logo-barra-lateral { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; }
+
 @media (max-width: 640px) {
   .layout-admin { flex-direction: column; }
   .barra-lateral { width: 100%; flex-direction: row; align-items: center; padding: 12px 16px; }
