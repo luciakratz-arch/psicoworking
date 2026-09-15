@@ -86,11 +86,20 @@ function TelaLogin() {
   }
 
   return (
-    <div className="tela-login">
-      <div className="cartao-login">
-        <h1>🦋 Portal do Paciente</h1>
-        <p className="subtitulo">Entre com o e-mail e a senha que você cadastrou.</p>
-        <form onSubmit={aoEntrar}>
+    <div className="tela-login-split">
+      <div className="painel-marca-p">
+        <div className="painel-marca-p-conteudo">
+          <span className="logo-plataforma-p-negativa">PsiCoWorking</span>
+          <h1 style={{ marginTop: 16 }}>Bem-vindo(a) de volta 🦋</h1>
+          <p>Acesse seu portal e continue de onde parou.</p>
+        </div>
+      </div>
+      <div className="painel-formulario-p">
+        <form className="cartao-login" onSubmit={aoEntrar}>
+          <span className="logo-plataforma-p">PsiCoWorking</span>
+          <h2>Portal do Paciente</h2>
+          <p className="subtitulo">Entre com o e-mail e a senha que você cadastrou.</p>
+
           <label>E-mail</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <label>Senha</label>
@@ -102,7 +111,9 @@ function TelaLogin() {
           <button type="submit" className="botao-primario-p" style={{ marginTop: 18 }} disabled={entrando}>
             {entrando ? "Entrando..." : "Entrar"}
           </button>
-          <button type="button" className="link-p" onClick={esqueciSenha}>Esqueci minha senha</button>
+          <button type="button" className="link-p" style={{ display: "block", textAlign: "center", width: "100%" }} onClick={esqueciSenha}>
+            Esqueci minha senha
+          </button>
         </form>
       </div>
     </div>
@@ -141,16 +152,16 @@ function App() {
   }, [usuario]);
 
   if (carregando) {
-    return <div className="tela-login"><p>Carregando...</p></div>;
+    return <div className="tela-central-p"><p>Carregando...</p></div>;
   }
 
   if (!usuario) return <TelaLogin />;
 
   if (usuario.role !== "paciente") {
     return (
-      <div className="tela-login">
-        <div className="cartao-login">
-          <h1>Acesso não permitido</h1>
+      <div className="tela-central-p">
+        <div className="cartao-login" style={{ background: "white", borderRadius: 16, padding: 32, boxShadow: "0 4px 24px rgba(0,0,0,0.08)", textAlign: "center" }}>
+          <h2>Acesso não permitido</h2>
           <p className="subtitulo">Esta área é exclusiva de pacientes.</p>
           <button className="botao-primario-p" onClick={logout}>Sair</button>
         </div>

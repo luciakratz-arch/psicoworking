@@ -16,6 +16,20 @@
   <script src="https://unpkg.com/lucide@0.383.0/dist/umd/lucide.min.js"></script>
   <style>
     * { box-sizing: border-box; }
+    :root {
+      /* Cores OFICIAIS da marca PsiCoWorking (Manual de Identidade
+         Visual) — nunca mudam, só aparecem no selo/wordmark da
+         plataforma. Mesmas variáveis do admin, pra manter o padrão. */
+      --marca-plataforma: #6A2BD9;
+      --marca-plataforma-clara: #A97BEF;
+      --marca-plataforma-escura: #3B0D6F;
+      --marca-plataforma-lavanda: #EADDFC;
+      /* Cor DA CLÍNICA — trocada em runtime a partir de psi_config,
+         igual ao admin. Some as mesmas por padrão. */
+      --cor-marca: #6A2BD9;
+      --cor-marca-clara: #A97BEF;
+      --cor-marca-escura: #3B0D6F;
+    }
     body {
       margin: 0;
       font-family: 'DM Sans', system-ui, sans-serif;
@@ -24,15 +38,40 @@
     }
     button, input, select, textarea { font-family: inherit; }
 
-    /* ── Login ─────────────────────────────────────── */
-    .tela-login {
-      min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      background: linear-gradient(150deg, #EADDFC 0%, #F3F4F6 60%);
-      padding: 24px;
+    /* ── Login (tela dividida, igual ao admin) ──────── */
+    .tela-login-split { min-height: 100vh; display: flex; }
+    .painel-marca-p {
+      flex: 1; position: relative; overflow: hidden;
+      background-image:
+        radial-gradient(circle at 20% 15%, rgba(255,255,255,0.22), transparent 40%),
+        radial-gradient(circle at 90% 10%, var(--cor-marca-clara) 0%, transparent 45%),
+        radial-gradient(circle at 80% 95%, rgba(0,0,0,0.35), transparent 55%),
+        linear-gradient(135deg, var(--cor-marca-clara) 0%, var(--cor-marca) 45%, var(--cor-marca-escura) 100%);
+      display: flex; align-items: center; justify-content: center;
+      padding: 48px; color: white;
     }
-    .cartao-login { background: white; border-radius: 20px; padding: 32px; width: 100%; max-width: 400px; box-shadow: 0 8px 40px rgba(106,43,217,0.14); }
-    .cartao-login h1 { font-size: 20px; margin: 0 0 4px; }
+    .painel-marca-p-conteudo { max-width: 380px; position: relative; z-index: 1; }
+    .painel-marca-p-conteudo h1 { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 36px; line-height: 1.2; letter-spacing: -0.01em; margin: 0 0 16px; }
+    .painel-marca-p-conteudo p { font-size: 15px; opacity: 0.85; line-height: 1.6; margin: 0 0 40px; }
+    .logo-plataforma-p {
+      display: inline-block; font-weight: 700; font-size: 20px;
+      background: linear-gradient(90deg, var(--marca-plataforma-escura), var(--marca-plataforma) 55%, var(--marca-plataforma-clara));
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: var(--marca-plataforma);
+    }
+    .logo-plataforma-p-negativa { display: inline-block; font-weight: 700; font-size: 15px; color: rgba(255,255,255,0.9); }
+    .painel-formulario-p { flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px; background: white; }
+    .cartao-login { width: 100%; max-width: 340px; }
+    .cartao-login .logo-plataforma-p { display: block; margin-bottom: 28px; }
+    .cartao-login h2 { font-size: 24px; margin: 0 0 4px; }
     .cartao-login .subtitulo { font-size: 13px; color: #6B7280; margin-bottom: 24px; }
+    @media (max-width: 768px) {
+      .tela-login-split { flex-direction: column; }
+      .painel-marca-p { flex: none; padding: 32px 24px; text-align: center; }
+      .painel-marca-p-conteudo h1 { font-size: 26px; margin-bottom: 8px; }
+      .painel-marca-p-conteudo p { display: none; }
+      .painel-formulario-p { flex: none; padding: 32px 24px; }
+    }
+    .tela-central-p { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
 
     /* ── Layout geral ──────────────────────────────── */
     .topo {
