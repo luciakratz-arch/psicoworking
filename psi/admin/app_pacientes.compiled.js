@@ -291,6 +291,7 @@ function FormNovoPaciente({
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [linkSucesso, setLinkSucesso] = useState("");
+  const [emailEnviado, setEmailEnviado] = useState(false);
   async function aoEnviar(evento) {
     evento.preventDefault();
     setErro("");
@@ -302,6 +303,15 @@ function FormNovoPaciente({
     try {
       const resultado = await chamarCadastrarPaciente(form);
       setLinkSucesso(resultado.data.linkDefinirSenha);
+      // Manda o e-mail de verdade pro paciente definir a senha —
+      // antes só gerava o link e esperava a psicóloga copiar e enviar
+      // na mão; agora sai automático, igual o autocadastro público.
+      try {
+        await auth.sendPasswordResetEmail(form.email);
+        setEmailEnviado(true);
+      } catch (eEmail) {
+        setEmailEnviado(false);
+      }
     } catch (e) {
       setErro(e.message || "Não foi possível cadastrar o paciente.");
     } finally {
@@ -332,7 +342,13 @@ function FormNovoPaciente({
     type: "submit",
     className: "botao-primario",
     disabled: enviando
-  }, enviando ? "Cadastrando..." : "Salvar"))), linkSucesso && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", null, "Paciente cadastrado! Envie este link para ", /*#__PURE__*/React.createElement("strong", null, form.nome), " definir a pr\xF3pria senha (ningu\xE9m, nem a cl\xEDnica, fica sabendo qual senha ele escolhe):"), /*#__PURE__*/React.createElement("textarea", {
+  }, enviando ? "Cadastrando..." : "Salvar"))), linkSucesso && /*#__PURE__*/React.createElement("div", null, emailEnviado ? /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-sucesso"
+  }, "Paciente cadastrado! J\xE1 mandamos um e-mail para ", /*#__PURE__*/React.createElement("strong", null, form.email), " com o link para ", /*#__PURE__*/React.createElement("strong", null, form.nome), " definir a pr\xF3pria senha (ningu\xE9m, nem a cl\xEDnica, fica sabendo qual senha ele escolhe).") : /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, "Paciente cadastrado, mas n\xE3o conseguimos enviar o e-mail autom\xE1tico. Copie o link abaixo e envie voc\xEA mesma para ", /*#__PURE__*/React.createElement("strong", null, form.nome), " (por WhatsApp, por exemplo):"), /*#__PURE__*/React.createElement("label", null, "Link de definir senha ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(reserva, caso o e-mail n\xE3o chegue)")), /*#__PURE__*/React.createElement("textarea", {
     readOnly: true,
     className: "campo-link",
     value: linkSucesso

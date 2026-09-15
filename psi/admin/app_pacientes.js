@@ -264,6 +264,7 @@ function FormNovoPaciente({ usuario, aoFechar }) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [linkSucesso, setLinkSucesso] = useState("");
+  const [emailEnviado, setEmailEnviado] = useState(false);
 
   async function aoEnviar(evento) {
     evento.preventDefault();
@@ -276,6 +277,15 @@ function FormNovoPaciente({ usuario, aoFechar }) {
     try {
       const resultado = await chamarCadastrarPaciente(form);
       setLinkSucesso(resultado.data.linkDefinirSenha);
+      // Manda o e-mail de verdade pro paciente definir a senha —
+      // antes só gerava o link e esperava a psicóloga copiar e enviar
+      // na mão; agora sai automático, igual o autocadastro público.
+      try {
+        await auth.sendPasswordResetEmail(form.email);
+        setEmailEnviado(true);
+      } catch (eEmail) {
+        setEmailEnviado(false);
+      }
     } catch (e) {
       setErro(e.message || "Não foi possível cadastrar o paciente.");
     } finally {
@@ -305,10 +315,19 @@ function FormNovoPaciente({ usuario, aoFechar }) {
 
         {linkSucesso && (
           <div>
-            <p>
-              Paciente cadastrado! Envie este link para <strong>{form.nome}</strong> definir a
-              própria senha (ninguém, nem a clínica, fica sabendo qual senha ele escolhe):
-            </p>
+            {emailEnviado ? (
+              <p className="mensagem-sucesso">
+                Paciente cadastrado! Já mandamos um e-mail para <strong>{form.email}</strong> com o link
+                para <strong>{form.nome}</strong> definir a própria senha (ninguém, nem a clínica, fica
+                sabendo qual senha ele escolhe).
+              </p>
+            ) : (
+              <p className="mensagem-erro">
+                Paciente cadastrado, mas não conseguimos enviar o e-mail automático. Copie o link abaixo e
+                envie você mesma para <strong>{form.nome}</strong> (por WhatsApp, por exemplo):
+              </p>
+            )}
+            <label>Link de definir senha <span className="opcional">(reserva, caso o e-mail não chegue)</span></label>
             <textarea readOnly className="campo-link" value={linkSucesso} />
             <div className="acoes-modal">
               <button className="botao-primario" onClick={aoFechar}>Concluir</button>
