@@ -1040,11 +1040,27 @@ const COMPONENTES_FERRAMENTA = {
   "decision-tree": FerramentaArvore,
 };
 
+// Itens cadastrados antes de existir o campo "Tipo de ferramenta
+// interativa" no admin não têm formularioKey salvo — reconhecemos
+// pelo título também, pra virarem interativas sem a psicóloga
+// precisar editar cada uma. Um formularioKey salvo de verdade sempre
+// tem prioridade (mesma lista em psi/admin/app_recursos.js).
+const TITULO_PARA_FORMULARIO_KEY = {
+  "gestão da ansiedade": "anxiety-management",
+  "registro abc de pensamentos": "abc-record",
+  "árvore da decisão": "decision-tree",
+};
+function resolverFormularioKey(item) {
+  if (item.formularioKey) return item.formularioKey;
+  const chave = (item.titulo || item.nome || "").trim().toLowerCase();
+  return TITULO_PARA_FORMULARIO_KEY[chave] || null;
+}
+
 function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
   const blocos = Array.isArray(item.blocos) ? item.blocos : [];
   const conteudoTexto = item.conteudo || item.passos || item.texto || "";
-  const ComponenteFerramenta = COMPONENTES_FERRAMENTA[item.formularioKey];
+  const ComponenteFerramenta = COMPONENTES_FERRAMENTA[resolverFormularioKey(item)];
 
   return (
     <div>
@@ -1053,7 +1069,7 @@ function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
       </button>
       <div className="cartao">
         <h2 style={{ margin: "0 0 6px" }}>{item.titulo || item.nome}</h2>
-        {item.descricao && <p style={{ color: "#6B7280", fontSize: 13.5, marginBottom: 18 }}>{item.descricao}</p>}
+        {item.descricao && !ComponenteFerramenta && <p style={{ color: "#6B7280", fontSize: 13.5, marginBottom: 18 }}>{item.descricao}</p>}
 
         {ComponenteFerramenta && (
           <ComponenteFerramenta usuario={usuario} paciente={paciente} recurso={item} />

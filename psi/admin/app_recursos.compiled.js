@@ -288,6 +288,23 @@ function TelaRecursos({
     aoFechar: () => setVisualizando(null)
   }));
 }
+
+// Cresce conforme mais ferramentas ganharem componente próprio (ver
+// COMPONENTES_FERRAMENTA no app.js do paciente e PREVIEWS_INTERATIVOS
+// acima) — precisa das duas listas em sincronia.
+const FERRAMENTAS_INTERATIVAS_DISPONIVEIS = [{
+  valor: "",
+  rotulo: "Nenhuma — só título, categoria e descrição"
+}, {
+  valor: "anxiety-management",
+  rotulo: "Gestão da Ansiedade"
+}, {
+  valor: "abc-record",
+  rotulo: "Registro ABC de Pensamentos"
+}, {
+  valor: "decision-tree",
+  rotulo: "Árvore da Decisão"
+}];
 function FormRecurso({
   colecao,
   item,
@@ -296,7 +313,8 @@ function FormRecurso({
   const [form, setForm] = useState(item || {
     titulo: "",
     categoria: "",
-    descricao: ""
+    descricao: "",
+    formularioKey: ""
   });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -314,6 +332,9 @@ function FormRecurso({
         categoria: form.categoria || "outros",
         descricao: form.descricao || ""
       };
+      if (colecao === "recursos_terapeuticos") {
+        dados.formularioKey = form.formularioKey || "";
+      }
       if (item) {
         await db.collection(colecao).doc(item.id).update(dados);
       } else {
@@ -354,7 +375,7 @@ function FormRecurso({
     })
   }), /*#__PURE__*/React.createElement("label", null, "Descri\xE7\xE3o ", /*#__PURE__*/React.createElement("span", {
     className: "opcional"
-  }, "(opcional)")), /*#__PURE__*/React.createElement("textarea", {
+  }, "(opcional \u2014 uma frase curta, o passo a passo j\xE1 fica dentro da ferramenta)")), /*#__PURE__*/React.createElement(TextAreaVoz, {
     className: "campo-descricao",
     rows: 3,
     value: form.descricao || "",
@@ -362,7 +383,18 @@ function FormRecurso({
       ...form,
       descricao: e.target.value
     })
-  }), erro && /*#__PURE__*/React.createElement("p", {
+  }), colecao === "recursos_terapeuticos" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Tipo de ferramenta interativa ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(se ela j\xE1 tem uma tela pronta)")), /*#__PURE__*/React.createElement("select", {
+    value: form.formularioKey || "",
+    onChange: e => setForm({
+      ...form,
+      formularioKey: e.target.value
+    })
+  }, FERRAMENTAS_INTERATIVAS_DISPONIVEIS.map(f => /*#__PURE__*/React.createElement("option", {
+    key: f.valor,
+    value: f.valor
+  }, f.rotulo)))), erro && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
   }, erro), /*#__PURE__*/React.createElement("div", {
     className: "acoes-modal"
@@ -477,6 +509,22 @@ const PREVIEWS_INTERATIVOS = {
   "abc-record": PreviewFerramentaABC,
   "decision-tree": PreviewFerramentaArvore
 };
+
+// Itens cadastrados antes de existir o campo "Tipo de ferramenta
+// interativa" no formulário não têm formularioKey salvo — por isso
+// também reconhecemos pelo título, pra elas ficarem interativas sem
+// a psicóloga precisar reabrir e editar cada uma manualmente. Um
+// formularioKey salvo de verdade sempre tem prioridade sobre isso.
+const TITULO_PARA_FORMULARIO_KEY = {
+  "gestão da ansiedade": "anxiety-management",
+  "registro abc de pensamentos": "abc-record",
+  "árvore da decisão": "decision-tree"
+};
+function resolverFormularioKey(item) {
+  if (item.formularioKey) return item.formularioKey;
+  const chave = (item.titulo || item.nome || "").trim().toLowerCase();
+  return TITULO_PARA_FORMULARIO_KEY[chave] || null;
+}
 function VisualizarRecursoModal({
   item,
   aoFechar
@@ -484,7 +532,7 @@ function VisualizarRecursoModal({
   const cores = corDaCategoria(item.categoria);
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
   const blocos = Array.isArray(item.blocos) ? item.blocos : [];
-  const ComponentePreview = PREVIEWS_INTERATIVOS[item.formularioKey];
+  const ComponentePreview = PREVIEWS_INTERATIVOS[resolverFormularioKey(item)];
   const temConteudoTexto = !!(item.conteudo || item.passos || item.texto);
   const temAlgumPreview = !!ComponentePreview || paginas.length > 0 || blocos.length > 0 || temConteudoTexto;
   return /*#__PURE__*/React.createElement("div", {
@@ -499,7 +547,7 @@ function VisualizarRecursoModal({
       "--cor-cat": cores.cor,
       "--bg-cat": cores.bg
     }
-  }, formatarCategoria(item.categoria)), /*#__PURE__*/React.createElement("h3", null, item.titulo || item.nome), item.descricao && !temConteudoTexto && /*#__PURE__*/React.createElement("p", {
+  }, formatarCategoria(item.categoria)), /*#__PURE__*/React.createElement("h3", null, item.titulo || item.nome), item.descricao && !temConteudoTexto && !ComponentePreview && /*#__PURE__*/React.createElement("p", {
     className: "texto-visualizar-recurso"
   }, item.descricao), /*#__PURE__*/React.createElement("div", {
     className: "aviso-preview-paciente"

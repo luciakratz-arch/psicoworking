@@ -217,8 +217,18 @@ function TelaRecursos({ usuario }) {
   );
 }
 
+// Cresce conforme mais ferramentas ganharem componente próprio (ver
+// COMPONENTES_FERRAMENTA no app.js do paciente e PREVIEWS_INTERATIVOS
+// acima) — precisa das duas listas em sincronia.
+const FERRAMENTAS_INTERATIVAS_DISPONIVEIS = [
+  { valor: "", rotulo: "Nenhuma — só título, categoria e descrição" },
+  { valor: "anxiety-management", rotulo: "Gestão da Ansiedade" },
+  { valor: "abc-record", rotulo: "Registro ABC de Pensamentos" },
+  { valor: "decision-tree", rotulo: "Árvore da Decisão" },
+];
+
 function FormRecurso({ colecao, item, aoFechar }) {
-  const [form, setForm] = useState(item || { titulo: "", categoria: "", descricao: "" });
+  const [form, setForm] = useState(item || { titulo: "", categoria: "", descricao: "", formularioKey: "" });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
@@ -236,6 +246,9 @@ function FormRecurso({ colecao, item, aoFechar }) {
         categoria: form.categoria || "outros",
         descricao: form.descricao || "",
       };
+      if (colecao === "recursos_terapeuticos") {
+        dados.formularioKey = form.formularioKey || "";
+      }
       if (item) {
         await db.collection(colecao).doc(item.id).update(dados);
       } else {
@@ -260,8 +273,19 @@ function FormRecurso({ colecao, item, aoFechar }) {
           <label>Categoria <span className="opcional">(ex.: tcc, relaxamento, ansiedade)</span></label>
           <input value={form.categoria || ""} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
 
-          <label>Descrição <span className="opcional">(opcional)</span></label>
-          <textarea className="campo-descricao" rows={3} value={form.descricao || ""} onChange={(e) => setForm({ ...form, descricao: e.target.value })} />
+          <label>Descrição <span className="opcional">(opcional — uma frase curta, o passo a passo já fica dentro da ferramenta)</span></label>
+          <TextAreaVoz className="campo-descricao" rows={3} value={form.descricao || ""} onChange={(e) => setForm({ ...form, descricao: e.target.value })} />
+
+          {colecao === "recursos_terapeuticos" && (
+            <>
+              <label>Tipo de ferramenta interativa <span className="opcional">(se ela já tem uma tela pronta)</span></label>
+              <select value={form.formularioKey || ""} onChange={(e) => setForm({ ...form, formularioKey: e.target.value })}>
+                {FERRAMENTAS_INTERATIVAS_DISPONIVEIS.map((f) => (
+                  <option key={f.valor} value={f.valor}>{f.rotulo}</option>
+                ))}
+              </select>
+            </>
+          )}
 
           {erro && <p className="mensagem-erro">{erro}</p>}
 
@@ -364,11 +388,27 @@ const PREVIEWS_INTERATIVOS = {
   "decision-tree": PreviewFerramentaArvore,
 };
 
+// Itens cadastrados antes de existir o campo "Tipo de ferramenta
+// interativa" no formulário não têm formularioKey salvo — por isso
+// também reconhecemos pelo título, pra elas ficarem interativas sem
+// a psicóloga precisar reabrir e editar cada uma manualmente. Um
+// formularioKey salvo de verdade sempre tem prioridade sobre isso.
+const TITULO_PARA_FORMULARIO_KEY = {
+  "gestão da ansiedade": "anxiety-management",
+  "registro abc de pensamentos": "abc-record",
+  "árvore da decisão": "decision-tree",
+};
+function resolverFormularioKey(item) {
+  if (item.formularioKey) return item.formularioKey;
+  const chave = (item.titulo || item.nome || "").trim().toLowerCase();
+  return TITULO_PARA_FORMULARIO_KEY[chave] || null;
+}
+
 function VisualizarRecursoModal({ item, aoFechar }) {
   const cores = corDaCategoria(item.categoria);
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
   const blocos = Array.isArray(item.blocos) ? item.blocos : [];
-  const ComponentePreview = PREVIEWS_INTERATIVOS[item.formularioKey];
+  const ComponentePreview = PREVIEWS_INTERATIVOS[resolverFormularioKey(item)];
   const temConteudoTexto = !!(item.conteudo || item.passos || item.texto);
   const temAlgumPreview = !!ComponentePreview || paginas.length > 0 || blocos.length > 0 || temConteudoTexto;
 
@@ -380,7 +420,7 @@ function VisualizarRecursoModal({ item, aoFechar }) {
         </span>
         <h3>{item.titulo || item.nome}</h3>
 
-        {item.descricao && !temConteudoTexto && <p className="texto-visualizar-recurso">{item.descricao}</p>}
+        {item.descricao && !temConteudoTexto && !ComponentePreview && <p className="texto-visualizar-recurso">{item.descricao}</p>}
 
         <div className="aviso-preview-paciente">
           <Icone nome="eye" tamanho={16} />
