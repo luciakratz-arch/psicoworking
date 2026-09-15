@@ -20,6 +20,17 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // Foto de perfil do próprio paciente: só ele pode enviar a dele.
+    match /pacientes/{psiId}/{pacienteId}/{arquivo} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == pacienteId
+        && request.auth.token.psi_id == psiId
+        && request.auth.token.role == 'paciente'
+        && request.resource.size < 3 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     match /{caminhoRestante=**} {
       allow read, write: if false;
     }

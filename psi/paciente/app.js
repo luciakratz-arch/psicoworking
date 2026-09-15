@@ -325,7 +325,11 @@ function App() {
         </div>
 
         <div className="paciente-barra-lateral">
-          <div className="avatar-paciente-p">{iniciaisPaciente || "?"}</div>
+          {paciente?.fotoUrl ? (
+            <img src={paciente.fotoUrl} alt="Sua foto" className="avatar-paciente-p avatar-paciente-p-foto" />
+          ) : (
+            <div className="avatar-paciente-p">{iniciaisPaciente || "?"}</div>
+          )}
           <div>
             <div className="nome-paciente-p">{paciente?.nome || usuario.email}</div>
             <span className="etiqueta-status-p">{paciente?.status || "paciente"}</span>
@@ -875,6 +879,11 @@ function TelaMeusLaudos({ usuario }) {
 // ─── Minha Conta ─────────────────────────────────────────────────
 function TelaMinhaConta({ usuario, paciente }) {
   const [msg, setMsg] = useState("");
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [erroFoto, setErroFoto] = useState("");
+  const inputFotoRef = useRef(null);
+
+  const iniciaisPaciente = (paciente?.nome || "?").trim().split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
   async function alterarSenha() {
     try {
@@ -885,9 +894,51 @@ function TelaMinhaConta({ usuario, paciente }) {
     }
   }
 
+  async function aoEscolherFoto(evento) {
+    const arquivo = evento.target.files[0];
+    evento.target.value = "";
+    if (!arquivo) return;
+    setErroFoto("");
+    setEnviandoFoto(true);
+    try {
+      const extensao = arquivo.name.split(".").pop();
+      const referencia = appPaciente.storage().ref(`pacientes/${usuario.psiId}/${usuario.uid}/foto.${extensao}`);
+      await referencia.put(arquivo);
+      const url = await referencia.getDownloadURL();
+      await db.collection("clinica_pacientes").doc(usuario.uid).update({
+        fotoUrl: url,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      setErroFoto(e.message || "Não foi possível enviar a foto.");
+    } finally {
+      setEnviandoFoto(false);
+    }
+  }
+
   return (
     <div className="cartao">
       <strong>Meus dados</strong>
+      <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 16 }}>
+        {paciente?.fotoUrl ? (
+          <img src={paciente.fotoUrl} alt="Sua foto" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover" }} />
+        ) : (
+          <div className="avatar-paciente-p" style={{ width: 72, height: 72, fontSize: 22 }}>{iniciaisPaciente || "?"}</div>
+        )}
+        <div>
+          <button
+            type="button"
+            className="botao-secundario-p"
+            onClick={() => inputFotoRef.current && inputFotoRef.current.click()}
+            disabled={enviandoFoto}
+          >
+            <Icone nome="camera" tamanho={14} /> {enviandoFoto ? "Enviando..." : "Trocar minha foto"}
+          </button>
+          <input ref={inputFotoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={aoEscolherFoto} />
+          <p className="dica-campo" style={{ marginTop: 6 }}>PNG ou JPG, até 3MB.</p>
+        </div>
+      </div>
+      {erroFoto && <p className="erro-p">{erroFoto}</p>}
       <div style={{ marginTop: 14 }}>
         <label>Nome completo</label>
         <input value={paciente?.nome || ""} disabled />

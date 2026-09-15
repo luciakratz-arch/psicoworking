@@ -79,6 +79,8 @@ service cloud.firestore {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
       allow read: if ehDonoPaciente(resource.data.psi_id, pacienteId);
+      allow update: if ehDonoPaciente(resource.data.psi_id, pacienteId)
+                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fotoUrl', 'atualizadoEm']);
     }
 
     match /clinica_sessoes/{sessaoId} {
