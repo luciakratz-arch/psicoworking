@@ -54,7 +54,33 @@ function logout() {
   auth.signOut();
 }
 
-function TelaLogin() {
+// Descobre de qual clínica é o paciente ANTES do login, pra já mostrar
+// o nome/logo/cor da psicóloga dele na tela de login (não da pra usar
+// o custom claim ainda, ele só existe depois de autenticar). Vem do
+// parâmetro ?psi= na URL (link que a psicóloga compartilha) ou, se já
+// logou aqui antes, do que ficou guardado no navegador.
+function pegarPsiIdConhecido() {
+  const daUrl = new URLSearchParams(window.location.search).get("psi");
+  if (daUrl) return daUrl;
+  try { return localStorage.getItem("psicoworking_psi_id") || ""; } catch (e) { return ""; }
+}
+
+function usarConfiguracaoPreLogin(psiId) {
+  const [config, setConfig] = useState(null);
+  useEffect(() => {
+    if (!psiId) return;
+    db.collection("psi_config").doc(psiId).get().then((doc) => {
+      if (doc.exists) {
+        const dados = doc.data();
+        setConfig(dados);
+        if (dados.corPrimaria) document.documentElement.style.setProperty("--cor-marca", dados.corPrimaria);
+      }
+    }).catch(() => {});
+  }, [psiId]);
+  return config;
+}
+
+function TelaLogin({ configClinica }) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [entrando, setEntrando] = useState(false);
@@ -85,12 +111,25 @@ function TelaLogin() {
     }
   }
 
+  const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl);
+
   return (
     <div className="tela-login-split">
       <div className="painel-marca-p">
         <div className="painel-marca-p-conteudo">
-          <span className="logo-plataforma-p-negativa">PsiCoWorking</span>
-          <h1 style={{ marginTop: 16 }}>Bem-vindo(a) de volta 🦋</h1>
+          {temMarca ? (
+            <div className="marca-clinica-login">
+              {configClinica.logoUrl ? (
+                <img src={configClinica.logoUrl} alt="Logo" className="logo-clinica-login" />
+              ) : (
+                <div className="avatar-clinica-login">{(configClinica.nome || "?").trim().charAt(0).toUpperCase()}</div>
+              )}
+              <span className="nome-clinica-login">{configClinica.nome}</span>
+            </div>
+          ) : (
+            <span className="logo-plataforma-p-negativa">PsiCoWorking</span>
+          )}
+          <h1 style={{ marginTop: 16 }}>Bem-vindo(a) de volta</h1>
           <p>Acesse seu portal e continue de onde parou.</p>
         </div>
       </div>
@@ -140,6 +179,7 @@ function App() {
   const { usuario, carregando } = useUsuarioLogado();
   const [tela, setTela] = useState("painel");
   const configClinica = usarConfiguracaoClinica(usuario && usuario.psiId);
+  const configPreLogin = usarConfiguracaoPreLogin(!usuario ? pegarPsiIdConhecido() : null);
   const [paciente, setPaciente] = useState(null);
   const [recursoAberto, setRecursoAberto] = useState(null);
 
@@ -151,11 +191,20 @@ function App() {
     return cancelar;
   }, [usuario]);
 
+  // Guarda o psi_id assim que ele fica conhecido de verdade (custom
+  // claim, pós-login), pra reconhecer a clínica em visitas futuras
+  // mesmo sem o ?psi= na URL.
+  useEffect(() => {
+    if (usuario?.psiId) {
+      try { localStorage.setItem("psicoworking_psi_id", usuario.psiId); } catch (e) {}
+    }
+  }, [usuario]);
+
   if (carregando) {
     return <div className="tela-central-p"><p>Carregando...</p></div>;
   }
 
-  if (!usuario) return <TelaLogin />;
+  if (!usuario) return <TelaLogin configClinica={configPreLogin} />;
 
   if (usuario.role !== "paciente") {
     return (
@@ -223,7 +272,7 @@ function TelaPainel({ paciente, usuario, aoAbrirRecursos }) {
   return (
     <div>
       <div className="cartao">
-        <div className="saudacao">{saudacao}, {paciente?.nome ? paciente.nome.split(" ")[0] : "!"} 👋</div>
+        <div className="saudacao">{saudacao}, {paciente?.nome ? paciente.nome.split(" ")[0] : ""}</div>
         <div className="saudacao-sub">Que bom te ver por aqui.</div>
 
         <div className="grade-stat">
@@ -363,9 +412,9 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
     { id: "musc", label: "Relaxamento Muscular", desc: "Contrair músculos 5s e relaxar com suspiro" },
   ];
   const ATIVIDADES = [
-    { id: "caminhada", label: "🚶 Caminhada" }, { id: "meditacao", label: "🧘 Meditação" },
-    { id: "diario", label: "📓 Diário" }, { id: "musica", label: "🎵 Música" },
-    { id: "alongamento", label: "🤸 Alongamento" }, { id: "agua", label: "💧 Hidratação" },
+    { id: "caminhada", label: "Caminhada", icone: "footprints" }, { id: "meditacao", label: "Meditação", icone: "flower-2" },
+    { id: "diario", label: "Diário", icone: "book-open" }, { id: "musica", label: "Música", icone: "music" },
+    { id: "alongamento", label: "Alongamento", icone: "stretch-horizontal" }, { id: "agua", label: "Hidratação", icone: "droplet" },
   ];
   const PERGUNTAS = [
     "Qual situação está me deixando ansioso(a)?", "Qual é o meu pensamento ansioso?",
@@ -408,7 +457,7 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
       });
       setHistorico((h) => [{ nivel: stress, nota, data: new Date().toLocaleDateString("pt-BR") }, ...h].slice(0, 5));
       setNota("");
-      setMsg("✓ Registrado!");
+      setMsg("Registrado!");
       setTimeout(() => setMsg(""), 2000);
     } catch (e) {
       setMsg("Erro ao salvar: " + e.message);
@@ -416,7 +465,7 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
   }
 
   async function salvarTracking() {
-    const feitos = [...TECNICAS, ...ATIVIDADES].filter((x) => track[x.id]).map((x) => x.label.replace(/^[^\s]+\s/, ""));
+    const feitos = [...TECNICAS, ...ATIVIDADES].filter((x) => track[x.id]).map((x) => x.label);
     if (feitos.length === 0) { alert("Marque pelo menos uma técnica ou atividade."); return; }
     setMsg("Salvando...");
     try {
@@ -427,7 +476,7 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       setTrack({});
-      setMsg("✓ Tracking salvo!");
+      setMsg("Tracking salvo!");
       setTimeout(() => setMsg(""), 2000);
     } catch (e) {
       setMsg("Erro ao salvar: " + e.message);
@@ -446,7 +495,7 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       setResp(Array(8).fill(""));
-      setMsg("✓ Salvo!");
+      setMsg("Salvo!");
       setTimeout(() => setMsg(""), 2000);
     } catch (e) {
       setMsg("Erro ao salvar: " + e.message);
@@ -456,8 +505,14 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
   return (
     <div>
       <div className="nav-abas" style={{ background: "none", padding: 0, marginBottom: 16 }}>
-        {["😰 Estresse", "✅ Tracking", "🧠 Pensamentos"].map((n, i) => (
-          <button key={i} className={"nav-aba" + (aba === i ? " nav-aba-ativa" : "")} onClick={() => setAba(i)}>{n}</button>
+        {[
+          { rotulo: "Estresse", icone: "gauge" },
+          { rotulo: "Tracking", icone: "list-checks" },
+          { rotulo: "Pensamentos", icone: "brain" },
+        ].map((a, i) => (
+          <button key={i} className={"nav-aba" + (aba === i ? " nav-aba-ativa" : "")} onClick={() => setAba(i)}>
+            <Icone nome={a.icone} tamanho={14} /> {a.rotulo}
+          </button>
         ))}
       </div>
 
@@ -495,7 +550,7 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
               onClick={() => setTrack((tr) => ({ ...tr, [t.id]: !tr[t.id] }))}
               style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, border: "1.5px solid", borderColor: track[t.id] ? "var(--cor-marca)" : "#E5E7EB", background: track[t.id] ? "#EADDFC" : "white", cursor: "pointer", marginBottom: 8 }}
             >
-              <span>{track[t.id] ? "✅" : "⭕"}</span>
+              <Icone nome={track[t.id] ? "check-circle-2" : "circle"} tamanho={18} />
               <div><div style={{ fontWeight: 600, fontSize: 13 }}>{t.label}</div><div style={{ fontSize: 12, color: "#6B7280" }}>{t.desc}</div></div>
             </div>
           ))}
@@ -505,9 +560,9 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
               <div
                 key={a.id}
                 onClick={() => setTrack((tr) => ({ ...tr, [a.id]: !tr[a.id] }))}
-                style={{ padding: 10, borderRadius: 10, border: "1.5px solid", borderColor: track[a.id] ? "var(--cor-marca)" : "#E5E7EB", background: track[a.id] ? "#EADDFC" : "white", cursor: "pointer", fontSize: 12, textAlign: "center", fontWeight: track[a.id] ? 600 : 400 }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: 10, borderRadius: 10, border: "1.5px solid", borderColor: track[a.id] ? "var(--cor-marca)" : "#E5E7EB", background: track[a.id] ? "#EADDFC" : "white", cursor: "pointer", fontSize: 12, textAlign: "center", fontWeight: track[a.id] ? 600 : 400 }}
               >
-                {a.label}
+                <Icone nome={a.icone} tamanho={14} /> {a.label}
               </div>
             ))}
           </div>
@@ -556,7 +611,7 @@ function LeitorFabula({ usuario, paciente, recurso }) {
         data: new Date().toLocaleDateString("pt-BR"),
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
-      setMsg("✓ Reflexões salvas!");
+      setMsg("Reflexões salvas!");
       setTimeout(() => setMsg(""), 2500);
     } catch (e) {
       setMsg("Erro ao salvar: " + e.message);
@@ -585,7 +640,7 @@ function LeitorFabula({ usuario, paciente, recurso }) {
 
       {concluido && perguntas.length > 0 && (
         <div className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB" }}>
-          <strong>💭 Para Refletir</strong>
+          <strong style={{ display: "flex", alignItems: "center", gap: 6 }}><Icone nome="message-circle" tamanho={15} /> Para Refletir</strong>
           {perguntas.map((p, i) => (
             <div key={i} style={{ marginTop: 12 }}>
               <label style={{ fontWeight: 600, fontSize: 13 }}>{i + 1}. {p}</label>
@@ -597,11 +652,17 @@ function LeitorFabula({ usuario, paciente, recurso }) {
       )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-        <button className="botao-secundario-p" style={{ flex: 1 }} disabled={idx === 0} onClick={() => setIdx((i) => Math.max(0, i - 1))}>← Anterior</button>
+        <button className="botao-secundario-p" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} disabled={idx === 0} onClick={() => setIdx((i) => Math.max(0, i - 1))}>
+          <Icone nome="arrow-left" tamanho={14} /> Anterior
+        </button>
         {!concluido ? (
-          <button className="botao-primario-p" style={{ flex: 2 }} onClick={() => setIdx((i) => Math.min(paginas.length - 1, i + 1))}>Próxima página →</button>
+          <button className="botao-primario-p" style={{ flex: 2 }} onClick={() => setIdx((i) => Math.min(paginas.length - 1, i + 1))}>
+            Próxima página <Icone nome="arrow-right" tamanho={14} />
+          </button>
         ) : (
-          <button className="botao-primario-p" style={{ flex: 2, background: "#059669" }} onClick={() => setIdx(0)}>✅ Concluído — Reler</button>
+          <button className="botao-primario-p" style={{ flex: 2, background: "#059669" }} onClick={() => setIdx(0)}>
+            <Icone nome="check" tamanho={14} /> Concluído — Reler
+          </button>
         )}
       </div>
     </div>
