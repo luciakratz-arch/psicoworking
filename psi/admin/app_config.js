@@ -19,6 +19,7 @@ function TelaConfiguracoes({ usuario }) {
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
+  const [linkCopiado, setLinkCopiado] = useState(false);
 
   useEffect(() => {
     db.collection("psi_config")
@@ -84,6 +85,17 @@ function TelaConfiguracoes({ usuario }) {
     }
   }
 
+  function copiarLinkPortal() {
+    const url = `${window.location.origin}/psi/paciente/?psi=${usuario.psiId}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setLinkCopiado(true);
+        setTimeout(() => setLinkCopiado(false), 2500);
+      })
+      .catch(() => prompt("Copie o link:", url));
+  }
+
   if (carregando) {
     return <div className="conteudo"><p>Carregando...</p></div>;
   }
@@ -134,6 +146,17 @@ function TelaConfiguracoes({ usuario }) {
           {salvando ? "Salvando..." : "Salvar Configurações"}
         </button>
       </form>
+
+      <div className="cartao-config" style={{ marginTop: 16 }}>
+        <label>Link do Portal do Paciente</label>
+        <p className="dica-campo">
+          Compartilhe esse link com seus pacientes (por WhatsApp, e-mail, etc.) — ele já abre o Portal
+          mostrando o nome e a cor da sua clínica na tela de login, em vez do genérico PsiCoWorking.
+        </p>
+        <button type="button" className="botao-secundario" onClick={copiarLinkPortal}>
+          <Icone nome="link" tamanho={15} /> {linkCopiado ? "Copiado!" : "Copiar Link do Portal"}
+        </button>
+      </div>
     </div>
   );
 }

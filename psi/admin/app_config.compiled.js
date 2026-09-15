@@ -20,6 +20,7 @@ function TelaConfiguracoes({
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
+  const [linkCopiado, setLinkCopiado] = useState(false);
   useEffect(() => {
     db.collection("psi_config").doc(usuario.psiId).get().then(doc => {
       if (doc.exists) {
@@ -72,6 +73,13 @@ function TelaConfiguracoes({
     } finally {
       setSalvando(false);
     }
+  }
+  function copiarLinkPortal() {
+    const url = `${window.location.origin}/psi/paciente/?psi=${usuario.psiId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopiado(true);
+      setTimeout(() => setLinkCopiado(false), 2500);
+    }).catch(() => prompt("Copie o link:", url));
   }
   if (carregando) {
     return /*#__PURE__*/React.createElement("div", {
@@ -126,5 +134,19 @@ function TelaConfiguracoes({
     type: "submit",
     className: "botao-primario",
     disabled: salvando
-  }, salvando ? "Salvando..." : "Salvar Configurações")));
+  }, salvando ? "Salvando..." : "Salvar Configurações")), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-config",
+    style: {
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Link do Portal do Paciente"), /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo"
+  }, "Compartilhe esse link com seus pacientes (por WhatsApp, e-mail, etc.) \u2014 ele j\xE1 abre o Portal mostrando o nome e a cor da sua cl\xEDnica na tela de login, em vez do gen\xE9rico PsiCoWorking."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: copiarLinkPortal
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "link",
+    tamanho: 15
+  }), " ", linkCopiado ? "Copiado!" : "Copiar Link do Portal")));
 }
