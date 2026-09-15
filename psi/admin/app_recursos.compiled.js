@@ -304,6 +304,9 @@ const FERRAMENTAS_INTERATIVAS_DISPONIVEIS = [{
 }, {
   valor: "decision-tree",
   rotulo: "Árvore da Decisão"
+}, {
+  valor: "roda-vida-integral",
+  rotulo: "Roda da Vida Integral"
 }];
 function FormRecurso({
   colecao,
@@ -507,7 +510,8 @@ function EnviarRecursoModal({
 const PREVIEWS_INTERATIVOS = {
   "anxiety-management": PreviewGestaoAnsiedade,
   "abc-record": PreviewFerramentaABC,
-  "decision-tree": PreviewFerramentaArvore
+  "decision-tree": PreviewFerramentaArvore,
+  "roda-vida-integral": PreviewFerramentaRodaVida
 };
 
 // Itens cadastrados antes de existir o campo "Tipo de ferramenta
@@ -518,7 +522,8 @@ const PREVIEWS_INTERATIVOS = {
 const TITULO_PARA_FORMULARIO_KEY = {
   "gestão da ansiedade": "anxiety-management",
   "registro abc de pensamentos": "abc-record",
-  "árvore da decisão": "decision-tree"
+  "árvore da decisão": "decision-tree",
+  "roda da vida integral": "roda-vida-integral"
 };
 function resolverFormularioKey(item) {
   if (item.formularioKey) return item.formularioKey;
@@ -1244,6 +1249,185 @@ function PreviewFerramentaArvore() {
     nome: "check",
     tamanho: 14
   }), " Concluir")));
+}
+
+// ─── Preview: Roda da Vida Integral ──────────────────────────────
+// Porta fiel de FerramentaRodaVidaIntegral (clinica/app.js): 8
+// sliders de 0 a 10 com radar SVG que atualiza em tempo real. Sem
+// gravar nada — só demonstração.
+function PreviewFerramentaRodaVida() {
+  const AREAS = [{
+    id: "saude",
+    label: "Saúde"
+  }, {
+    id: "carreira",
+    label: "Carreira"
+  }, {
+    id: "financeiro",
+    label: "Finanças"
+  }, {
+    id: "familia",
+    label: "Família"
+  }, {
+    id: "social",
+    label: "Relacionamentos"
+  }, {
+    id: "espirito",
+    label: "Espiritualidade"
+  }, {
+    id: "lazer",
+    label: "Lazer"
+  }, {
+    id: "pessoal",
+    label: "Desenv. Pessoal"
+  }];
+  const [vals, setVals] = useState({});
+  const [msg, setMsg] = useState("");
+  function RadarSVG({
+    valores
+  }) {
+    const n = AREAS.length;
+    const cx = 140,
+      cy = 140,
+      r = 110;
+    const grades = [2, 4, 6, 8, 10].map(g => {
+      const pts = AREAS.map((_, i) => {
+        const ang = i / n * 2 * Math.PI - Math.PI / 2;
+        return [cx + r * (g / 10) * Math.cos(ang), cy + r * (g / 10) * Math.sin(ang)].join(",");
+      }).join(" ");
+      return /*#__PURE__*/React.createElement("polygon", {
+        key: g,
+        points: pts,
+        fill: "none",
+        stroke: "#E5E7EB",
+        strokeWidth: g === 10 ? "1" : "0.5"
+      });
+    });
+    const eixos = AREAS.map((_, i) => {
+      const ang = i / n * 2 * Math.PI - Math.PI / 2;
+      return /*#__PURE__*/React.createElement("line", {
+        key: i,
+        x1: cx,
+        y1: cy,
+        x2: cx + r * Math.cos(ang),
+        y2: cy + r * Math.sin(ang),
+        stroke: "#E5E7EB",
+        strokeWidth: "0.5"
+      });
+    });
+    const pts = AREAS.map((a, i) => {
+      const ang = i / n * 2 * Math.PI - Math.PI / 2;
+      const v = (valores[a.id] || 0) / 10;
+      return [cx + r * v * Math.cos(ang), cy + r * v * Math.sin(ang)].join(",");
+    }).join(" ");
+    const pontos = AREAS.map((a, i) => {
+      const ang = i / n * 2 * Math.PI - Math.PI / 2;
+      const v = (valores[a.id] || 0) / 10;
+      return {
+        x: cx + r * v * Math.cos(ang),
+        y: cy + r * v * Math.sin(ang)
+      };
+    });
+    const labels = AREAS.map((a, i) => {
+      const ang = i / n * 2 * Math.PI - Math.PI / 2;
+      const lx = cx + (r + 22) * Math.cos(ang);
+      const ly = cy + (r + 22) * Math.sin(ang);
+      return /*#__PURE__*/React.createElement("text", {
+        key: i,
+        x: lx,
+        y: ly,
+        textAnchor: "middle",
+        dominantBaseline: "middle",
+        fontSize: "9",
+        fill: "var(--texto-suave)",
+        fontWeight: "600"
+      }, a.label);
+    });
+    return /*#__PURE__*/React.createElement("svg", {
+      width: "280",
+      height: "280",
+      viewBox: "0 0 280 280"
+    }, grades, eixos, /*#__PURE__*/React.createElement("polygon", {
+      points: pts,
+      fill: "rgba(123,0,196,0.15)",
+      stroke: "var(--cor-marca)",
+      strokeWidth: "2"
+    }), pontos.map((p, i) => /*#__PURE__*/React.createElement("circle", {
+      key: i,
+      cx: p.x,
+      cy: p.y,
+      r: "4",
+      fill: "var(--cor-marca)"
+    })), labels);
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio",
+    style: {
+      marginBottom: 16,
+      background: "#F9F5FF",
+      padding: "10px 12px",
+      borderRadius: 8
+    }
+  }, "Avalie sua satisfa\xE7\xE3o em cada \xE1rea de ", /*#__PURE__*/React.createElement("strong", null, "0 a 10"), ". O gr\xE1fico atualiza em tempo real conforme voc\xEA move os controles."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      marginBottom: 16
+    }
+  }, AREAS.map(a => /*#__PURE__*/React.createElement("div", {
+    key: a.id
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 12,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 600
+    }
+  }, a.label), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      color: "var(--cor-marca)",
+      minWidth: 32,
+      textAlign: "right"
+    }
+  }, vals[a.id] || 0, "/10")), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: 0,
+    max: 10,
+    step: 1,
+    value: vals[a.id] || 0,
+    onChange: e => setVals(v => ({
+      ...v,
+      [a.id]: +e.target.value
+    })),
+    style: {
+      width: "100%",
+      accentColor: "var(--cor-marca)"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      margin: "8px 0 16px"
+    }
+  }, /*#__PURE__*/React.createElement(RadarSVG, {
+    valores: vals
+  })), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      width: "100%",
+      justifyContent: "center"
+    },
+    onClick: () => setMsg("✓ Roda da Vida salva! (visualização — nada foi salvo de verdade)")
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "save",
+    tamanho: 14
+  }), " ", msg || "Salvar Roda da Vida"));
 }
 
 // ─── Preview: Fábula (página por página) ────────────────────────

@@ -225,6 +225,7 @@ const FERRAMENTAS_INTERATIVAS_DISPONIVEIS = [
   { valor: "anxiety-management", rotulo: "Gestão da Ansiedade" },
   { valor: "abc-record", rotulo: "Registro ABC de Pensamentos" },
   { valor: "decision-tree", rotulo: "Árvore da Decisão" },
+  { valor: "roda-vida-integral", rotulo: "Roda da Vida Integral" },
 ];
 
 function FormRecurso({ colecao, item, aoFechar }) {
@@ -386,6 +387,7 @@ const PREVIEWS_INTERATIVOS = {
   "anxiety-management": PreviewGestaoAnsiedade,
   "abc-record": PreviewFerramentaABC,
   "decision-tree": PreviewFerramentaArvore,
+  "roda-vida-integral": PreviewFerramentaRodaVida,
 };
 
 // Itens cadastrados antes de existir o campo "Tipo de ferramenta
@@ -397,6 +399,7 @@ const TITULO_PARA_FORMULARIO_KEY = {
   "gestão da ansiedade": "anxiety-management",
   "registro abc de pensamentos": "abc-record",
   "árvore da decisão": "decision-tree",
+  "roda da vida integral": "roda-vida-integral",
 };
 function resolverFormularioKey(item) {
   if (item.formularioKey) return item.formularioKey;
@@ -777,6 +780,90 @@ function PreviewFerramentaArvore() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Preview: Roda da Vida Integral ──────────────────────────────
+// Porta fiel de FerramentaRodaVidaIntegral (clinica/app.js): 8
+// sliders de 0 a 10 com radar SVG que atualiza em tempo real. Sem
+// gravar nada — só demonstração.
+function PreviewFerramentaRodaVida() {
+  const AREAS = [
+    { id: "saude", label: "Saúde" },
+    { id: "carreira", label: "Carreira" },
+    { id: "financeiro", label: "Finanças" },
+    { id: "familia", label: "Família" },
+    { id: "social", label: "Relacionamentos" },
+    { id: "espirito", label: "Espiritualidade" },
+    { id: "lazer", label: "Lazer" },
+    { id: "pessoal", label: "Desenv. Pessoal" },
+  ];
+  const [vals, setVals] = useState({});
+  const [msg, setMsg] = useState("");
+
+  function RadarSVG({ valores }) {
+    const n = AREAS.length;
+    const cx = 140, cy = 140, r = 110;
+    const grades = [2, 4, 6, 8, 10].map((g) => {
+      const pts = AREAS.map((_, i) => {
+        const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+        return [cx + r * (g / 10) * Math.cos(ang), cy + r * (g / 10) * Math.sin(ang)].join(",");
+      }).join(" ");
+      return <polygon key={g} points={pts} fill="none" stroke="#E5E7EB" strokeWidth={g === 10 ? "1" : "0.5"} />;
+    });
+    const eixos = AREAS.map((_, i) => {
+      const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+      return <line key={i} x1={cx} y1={cy} x2={cx + r * Math.cos(ang)} y2={cy + r * Math.sin(ang)} stroke="#E5E7EB" strokeWidth="0.5" />;
+    });
+    const pts = AREAS.map((a, i) => {
+      const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+      const v = (valores[a.id] || 0) / 10;
+      return [cx + r * v * Math.cos(ang), cy + r * v * Math.sin(ang)].join(",");
+    }).join(" ");
+    const pontos = AREAS.map((a, i) => {
+      const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+      const v = (valores[a.id] || 0) / 10;
+      return { x: cx + r * v * Math.cos(ang), y: cy + r * v * Math.sin(ang) };
+    });
+    const labels = AREAS.map((a, i) => {
+      const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+      const lx = cx + (r + 22) * Math.cos(ang);
+      const ly = cy + (r + 22) * Math.sin(ang);
+      return <text key={i} x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill="var(--texto-suave)" fontWeight="600">{a.label}</text>;
+    });
+    return (
+      <svg width="280" height="280" viewBox="0 0 280 280">
+        {grades}{eixos}
+        <polygon points={pts} fill="rgba(123,0,196,0.15)" stroke="var(--cor-marca)" strokeWidth="2" />
+        {pontos.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill="var(--cor-marca)" />)}
+        {labels}
+      </svg>
+    );
+  }
+
+  return (
+    <div>
+      <p className="texto-vazio" style={{ marginBottom: 16, background: "#F9F5FF", padding: "10px 12px", borderRadius: 8 }}>
+        Avalie sua satisfação em cada área de <strong>0 a 10</strong>. O gráfico atualiza em tempo real conforme você move os controles.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        {AREAS.map((a) => (
+          <div key={a.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+              <span style={{ fontWeight: 600 }}>{a.label}</span>
+              <span style={{ fontWeight: 700, color: "var(--cor-marca)", minWidth: 32, textAlign: "right" }}>{vals[a.id] || 0}/10</span>
+            </div>
+            <input type="range" min={0} max={10} step={1} value={vals[a.id] || 0} onChange={(e) => setVals((v) => ({ ...v, [a.id]: +e.target.value }))} style={{ width: "100%", accentColor: "var(--cor-marca)" }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", margin: "8px 0 16px" }}>
+        <RadarSVG valores={vals} />
+      </div>
+      <button className="botao-primario" style={{ width: "100%", justifyContent: "center" }} onClick={() => setMsg("✓ Roda da Vida salva! (visualização — nada foi salvo de verdade)")}>
+        <Icone nome="save" tamanho={14} /> {msg || "Salvar Roda da Vida"}
+      </button>
     </div>
   );
 }

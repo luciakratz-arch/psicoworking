@@ -1038,6 +1038,7 @@ const COMPONENTES_FERRAMENTA = {
   "anxiety-management": FerramentaGestaoAnsiedade,
   "abc-record": FerramentaABC,
   "decision-tree": FerramentaArvore,
+  "roda-vida-integral": FerramentaRodaVida,
 };
 
 // Itens cadastrados antes de existir o campo "Tipo de ferramenta
@@ -1049,6 +1050,7 @@ const TITULO_PARA_FORMULARIO_KEY = {
   "gestão da ansiedade": "anxiety-management",
   "registro abc de pensamentos": "abc-record",
   "árvore da decisão": "decision-tree",
+  "roda da vida integral": "roda-vida-integral",
 };
 function resolverFormularioKey(item) {
   if (item.formularioKey) return item.formularioKey;
@@ -1572,6 +1574,139 @@ function FerramentaArvore({ usuario, paciente, recurso }) {
       )}
 
       {msg && <p className="erro-p">{msg}</p>}
+    </div>
+  );
+}
+
+// ─── Ferramenta: Roda da Vida Integral (grava de verdade) ────────
+function FerramentaRodaVida({ usuario, paciente, recurso }) {
+  const AREAS = [
+    { id: "saude", label: "Saúde" },
+    { id: "carreira", label: "Carreira" },
+    { id: "financeiro", label: "Finanças" },
+    { id: "familia", label: "Família" },
+    { id: "social", label: "Relacionamentos" },
+    { id: "espirito", label: "Espiritualidade" },
+    { id: "lazer", label: "Lazer" },
+    { id: "pessoal", label: "Desenv. Pessoal" },
+  ];
+  const [vals, setVals] = useState({});
+  const [msg, setMsg] = useState("");
+  const [historico, setHistorico] = useState([]);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    db.collection("clinica_gestao_ansiedade")
+      .where("pacienteId", "==", usuario.uid)
+      .where("tipo", "==", "roda")
+      .get()
+      .then((snap) => {
+        const docs = snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        if (docs.length > 0) {
+          const v = {};
+          (docs[0].areas || []).forEach((a) => {
+            const found = AREAS.find((x) => x.label === a.area);
+            if (found) v[found.id] = a.valor;
+          });
+          setVals(v);
+        }
+        setHistorico(docs.slice(0, 5));
+      })
+      .catch(() => {});
+  }, [usuario.uid]);
+
+  function RadarSVG({ valores }) {
+    const n = AREAS.length;
+    const cx = 140, cy = 140, r = 110;
+    const grades = [2, 4, 6, 8, 10].map((g) => {
+      const pts = AREAS.map((_, i) => {
+        const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+        return [cx + r * (g / 10) * Math.cos(ang), cy + r * (g / 10) * Math.sin(ang)].join(",");
+      }).join(" ");
+      return <polygon key={g} points={pts} fill="none" stroke="#E5E7EB" strokeWidth={g === 10 ? "1" : "0.5"} />;
+    });
+    const eixos = AREAS.map((_, i) => {
+      const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+      return <line key={i} x1={cx} y1={cy} x2={cx + r * Math.cos(ang)} y2={cy + r * Math.sin(ang)} stroke="#E5E7EB" strokeWidth="0.5" />;
+    });
+    const pts = AREAS.map((a, i) => {
+      const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+      const v = (valores[a.id] || 0) / 10;
+      return [cx + r * v * Math.cos(ang), cy + r * v * Math.sin(ang)].join(",");
+    }).join(" ");
+    const pontos = AREAS.map((a, i) => {
+      const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+      const v = (valores[a.id] || 0) / 10;
+      return { x: cx + r * v * Math.cos(ang), y: cy + r * v * Math.sin(ang) };
+    });
+    const labels = AREAS.map((a, i) => {
+      const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+      const lx = cx + (r + 22) * Math.cos(ang);
+      const ly = cy + (r + 22) * Math.sin(ang);
+      return <text key={i} x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill="#6B7280" fontWeight="600">{a.label}</text>;
+    });
+    return (
+      <svg width="280" height="280" viewBox="0 0 280 280">
+        {grades}{eixos}
+        <polygon points={pts} fill="rgba(123,0,196,0.15)" stroke="var(--cor-marca)" strokeWidth="2" />
+        {pontos.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill="var(--cor-marca)" />)}
+        {labels}
+      </svg>
+    );
+  }
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      const areas = AREAS.map((a) => ({ area: a.label, valor: vals[a.id] || 0 }));
+      await db.collection("clinica_gestao_ansiedade").add({
+        psi_id: usuario.psiId, pacienteId: usuario.uid, pacienteNome: paciente?.nome || "",
+        tipo: "roda", areas,
+        data: new Date().toLocaleDateString("pt-BR"),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setHistorico((h) => [{ areas, data: new Date().toLocaleDateString("pt-BR") }, ...h].slice(0, 5));
+      setMsg("Roda da Vida salva!");
+      setTimeout(() => setMsg(""), 2500);
+    } catch (e) {
+      setMsg("Erro ao salvar: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: "#6B7280", marginBottom: 16, background: "#F9F5FF", padding: "10px 12px", borderRadius: 8 }}>
+        Avalie sua satisfação em cada área de <strong>0 a 10</strong>. O gráfico atualiza em tempo real conforme você move os controles.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        {AREAS.map((a) => (
+          <div key={a.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+              <span style={{ fontWeight: 600 }}>{a.label}</span>
+              <span style={{ fontWeight: 700, color: "var(--cor-marca)", minWidth: 32, textAlign: "right" }}>{vals[a.id] || 0}/10</span>
+            </div>
+            <input type="range" min={0} max={10} step={1} value={vals[a.id] || 0} onChange={(e) => setVals((v) => ({ ...v, [a.id]: +e.target.value }))} style={{ width: "100%", accentColor: "var(--cor-marca)" }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", margin: "8px 0 16px" }}>
+        <RadarSVG valores={vals} />
+      </div>
+      <button className="botao-primario-p" style={{ width: "100%", justifyContent: "center" }} disabled={salvando} onClick={salvar}>
+        <Icone nome="save" tamanho={14} /> {msg || (salvando ? "Salvando..." : "Salvar Roda da Vida")}
+      </button>
+      {historico.length > 1 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--cor-marca)", marginBottom: 8 }}>Histórico</div>
+          {historico.slice(1, 4).map((h, i) => (
+            <div key={i} style={{ fontSize: 11, color: "#6B7280", padding: "6px 10px", background: "#F9FAFB", borderRadius: 8, marginBottom: 4 }}>
+              {h.data} — {(h.areas || []).map((a) => `${a.area}: ${a.valor}`).join(" · ")}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
