@@ -106,6 +106,12 @@ service cloud.firestore {
       allow read, update: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
     }
 
+    match /clinica_laudos/{laudoId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
+    }
+
     match /clinica_anamneses/{registroId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'

@@ -13,6 +13,7 @@ function TelaConfiguracoes({ usuario }) {
   const [corPrimaria, setCorPrimaria] = useState("#6A2BD9");
   const [logoUrl, setLogoUrl] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [arquivoLogo, setArquivoLogo] = useState(null);
   const [arquivoFoto, setArquivoFoto] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -32,6 +33,7 @@ function TelaConfiguracoes({ usuario }) {
           setCorPrimaria(dados.corPrimaria || "#6A2BD9");
           setLogoUrl(dados.logoUrl || "");
           setFotoUrl(dados.fotoUrl || "");
+          setWhatsapp(dados.whatsapp || "");
         }
         setCarregando(false);
       })
@@ -69,6 +71,7 @@ function TelaConfiguracoes({ usuario }) {
           corPrimaria,
           logoUrl: urlLogoFinal,
           fotoUrl: urlFotoFinal,
+          whatsapp,
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -110,6 +113,9 @@ function TelaConfiguracoes({ usuario }) {
       <form className="cartao-config" onSubmit={aoSalvar}>
         <label>Nome da clínica (ou seu nome)</label>
         <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Consultório Dra. Maria Silva" />
+
+        <label>WhatsApp da clínica <span className="opcional">(opcional — usado no botão "Reagendar" do paciente)</span></label>
+        <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex.: 62994644950" />
 
         <label>Cor principal</label>
         <div className="linha-cor">

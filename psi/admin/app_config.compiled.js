@@ -14,6 +14,7 @@ function TelaConfiguracoes({
   const [corPrimaria, setCorPrimaria] = useState("#6A2BD9");
   const [logoUrl, setLogoUrl] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [arquivoLogo, setArquivoLogo] = useState(null);
   const [arquivoFoto, setArquivoFoto] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -29,6 +30,7 @@ function TelaConfiguracoes({
         setCorPrimaria(dados.corPrimaria || "#6A2BD9");
         setLogoUrl(dados.logoUrl || "");
         setFotoUrl(dados.fotoUrl || "");
+        setWhatsapp(dados.whatsapp || "");
       }
       setCarregando(false);
     }).catch(() => setCarregando(false));
@@ -60,6 +62,7 @@ function TelaConfiguracoes({
         corPrimaria,
         logoUrl: urlLogoFinal,
         fotoUrl: urlFotoFinal,
+        whatsapp,
         atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
       }, {
         merge: true
@@ -98,6 +101,12 @@ function TelaConfiguracoes({
     value: nome,
     onChange: e => setNome(e.target.value),
     placeholder: "Ex.: Consult\xF3rio Dra. Maria Silva"
+  }), /*#__PURE__*/React.createElement("label", null, "WhatsApp da cl\xEDnica ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional \u2014 usado no bot\xE3o \"Reagendar\" do paciente)")), /*#__PURE__*/React.createElement("input", {
+    value: whatsapp,
+    onChange: e => setWhatsapp(e.target.value),
+    placeholder: "Ex.: 62994644950"
   }), /*#__PURE__*/React.createElement("label", null, "Cor principal"), /*#__PURE__*/React.createElement("div", {
     className: "linha-cor"
   }, /*#__PURE__*/React.createElement("input", {

@@ -244,74 +244,104 @@ function App() {
   }
 
   const inicial = (configClinica?.nome || "P").trim().charAt(0).toUpperCase();
+  const iniciaisPaciente = (paciente?.nome || "?").trim().split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+
+  const NAV = [
+    { id: "painel", rotulo: "Meu Painel", icone: "layout-dashboard" },
+    { id: "humor", rotulo: "Check-in Diário", icone: "heart" },
+    { id: "metas", rotulo: "Minhas Metas", icone: "target" },
+    { id: "diario", rotulo: "Diário Terapêutico", icone: "book-open" },
+    { id: "recursos", rotulo: "Recursos Terapêuticos", icone: "wrench" },
+    { id: "laudos", rotulo: "Meus Laudos", icone: "file-text" },
+    { id: "avaliar", rotulo: "Avaliar", icone: "star" },
+    { id: "conta", rotulo: "Minha Conta", icone: "user-circle" },
+  ];
+
+  function irPara(id) {
+    setTela(id);
+    setRecursoAberto(null);
+  }
 
   return (
-    <div>
-      <div className="topo">
-        <div className="topo-marca">
+    <div className="layout-paciente">
+      <aside className="barra-lateral-p">
+        <div className="marca-barra-lateral-p">
           {configClinica?.logoUrl ? (
             <img src={configClinica.logoUrl} alt="Logo" />
           ) : (
-            <div className="topo-marca-inicial">{inicial}</div>
+            <div className="avatar-marca-p">{inicial}</div>
           )}
-          <span className="topo-nome">{configClinica?.nome || "PsiCoWorking"}</span>
+          <div>
+            <div className="marca-barra-lateral-p-nome">{configClinica?.nome || "PsiCoWorking"}</div>
+            <div className="marca-barra-lateral-p-sub">Área do Paciente</div>
+          </div>
         </div>
-        <button className="botao-sair-topo" onClick={logout}>
-          <Icone nome="log-out" tamanho={13} /> Sair
-        </button>
-      </div>
 
-      <div className="nav-abas">
-        {[
-          { id: "painel", rotulo: "Meu Painel", icone: "layout-dashboard" },
-          { id: "humor", rotulo: "Check-in Diário", icone: "heart" },
-          { id: "recursos", rotulo: "Recursos Terapêuticos", icone: "wrench" },
-          { id: "metas", rotulo: "Minhas Metas", icone: "target" },
-          { id: "diario", rotulo: "Diário Terapêutico", icone: "book-open" },
-          { id: "avaliar", rotulo: "Avaliar", icone: "star" },
-        ].map((item) => (
-          <button key={item.id} className={"nav-aba" + (tela === item.id ? " nav-aba-ativa" : "")} onClick={() => { setTela(item.id); setRecursoAberto(null); }}>
-            <Icone nome={item.icone} tamanho={15} /> {item.rotulo}
+        <div className="paciente-barra-lateral">
+          <div className="avatar-paciente-p">{iniciaisPaciente || "?"}</div>
+          <div>
+            <div className="nome-paciente-p">{paciente?.nome || usuario.email}</div>
+            <span className="etiqueta-status-p">{paciente?.status || "paciente"}</span>
+          </div>
+        </div>
+
+        <nav>
+          {NAV.map((item) => (
+            <button key={item.id} className={"item-menu-p" + (tela === item.id ? " item-menu-p-ativo" : "")} onClick={() => irPara(item.id)}>
+              <Icone nome={item.icone} tamanho={16} /> {item.rotulo}
+            </button>
+          ))}
+        </nav>
+
+        <div className="rodape-barra-lateral-p">
+          <button className="botao-sair-p" onClick={logout}>
+            <Icone nome="log-out" tamanho={13} /> Sair
           </button>
-        ))}
-      </div>
+        </div>
+      </aside>
 
-      <div className="conteudo">
-        {tela === "painel" && (
-          <TelaPainel
-            paciente={paciente}
-            usuario={usuario}
-            aoAbrirRecursos={() => setTela("recursos")}
-            aoAbrirMetas={() => setTela("metas")}
-          />
-        )}
-        {tela === "recursos" && (
-          <TelaRecursosPaciente
-            paciente={paciente}
-            usuario={usuario}
-            recursoAberto={recursoAberto}
-            setRecursoAberto={setRecursoAberto}
-          />
-        )}
-        {tela === "humor" && <TelaCheckinHumor usuario={usuario} />}
-        {tela === "metas" && <TelaMinhasMetas usuario={usuario} />}
-        {tela === "diario" && <TelaDiario usuario={usuario} paciente={paciente} />}
-        {tela === "avaliar" && <TelaAvaliar usuario={usuario} />}
-      </div>
+      <main className="area-principal-p">
+        <div className="conteudo">
+          {tela === "painel" && (
+            <TelaPainel
+              paciente={paciente}
+              usuario={usuario}
+              configClinica={configClinica}
+              aoAbrirRecursos={() => irPara("recursos")}
+              aoIrPara={irPara}
+            />
+          )}
+          {tela === "recursos" && (
+            <TelaRecursosPaciente
+              paciente={paciente}
+              usuario={usuario}
+              recursoAberto={recursoAberto}
+              setRecursoAberto={setRecursoAberto}
+            />
+          )}
+          {tela === "humor" && <TelaCheckinHumor usuario={usuario} />}
+          {tela === "metas" && <TelaMinhasMetas usuario={usuario} />}
+          {tela === "diario" && <TelaDiario usuario={usuario} paciente={paciente} />}
+          {tela === "avaliar" && <TelaAvaliar usuario={usuario} />}
+          {tela === "laudos" && <TelaMeusLaudos usuario={usuario} />}
+          {tela === "conta" && <TelaMinhaConta usuario={usuario} paciente={paciente} />}
+        </div>
+      </main>
     </div>
   );
 }
 
 // ─── Meu Painel ──────────────────────────────────────────────────
-function TelaPainel({ paciente, usuario, aoAbrirRecursos, aoAbrirMetas }) {
+function TelaPainel({ paciente, usuario, configClinica, aoAbrirRecursos, aoIrPara }) {
   const ativos = paciente?.modulosConfig
     ? Object.values(paciente.modulosConfig).filter((m) => m && m.ativo).length
     : 0;
   const [proximaSessao, setProximaSessao] = useState(null);
   const [carregandoSessao, setCarregandoSessao] = useState(true);
   const [confirmando, setConfirmando] = useState(false);
-  const [humorHoje, setHumorHoje] = useState(null);
+  const [humores, setHumores] = useState([]);
   const [metasAtivas, setMetasAtivas] = useState(0);
+  const [entradasDiario, setEntradasDiario] = useState(0);
 
   useEffect(() => {
     const hoje = new Date().toISOString().slice(0, 10);
@@ -330,19 +360,25 @@ function TelaPainel({ paciente, usuario, aoAbrirRecursos, aoAbrirMetas }) {
   }, [usuario.uid]);
 
   useEffect(() => {
-    const hojeFmt = new Date().toLocaleDateString("pt-BR");
     db.collection("clinica_humor")
       .where("pacienteId", "==", usuario.uid)
-      .where("data", "==", hojeFmt)
-      .limit(1)
       .get()
-      .then((snap) => setHumorHoje(snap.empty ? null : snap.docs[0].data()))
+      .then((snap) => {
+        const docs = snap.docs.map((d) => d.data());
+        docs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+        setHumores(docs);
+      })
       .catch(() => {});
     db.collection("clinica_metas")
       .where("pacienteId", "==", usuario.uid)
       .where("status", "==", "ativa")
       .get()
       .then((snap) => setMetasAtivas(snap.size))
+      .catch(() => {});
+    db.collection("clinica_diario")
+      .where("pacienteId", "==", usuario.uid)
+      .get()
+      .then((snap) => setEntradasDiario(snap.size))
       .catch(() => {});
   }, [usuario.uid]);
 
@@ -362,44 +398,38 @@ function TelaPainel({ paciente, usuario, aoAbrirRecursos, aoAbrirMetas }) {
     }
   }
 
+  function reagendarWhatsApp() {
+    const numero = (configClinica?.whatsapp || "").replace(/\D/g, "");
+    if (!numero || !proximaSessao) return;
+    const dataFmt = new Date(proximaSessao.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+    const msg = `Olá! Sou ${paciente?.nome || ""}.\n\nGostaria de solicitar o reagendamento da minha sessão marcada para ${dataFmt}${proximaSessao.hora ? " às " + proximaSessao.hora : ""}.\n\nPodemos verificar uma nova data disponível? Obrigado(a)!`;
+    window.open(`https://wa.me/55${numero}?text=${encodeURIComponent(msg)}`, "_blank");
+  }
+
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
+  const hojeFmt = new Date().toLocaleDateString("pt-BR");
+  const humorHoje = humores.find((h) => h.data === hojeFmt);
+  const media30 = humores.length > 0 ? (humores.reduce((a, h) => a + (h.valor || 0), 0) / humores.length).toFixed(1) : null;
 
   return (
     <div>
-      <div className="cartao">
-        <div className="saudacao">{saudacao}, {paciente?.nome ? paciente.nome.split(" ")[0] : ""}</div>
-        <div className="saudacao-sub">
-          {humorHoje ? `Humor registrado hoje: ${humorHoje.valor}/10` : "Que bom te ver por aqui."}
-        </div>
-
-        <div className="grade-stat">
-          <div>
-            <div className="stat-num">{ativos}</div>
-            <div className="stat-label">recurso(s) disponível(is) pra você</div>
-          </div>
-          <div>
-            <div className="stat-num">{metasAtivas}</div>
-            <div className="stat-label">meta(s) em andamento</div>
-          </div>
-        </div>
-
-        <button className="botao-primario-p" onClick={aoAbrirRecursos}>
-          <Icone nome="wrench" tamanho={16} /> Ver meus Recursos Terapêuticos
-        </button>
+      <div className="banner-painel">
+        <div className="banner-painel-data">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</div>
+        <div className="banner-painel-saudacao">{saudacao}, {paciente?.nome ? paciente.nome.split(" ")[0] : ""}!</div>
       </div>
 
       {!carregandoSessao && proximaSessao && (
-        <div className="cartao cartao-sessao-painel">
-          <div className="icone-tipo" style={{ marginBottom: 10 }}>
-            <Icone nome="calendar" tamanho={20} />
+        <div className="barra-sessao">
+          <div className="barra-sessao-icone"><Icone nome="calendar" tamanho={20} /></div>
+          <div className="barra-sessao-info">
+            <div className="barra-sessao-rotulo">Próxima Sessão</div>
+            <div className="barra-sessao-data">
+              {new Date(proximaSessao.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+              {proximaSessao.hora ? ` às ${proximaSessao.hora}` : ""}
+            </div>
           </div>
-          <span className="etiqueta-tipo">Próxima Sessão</span>
-          <div style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}>
-            {new Date(proximaSessao.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
-            {proximaSessao.hora ? ` às ${proximaSessao.hora}` : ""}
-          </div>
-          <div style={{ marginTop: 12 }}>
+          <div className="barra-sessao-acoes">
             {proximaSessao.statusConfirmacao === "confirmado" ? (
               <span className="etiqueta-confirmada"><Icone nome="check" tamanho={13} /> Presença confirmada</span>
             ) : (
@@ -407,7 +437,66 @@ function TelaPainel({ paciente, usuario, aoAbrirRecursos, aoAbrirMetas }) {
                 <Icone nome="check" tamanho={14} /> {confirmando ? "Confirmando..." : "Confirmar presença"}
               </button>
             )}
+            {configClinica?.whatsapp && (
+              <button className="botao-reagendar-p" onClick={reagendarWhatsApp}>
+                <Icone nome="message-circle" tamanho={14} /> Reagendar
+              </button>
+            )}
           </div>
+        </div>
+      )}
+
+      <div className="grade-stat-painel">
+        <div className="cartao-stat-painel">
+          <div className="cartao-stat-painel-topo">
+            <span className="cartao-stat-painel-label">Humor hoje</span>
+            <div className="cartao-stat-painel-icone"><Icone nome="heart" tamanho={15} /></div>
+          </div>
+          <div className="cartao-stat-painel-num">{humorHoje ? `${humorHoje.valor}/10` : "—"}</div>
+        </div>
+        <div className="cartao-stat-painel">
+          <div className="cartao-stat-painel-topo">
+            <span className="cartao-stat-painel-label">Média 30 dias</span>
+            <div className="cartao-stat-painel-icone"><Icone nome="trending-up" tamanho={15} /></div>
+          </div>
+          <div className="cartao-stat-painel-num">{media30 ? `${media30}/10` : "—"}</div>
+        </div>
+        <div className="cartao-stat-painel">
+          <div className="cartao-stat-painel-topo">
+            <span className="cartao-stat-painel-label">Metas ativas</span>
+            <div className="cartao-stat-painel-icone"><Icone nome="target" tamanho={15} /></div>
+          </div>
+          <div className="cartao-stat-painel-num">{metasAtivas}</div>
+        </div>
+        <div className="cartao-stat-painel">
+          <div className="cartao-stat-painel-topo">
+            <span className="cartao-stat-painel-label">Entradas no diário</span>
+            <div className="cartao-stat-painel-icone"><Icone nome="book-open" tamanho={15} /></div>
+          </div>
+          <div className="cartao-stat-painel-num">{entradasDiario}</div>
+        </div>
+      </div>
+
+      <div className="cartao-atalhos">
+        <div className="cartao-atalhos-topo">
+          <strong>Acesso Rápido</strong>
+          <span className="texto-vazio-p">{ativos} módulo(s) ativo(s)</span>
+        </div>
+        <div className="grade-atalhos">
+          <button className="atalho-p" onClick={() => aoIrPara("humor")}><Icone nome="heart" tamanho={15} /> Registrar</button>
+          <button className="atalho-p" onClick={() => aoIrPara("diario")}><Icone nome="book-open" tamanho={15} /> Diário</button>
+          <button className="atalho-p" onClick={() => aoIrPara("metas")}><Icone nome="target" tamanho={15} /> Minhas Metas</button>
+          <button className="atalho-p" onClick={aoAbrirRecursos}><Icone nome="wrench" tamanho={15} /> Recursos</button>
+        </div>
+      </div>
+
+      {humores.length > 1 && (
+        <div className="cartao-grafico">
+          <div className="cartao-grafico-topo">
+            <strong>Minha Evolução de Humor</strong>
+            {media30 && <span style={{ color: "var(--cor-marca)", fontWeight: 700, fontSize: 13 }}>Média: {media30}/10</span>}
+          </div>
+          <GraficoHumor humores={humores.slice(-14)} />
         </div>
       )}
 
@@ -417,6 +506,30 @@ function TelaPainel({ paciente, usuario, aoAbrirRecursos, aoAbrirMetas }) {
         </div>
       )}
     </div>
+  );
+}
+
+// Gráfico de linha simples (SVG puro, sem biblioteca) com a evolução
+// do humor nos últimos registros.
+function GraficoHumor({ humores }) {
+  const largura = 600, altura = 180, margem = 24;
+  const n = humores.length;
+  const pontoX = (i) => margem + (i * (largura - margem * 2)) / Math.max(1, n - 1);
+  const pontoY = (v) => altura - margem - ((v || 0) / 10) * (altura - margem * 2);
+  const pontos = humores.map((h, i) => `${pontoX(i)},${pontoY(h.valor)}`).join(" ");
+  const areaPontos = `${margem},${altura - margem} ${pontos} ${largura - margem},${altura - margem}`;
+
+  return (
+    <svg viewBox={`0 0 ${largura} ${altura}`} style={{ width: "100%", height: "auto" }}>
+      {[0, 2.5, 5, 7.5, 10].map((v) => (
+        <line key={v} x1={margem} x2={largura - margem} y1={pontoY(v)} y2={pontoY(v)} stroke="#F3F4F6" strokeWidth="1" />
+      ))}
+      <polygon points={areaPontos} fill="var(--cor-marca)" opacity="0.08" />
+      <polyline points={pontos} fill="none" stroke="var(--cor-marca)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      {humores.map((h, i) => (
+        <circle key={i} cx={pontoX(i)} cy={pontoY(h.valor)} r="5" fill="white" stroke="var(--cor-marca)" strokeWidth="3" />
+      ))}
+    </svg>
   );
 }
 
@@ -663,6 +776,86 @@ function TelaAvaliar({ usuario }) {
       <textarea rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Quer contar mais alguma coisa? (opcional)" />
       {erro && <p className="erro-p">{erro}</p>}
       <button className="botao-primario-p" style={{ marginTop: 10 }} onClick={enviar}>Enviar avaliação</button>
+    </div>
+  );
+}
+
+// ─── Meus Laudos ─────────────────────────────────────────────────
+// A psicóloga ainda não tem uma tela pra emitir laudos (é uma das
+// próximas etapas do lado dela) — essa tela já fica pronta pra
+// mostrar assim que existir.
+function TelaMeusLaudos({ usuario }) {
+  const [laudos, setLaudos] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    db.collection("clinica_laudos")
+      .where("pacienteId", "==", usuario.uid)
+      .get()
+      .then((snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        docs.sort((a, b) => (b.criadoEm?.toMillis?.() || 0) - (a.criadoEm?.toMillis?.() || 0));
+        setLaudos(docs);
+        setCarregando(false);
+      })
+      .catch(() => setCarregando(false));
+  }, [usuario.uid]);
+
+  if (carregando) return <p className="texto-vazio-p">Carregando...</p>;
+
+  if (laudos.length === 0) {
+    return (
+      <div className="cartao" style={{ textAlign: "center" }}>
+        <Icone nome="file-text" tamanho={32} />
+        <p style={{ fontWeight: 600, marginTop: 10 }}>Nenhum laudo por enquanto</p>
+        <p className="texto-vazio-p">Quando sua psicóloga emitir um laudo ou relatório, ele aparece aqui.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {laudos.map((l) => (
+        <div key={l.id} className="cartao">
+          <div style={{ fontWeight: 700, fontSize: 15 }}>{l.titulo || "Laudo"}</div>
+          <div style={{ fontSize: 11.5, color: "#9CA3AF", marginTop: 4 }}>{l.data}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Minha Conta ─────────────────────────────────────────────────
+function TelaMinhaConta({ usuario, paciente }) {
+  const [msg, setMsg] = useState("");
+
+  async function alterarSenha() {
+    try {
+      await auth.sendPasswordResetEmail(usuario.email);
+      setMsg("Enviamos um link para " + usuario.email + " pra você definir uma senha nova.");
+    } catch (e) {
+      setMsg("Não foi possível enviar: " + e.message);
+    }
+  }
+
+  return (
+    <div className="cartao">
+      <strong>Meus dados</strong>
+      <div style={{ marginTop: 14 }}>
+        <label>Nome completo</label>
+        <input value={paciente?.nome || ""} disabled />
+        <label>E-mail</label>
+        <input value={usuario.email || ""} disabled />
+        <label>Telefone</label>
+        <input value={paciente?.telefone || "—"} disabled />
+      </div>
+      <p className="texto-vazio-p" style={{ marginTop: 10 }}>
+        Pra corrigir algum desses dados, fale com sua psicóloga.
+      </p>
+      <button className="botao-secundario-p" style={{ marginTop: 14 }} onClick={alterarSenha}>
+        <Icone nome="key" tamanho={14} /> Alterar minha senha
+      </button>
+      {msg && <p className="erro-p" style={{ background: "#DCFCE7", color: "#166534" }}>{msg}</p>}
     </div>
   );
 }
