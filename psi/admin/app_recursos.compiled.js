@@ -473,7 +473,9 @@ function EnviarRecursoModal({
 // primeira; as outras ainda caem no aviso "pré-visualização não
 // disponível" abaixo.
 const PREVIEWS_INTERATIVOS = {
-  "anxiety-management": PreviewGestaoAnsiedade
+  "anxiety-management": PreviewGestaoAnsiedade,
+  "abc-record": PreviewFerramentaABC,
+  "decision-tree": PreviewFerramentaArvore
 };
 function VisualizarRecursoModal({
   item,
@@ -743,6 +745,457 @@ function PreviewGestaoAnsiedade() {
       confirmar("Salvo!");
     }
   }, msg || "Salvar respostas")));
+}
+
+// ─── Preview: Registro ABC de Pensamentos ───────────────────────
+// Porta fiel da ferramenta real (clinica/app.js, FerramentaABC): 4
+// passos (Situação, Pensamento, Emoção, Resposta Racional) com barra
+// de progresso. Aqui não grava nada — mesmo espírito do preview de
+// Gestão da Ansiedade acima.
+function PreviewFerramentaABC() {
+  const EMOCOES = ["Ansiedade", "Tristeza", "Raiva", "Medo", "Vergonha", "Culpa", "Frustração", "Insegurança", "Alívio", "Esperança"];
+  const PASSOS_INFO = [{
+    n: 1,
+    letra: "A",
+    titulo: "Situação",
+    subtitulo: "O que aconteceu?",
+    dica: "Descreva a situação de forma objetiva — onde estava, com quem, o que aconteceu. Sem interpretações ainda.",
+    placeholder: "Ex: Meu chefe me chamou para uma conversa inesperada..."
+  }, {
+    n: 2,
+    letra: "B",
+    titulo: "Pensamento Automático",
+    subtitulo: "O que passou pela sua cabeça?",
+    dica: "Escreva exatamente como o pensamento veio à mente, sem filtrar.",
+    placeholder: "Ex: Vou ser demitido(a), eu fiz tudo errado..."
+  }, {
+    n: 3,
+    letra: "C",
+    titulo: "Emoção e Intensidade",
+    subtitulo: "O que você sentiu?",
+    dica: "Escolha a emoção mais próxima e avalie a intensidade dela."
+  }, {
+    n: 4,
+    letra: "D",
+    titulo: "Resposta Racional",
+    subtitulo: "O que a razão diz?",
+    dica: "Questione o pensamento: há evidências reais? Existe outra forma de ver essa situação?",
+    placeholder: "Ex: Não tenho provas de que serei demitido(a); posso perguntar diretamente..."
+  }];
+  const [passo, setPasso] = useState(1);
+  const [draft, setDraft] = useState({
+    situacao: "",
+    pensamento: "",
+    emocao: "",
+    intensidade: 60,
+    alternativo: ""
+  });
+  const [msg, setMsg] = useState("");
+  const passoInfo = PASSOS_INFO[passo - 1];
+  const podeAvancar = passo === 1 && draft.situacao.trim() || passo === 2 && draft.pensamento.trim() || passo === 3 && draft.emocao || passo === 4 && draft.alternativo.trim();
+  function confirmar(texto) {
+    setMsg("✓ " + texto + " (visualização — nada foi salvo de verdade)");
+  }
+  if (passo === 5) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "cartao-secao",
+      style: {
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "check-circle-2",
+      tamanho: 32
+    }), /*#__PURE__*/React.createElement("h3", {
+      style: {
+        margin: "10px 0 4px"
+      }
+    }, "Registro conclu\xEDdo"), /*#__PURE__*/React.createElement("p", {
+      className: "texto-vazio"
+    }, msg), /*#__PURE__*/React.createElement("button", {
+      className: "botao-secundario",
+      style: {
+        marginTop: 10
+      },
+      onClick: () => {
+        setDraft({
+          situacao: "",
+          pensamento: "",
+          emocao: "",
+          intensidade: 60,
+          alternativo: ""
+        });
+        setPasso(1);
+        setMsg("");
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "rotate-ccw",
+      tamanho: 14
+    }), " Recome\xE7ar"));
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 18
+    }
+  }, PASSOS_INFO.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.n,
+    style: {
+      flex: 1,
+      height: 5,
+      borderRadius: 20,
+      background: p.n <= passo ? "var(--cor-marca)" : "#EADDFC"
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      background: "#EADDFC",
+      color: "var(--cor-marca)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontWeight: 700,
+      flexShrink: 0
+    }
+  }, passoInfo.letra), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15
+    }
+  }, passoInfo.titulo), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: "var(--texto-suave)"
+    }
+  }, passoInfo.subtitulo))), passoInfo.dica && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12.5,
+      color: "var(--texto-suave)",
+      background: "#F9FAFB",
+      borderRadius: 8,
+      padding: "8px 10px",
+      margin: "10px 0"
+    }
+  }, passoInfo.dica), passo === 1 && /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 4,
+    value: draft.situacao,
+    onChange: e => setDraft(d => ({
+      ...d,
+      situacao: e.target.value
+    })),
+    placeholder: passoInfo.placeholder
+  }), passo === 2 && /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 4,
+    value: draft.pensamento,
+    onChange: e => setDraft(d => ({
+      ...d,
+      pensamento: e.target.value
+    })),
+    placeholder: passoInfo.placeholder
+  }), passo === 3 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 16
+    }
+  }, EMOCOES.map(em => /*#__PURE__*/React.createElement("button", {
+    key: em,
+    type: "button",
+    onClick: () => setDraft(d => ({
+      ...d,
+      emocao: em
+    })),
+    style: {
+      padding: "7px 14px",
+      borderRadius: 20,
+      border: "1.5px solid",
+      borderColor: draft.emocao === em ? "var(--cor-marca)" : "#E5E7EB",
+      background: draft.emocao === em ? "var(--cor-marca)" : "white",
+      color: draft.emocao === em ? "white" : "#374151",
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, em))), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "Intensidade: ", draft.intensidade, "/100"), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: 0,
+    max: 100,
+    value: draft.intensidade,
+    onChange: e => setDraft(d => ({
+      ...d,
+      intensidade: +e.target.value
+    })),
+    style: {
+      width: "100%",
+      accentColor: "var(--cor-marca)"
+    }
+  })), passo === 4 && /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 4,
+    value: draft.alternativo,
+    onChange: e => setDraft(d => ({
+      ...d,
+      alternativo: e.target.value
+    })),
+    placeholder: passoInfo.placeholder
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 18
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      flex: 1
+    },
+    disabled: passo === 1,
+    onClick: () => setPasso(p => p - 1)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 14
+  }), " Anterior"), passo < 4 ? /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      flex: 2,
+      justifyContent: "center"
+    },
+    disabled: !podeAvancar,
+    onClick: () => setPasso(p => p + 1)
+  }, "Pr\xF3ximo ", /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-right",
+    tamanho: 14
+  })) : /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      flex: 2,
+      justifyContent: "center"
+    },
+    disabled: !podeAvancar,
+    onClick: () => {
+      confirmar("Registro concluído!");
+      setPasso(5);
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "check",
+    tamanho: 14
+  }), " Salvar registro")));
+}
+
+// ─── Preview: Árvore da Decisão ──────────────────────────────────
+// Porta fiel da ferramenta real (clinica/app.js, FerramentaArvore):
+// árvore de decisão ramificada (cada resposta leva a uma tela
+// diferente), não um wizard linear. Sem gravação — só demonstração.
+function PreviewFerramentaArvore() {
+  const [step, setStep] = useState("home");
+  const [preocupacao, setPreocupacao] = useState("");
+  const [acoes, setAcoes] = useState("");
+  const [plano, setPlano] = useState("");
+  const [conclusao, setConclusao] = useState(null);
+  const TEXTO_CONCLUSAO = {
+    redirect: {
+      icone: "wind",
+      titulo: "Solte essa preocupação",
+      texto: "Isso não está sob seu controle agora. Tente redirecionar sua atenção para algo que você pode influenciar."
+    },
+    "act-now": {
+      icone: "zap",
+      titulo: "Ótimo, você pode agir agora",
+      texto: "Você já sabe o que fazer — coloque em prática assim que possível."
+    },
+    plan: {
+      icone: "calendar-check",
+      titulo: "Você tem um plano",
+      texto: "Nem tudo precisa ser resolvido agora. Ter um plano já reduz a ansiedade."
+    }
+  };
+  function concluir(c) {
+    setConclusao(c);
+    setStep("conclusao");
+  }
+  function recomecar() {
+    setPreocupacao("");
+    setAcoes("");
+    setPlano("");
+    setConclusao(null);
+    setStep("home");
+  }
+  if (step === "conclusao" && conclusao) {
+    const info = TEXTO_CONCLUSAO[conclusao];
+    return /*#__PURE__*/React.createElement("div", {
+      className: "cartao-secao",
+      style: {
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: info.icone,
+      tamanho: 30
+    }), /*#__PURE__*/React.createElement("h3", {
+      style: {
+        margin: "10px 0 4px"
+      }
+    }, info.titulo), /*#__PURE__*/React.createElement("p", {
+      className: "texto-vazio"
+    }, info.texto), /*#__PURE__*/React.createElement("p", {
+      className: "texto-vazio",
+      style: {
+        fontSize: 11
+      }
+    }, "(visualiza\xE7\xE3o \u2014 nada foi salvo de verdade)"), /*#__PURE__*/React.createElement("button", {
+      className: "botao-secundario",
+      style: {
+        marginTop: 10
+      },
+      onClick: recomecar
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "rotate-ccw",
+      tamanho: 14
+    }), " Recome\xE7ar"));
+  }
+  return /*#__PURE__*/React.createElement("div", null, step === "home" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13
+    }
+  }, "O que est\xE1 te preocupando?"), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 3,
+    value: preocupacao,
+    onChange: e => setPreocupacao(e.target.value),
+    placeholder: "Descreva a preocupa\xE7\xE3o..."
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      marginTop: 12,
+      justifyContent: "center"
+    },
+    disabled: !preocupacao.trim(),
+    onClick: () => setStep("can-intervene")
+  }, "Continuar ", /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-right",
+    tamanho: 14
+  }))), step === "can-intervene" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      marginBottom: 12
+    }
+  }, "Voc\xEA pode fazer algo para resolver esta preocupa\xE7\xE3o?"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      flex: 1,
+      justifyContent: "center"
+    },
+    onClick: () => setStep("actions")
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "check",
+    tamanho: 14
+  }), " Sim, posso agir"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      flex: 1,
+      justifyContent: "center"
+    },
+    onClick: () => concluir("redirect")
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "x",
+    tamanho: 14
+  }), " N\xE3o est\xE1 no meu controle"))), step === "actions" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13
+    }
+  }, "O que voc\xEA pode fazer a respeito?"), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 3,
+    value: acoes,
+    onChange: e => setAcoes(e.target.value),
+    placeholder: "Liste as a\xE7\xF5es poss\xEDveis..."
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      marginTop: 12,
+      justifyContent: "center"
+    },
+    disabled: !acoes.trim(),
+    onClick: () => setStep("can-act-now")
+  }, "Continuar ", /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-right",
+    tamanho: 14
+  }))), step === "can-act-now" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      marginBottom: 12
+    }
+  }, "Voc\xEA pode agir agora mesmo?"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      flex: 1,
+      justifyContent: "center"
+    },
+    onClick: () => concluir("act-now")
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "zap",
+    tamanho: 14
+  }), " Sim, agora"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      flex: 1,
+      justifyContent: "center"
+    },
+    onClick: () => setStep("plan")
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "calendar",
+    tamanho: 14
+  }), " Preciso planejar"))), step === "plan" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13
+    }
+  }, "Quando e como voc\xEA vai agir?"), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 3,
+    value: plano,
+    onChange: e => setPlano(e.target.value),
+    placeholder: "Ex: Vou conversar com meu chefe na sexta-feira..."
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      marginTop: 12,
+      justifyContent: "center"
+    },
+    disabled: !plano.trim(),
+    onClick: () => concluir("plan")
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "check",
+    tamanho: 14
+  }), " Concluir")));
 }
 
 // ─── Preview: Fábula (página por página) ────────────────────────

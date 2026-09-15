@@ -1030,10 +1030,21 @@ function TelaRecursosPaciente({ paciente, usuario, recursoAberto, setRecursoAber
   );
 }
 
+// Cada ferramenta interativa tem seu próprio componente (mesmo padrão
+// do app de referência: dispatcher por formularioKey). Uma ferramenta
+// sem componente próprio ainda cai nos fallbacks (fábula/blocos/texto)
+// logo abaixo — é assim que ela "nasce" simples e vai virando interativa.
+const COMPONENTES_FERRAMENTA = {
+  "anxiety-management": FerramentaGestaoAnsiedade,
+  "abc-record": FerramentaABC,
+  "decision-tree": FerramentaArvore,
+};
+
 function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
   const blocos = Array.isArray(item.blocos) ? item.blocos : [];
   const conteudoTexto = item.conteudo || item.passos || item.texto || "";
+  const ComponenteFerramenta = COMPONENTES_FERRAMENTA[item.formularioKey];
 
   return (
     <div>
@@ -1044,19 +1055,19 @@ function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
         <h2 style={{ margin: "0 0 6px" }}>{item.titulo || item.nome}</h2>
         {item.descricao && <p style={{ color: "#6B7280", fontSize: 13.5, marginBottom: 18 }}>{item.descricao}</p>}
 
-        {item.formularioKey === "anxiety-management" && (
-          <FerramentaGestaoAnsiedade usuario={usuario} paciente={paciente} recurso={item} />
+        {ComponenteFerramenta && (
+          <ComponenteFerramenta usuario={usuario} paciente={paciente} recurso={item} />
         )}
-        {item.formularioKey !== "anxiety-management" && paginas.length > 0 && (
+        {!ComponenteFerramenta && paginas.length > 0 && (
           <LeitorFabula usuario={usuario} paciente={paciente} recurso={item} />
         )}
-        {item.formularioKey !== "anxiety-management" && paginas.length === 0 && blocos.length > 0 && (
+        {!ComponenteFerramenta && paginas.length === 0 && blocos.length > 0 && (
           <VisualizadorBlocos blocos={blocos} />
         )}
-        {item.formularioKey !== "anxiety-management" && paginas.length === 0 && blocos.length === 0 && conteudoTexto && (
+        {!ComponenteFerramenta && paginas.length === 0 && blocos.length === 0 && conteudoTexto && (
           <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7, fontSize: 14 }}>{conteudoTexto}</p>
         )}
-        {item.formularioKey && item.formularioKey !== "anxiety-management" && paginas.length === 0 && blocos.length === 0 && !conteudoTexto && (
+        {item.formularioKey && !ComponenteFerramenta && paginas.length === 0 && blocos.length === 0 && !conteudoTexto && (
           <p className="texto-vazio-p">
             Essa ferramenta ainda está sendo preparada — em breve você vai poder usá-la por aqui.
           </p>
@@ -1244,6 +1255,307 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
           <button className="botao-primario-p" onClick={salvarPensamentos}>{msg || "Salvar respostas"}</button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Ferramenta: Registro ABC de Pensamentos (grava de verdade) ─
+function FerramentaABC({ usuario, paciente, recurso }) {
+  const EMOCOES = ["Ansiedade", "Tristeza", "Raiva", "Medo", "Vergonha", "Culpa", "Frustração", "Insegurança", "Alívio", "Esperança"];
+  const PASSOS_INFO = [
+    { n: 1, letra: "A", titulo: "Situação", subtitulo: "O que aconteceu?", dica: "Descreva a situação de forma objetiva — onde estava, com quem, o que aconteceu. Sem interpretações ainda.", placeholder: "Ex: Meu chefe me chamou para uma conversa inesperada..." },
+    { n: 2, letra: "B", titulo: "Pensamento Automático", subtitulo: "O que passou pela sua cabeça?", dica: "Escreva exatamente como o pensamento veio à mente, sem filtrar.", placeholder: "Ex: Vou ser demitido(a), eu fiz tudo errado..." },
+    { n: 3, letra: "C", titulo: "Emoção e Intensidade", subtitulo: "O que você sentiu?", dica: "Escolha a emoção mais próxima e avalie a intensidade dela." },
+    { n: 4, letra: "D", titulo: "Resposta Racional", subtitulo: "O que a razão diz?", dica: "Questione o pensamento: há evidências reais? Existe outra forma de ver essa situação?", placeholder: "Ex: Não tenho provas de que serei demitido(a); posso perguntar diretamente..." },
+  ];
+
+  const [passo, setPasso] = useState(1);
+  const [draft, setDraft] = useState({ situacao: "", pensamento: "", emocao: "", intensidade: 60, alternativo: "" });
+  const [historico, setHistorico] = useState([]);
+  const [msg, setMsg] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    db.collection("clinica_registro_abc")
+      .where("pacienteId", "==", usuario.uid)
+      .get()
+      .then((snap) => {
+        const docs = snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        setHistorico(docs.slice(0, 5));
+      })
+      .catch(() => {});
+  }, [usuario.uid]);
+
+  const passoInfo = PASSOS_INFO[passo - 1];
+  const podeAvancar =
+    (passo === 1 && draft.situacao.trim()) ||
+    (passo === 2 && draft.pensamento.trim()) ||
+    (passo === 3 && draft.emocao) ||
+    (passo === 4 && draft.alternativo.trim());
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      await db.collection("clinica_registro_abc").add({
+        psi_id: usuario.psiId, pacienteId: usuario.uid, pacienteNome: paciente?.nome || "",
+        situacao: draft.situacao, pensamento: draft.pensamento, emocao: draft.emocao,
+        intensidade: draft.intensidade, alternativo: draft.alternativo,
+        data: new Date().toLocaleDateString("pt-BR"),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setHistorico((h) => [{ ...draft, data: new Date().toLocaleDateString("pt-BR") }, ...h].slice(0, 5));
+      setPasso(5);
+    } catch (e) {
+      setMsg("Erro ao salvar: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  function recomecar() {
+    setDraft({ situacao: "", pensamento: "", emocao: "", intensidade: 60, alternativo: "" });
+    setPasso(1);
+    setMsg("");
+  }
+
+  if (passo === 5) {
+    return (
+      <div>
+        <div className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB", textAlign: "center" }}>
+          <Icone nome="check-circle-2" tamanho={36} />
+          <h3 style={{ margin: "10px 0 4px" }}>Registro concluído</h3>
+          <p className="texto-vazio-p">Seu registro foi salvo. Sua psicóloga vai poder ver isso na próxima sessão.</p>
+          <button className="botao-primario-p" style={{ marginTop: 12 }} onClick={recomecar}>
+            <Icone nome="plus" tamanho={14} /> Novo registro
+          </button>
+        </div>
+        {historico.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <strong style={{ fontSize: 13 }}>Registros recentes</strong>
+            {historico.map((h, i) => (
+              <div key={i} className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB", marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: "#9CA3AF" }}>{h.data} · {h.emocao} ({h.intensidade}/100)</div>
+                <div style={{ fontSize: 13, marginTop: 4 }}><strong>Situação:</strong> {h.situacao}</div>
+                <div style={{ fontSize: 13, marginTop: 2 }}><strong>Pensamento:</strong> {h.pensamento}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+        {PASSOS_INFO.map((p) => (
+          <div
+            key={p.n}
+            style={{ flex: 1, height: 5, borderRadius: 20, background: p.n <= passo ? "var(--cor-marca)" : "#EADDFC", cursor: p.n < passo ? "pointer" : "default", transition: "background .2s" }}
+            onClick={() => p.n < passo && setPasso(p.n)}
+          />
+        ))}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 10, background: "#EADDFC", color: "var(--cor-marca)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}>{passoInfo.letra}</div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>{passoInfo.titulo}</div>
+          <div style={{ fontSize: 12.5, color: "#6B7280" }}>{passoInfo.subtitulo}</div>
+        </div>
+      </div>
+
+      {passoInfo.dica && (
+        <p style={{ fontSize: 12.5, color: "#6B7280", background: "#F9FAFB", borderRadius: 8, padding: "8px 10px", margin: "10px 0" }}>{passoInfo.dica}</p>
+      )}
+
+      {passo === 1 && (
+        <TextAreaVoz rows={4} value={draft.situacao} onChange={(e) => setDraft((d) => ({ ...d, situacao: e.target.value }))} placeholder={passoInfo.placeholder} />
+      )}
+      {passo === 2 && (
+        <TextAreaVoz rows={4} value={draft.pensamento} onChange={(e) => setDraft((d) => ({ ...d, pensamento: e.target.value }))} placeholder={passoInfo.placeholder} />
+      )}
+      {passo === 3 && (
+        <div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+            {EMOCOES.map((em) => (
+              <button
+                key={em}
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, emocao: em }))}
+                style={{ padding: "7px 14px", borderRadius: 20, border: "1.5px solid", borderColor: draft.emocao === em ? "var(--cor-marca)" : "#E5E7EB", background: draft.emocao === em ? "var(--cor-marca)" : "white", color: draft.emocao === em ? "white" : "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+              >
+                {em}
+              </button>
+            ))}
+          </div>
+          <label style={{ fontSize: 13, fontWeight: 600 }}>Intensidade: {draft.intensidade}/100</label>
+          <input type="range" min={0} max={100} value={draft.intensidade} onChange={(e) => setDraft((d) => ({ ...d, intensidade: +e.target.value }))} style={{ width: "100%", accentColor: "var(--cor-marca)" }} />
+        </div>
+      )}
+      {passo === 4 && (
+        <TextAreaVoz rows={4} value={draft.alternativo} onChange={(e) => setDraft((d) => ({ ...d, alternativo: e.target.value }))} placeholder={passoInfo.placeholder} />
+      )}
+
+      {msg && <p className="erro-p">{msg}</p>}
+
+      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+        <button className="botao-secundario-p" style={{ flex: 1 }} disabled={passo === 1} onClick={() => setPasso((p) => p - 1)}>
+          <Icone nome="arrow-left" tamanho={14} /> Anterior
+        </button>
+        {passo < 4 ? (
+          <button className="botao-primario-p" style={{ flex: 2 }} disabled={!podeAvancar} onClick={() => setPasso((p) => p + 1)}>
+            Próximo <Icone nome="arrow-right" tamanho={14} />
+          </button>
+        ) : (
+          <button className="botao-primario-p" style={{ flex: 2 }} disabled={!podeAvancar || salvando} onClick={salvar}>
+            <Icone nome="check" tamanho={14} /> {salvando ? "Salvando..." : "Salvar registro"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Ferramenta: Árvore da Decisão (grava de verdade) ────────────
+function FerramentaArvore({ usuario, paciente, recurso }) {
+  const [step, setStep] = useState("home");
+  const [preocupacao, setPreocupacao] = useState("");
+  const [acoes, setAcoes] = useState("");
+  const [plano, setPlano] = useState("");
+  const [conclusao, setConclusao] = useState(null);
+  const [historico, setHistorico] = useState([]);
+  const [msg, setMsg] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    db.collection("clinica_arvore_decisao")
+      .where("pacienteId", "==", usuario.uid)
+      .get()
+      .then((snap) => {
+        const docs = snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        setHistorico(docs.slice(0, 5));
+      })
+      .catch(() => {});
+  }, [usuario.uid]);
+
+  const TEXTO_CONCLUSAO = {
+    redirect: { icone: "wind", titulo: "Solte essa preocupação", texto: "Isso não está sob seu controle agora. Tente redirecionar sua atenção para algo que você pode influenciar." },
+    "act-now": { icone: "zap", titulo: "Ótimo, você pode agir agora", texto: "Você já sabe o que fazer — coloque em prática assim que possível." },
+    plan: { icone: "calendar-check", titulo: "Você tem um plano", texto: "Nem tudo precisa ser resolvido agora. Ter um plano já reduz a ansiedade." },
+  };
+
+  async function salvarHistorico(c) {
+    setSalvando(true);
+    try {
+      await db.collection("clinica_arvore_decisao").add({
+        psi_id: usuario.psiId, pacienteId: usuario.uid, pacienteNome: paciente?.nome || "",
+        preocupacao, acoes, plano, conclusao: c,
+        data: new Date().toLocaleDateString("pt-BR"),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setHistorico((h) => [{ preocupacao, acoes, plano, conclusao: c, data: new Date().toLocaleDateString("pt-BR") }, ...h].slice(0, 5));
+    } catch (e) {
+      setMsg("Erro ao salvar: " + e.message);
+    } finally {
+      setConclusao(c);
+      setStep("conclusao");
+      setSalvando(false);
+    }
+  }
+
+  function recomecar() {
+    setPreocupacao(""); setAcoes(""); setPlano(""); setConclusao(null); setStep("home"); setMsg("");
+  }
+
+  if (step === "conclusao" && conclusao) {
+    const info = TEXTO_CONCLUSAO[conclusao];
+    return (
+      <div>
+        <div className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB", textAlign: "center" }}>
+          <Icone nome={info.icone} tamanho={32} />
+          <h3 style={{ margin: "10px 0 4px" }}>{info.titulo}</h3>
+          <p className="texto-vazio-p">{info.texto}</p>
+          <button className="botao-primario-p" style={{ marginTop: 12 }} onClick={recomecar}>
+            <Icone nome="plus" tamanho={14} /> Nova preocupação
+          </button>
+        </div>
+        {historico.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <strong style={{ fontSize: 13 }}>Registros recentes</strong>
+            {historico.map((h, i) => (
+              <div key={i} className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB", marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: "#9CA3AF" }}>{h.data}</div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>{h.preocupacao}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {step === "home" && (
+        <div>
+          <label style={{ fontWeight: 600, fontSize: 13 }}>O que está te preocupando?</label>
+          <TextAreaVoz rows={3} value={preocupacao} onChange={(e) => setPreocupacao(e.target.value)} placeholder="Descreva a preocupação..." />
+          <button className="botao-primario-p" style={{ marginTop: 12 }} disabled={!preocupacao.trim()} onClick={() => setStep("can-intervene")}>
+            Continuar <Icone nome="arrow-right" tamanho={14} />
+          </button>
+        </div>
+      )}
+
+      {step === "can-intervene" && (
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>Você pode fazer algo para resolver esta preocupação?</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="botao-primario-p" style={{ flex: 1 }} onClick={() => setStep("actions")}>
+              <Icone nome="check" tamanho={14} /> Sim, posso agir
+            </button>
+            <button className="botao-secundario-p" style={{ flex: 1 }} onClick={() => salvarHistorico("redirect")}>
+              <Icone nome="x" tamanho={14} /> Não está no meu controle
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === "actions" && (
+        <div>
+          <label style={{ fontWeight: 600, fontSize: 13 }}>O que você pode fazer a respeito?</label>
+          <TextAreaVoz rows={3} value={acoes} onChange={(e) => setAcoes(e.target.value)} placeholder="Liste as ações possíveis..." />
+          <button className="botao-primario-p" style={{ marginTop: 12 }} disabled={!acoes.trim()} onClick={() => setStep("can-act-now")}>
+            Continuar <Icone nome="arrow-right" tamanho={14} />
+          </button>
+        </div>
+      )}
+
+      {step === "can-act-now" && (
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>Você pode agir agora mesmo?</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="botao-primario-p" style={{ flex: 1 }} onClick={() => salvarHistorico("act-now")}>
+              <Icone nome="zap" tamanho={14} /> Sim, agora
+            </button>
+            <button className="botao-secundario-p" style={{ flex: 1 }} onClick={() => setStep("plan")}>
+              <Icone nome="calendar" tamanho={14} /> Preciso planejar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === "plan" && (
+        <div>
+          <label style={{ fontWeight: 600, fontSize: 13 }}>Quando e como você vai agir?</label>
+          <TextAreaVoz rows={3} value={plano} onChange={(e) => setPlano(e.target.value)} placeholder="Ex: Vou conversar com meu chefe na sexta-feira..." />
+          <button className="botao-primario-p" style={{ marginTop: 12 }} disabled={!plano.trim() || salvando} onClick={() => salvarHistorico("plan")}>
+            <Icone nome="check" tamanho={14} /> {salvando ? "Salvando..." : "Concluir"}
+          </button>
+        </div>
+      )}
+
+      {msg && <p className="erro-p">{msg}</p>}
     </div>
   );
 }

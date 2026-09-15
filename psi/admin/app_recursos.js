@@ -360,6 +360,8 @@ function EnviarRecursoModal({ usuario, item, tipo, aoFechar }) {
 // disponível" abaixo.
 const PREVIEWS_INTERATIVOS = {
   "anxiety-management": PreviewGestaoAnsiedade,
+  "abc-record": PreviewFerramentaABC,
+  "decision-tree": PreviewFerramentaArvore,
 };
 
 function VisualizarRecursoModal({ item, aoFechar }) {
@@ -530,6 +532,208 @@ function PreviewGestaoAnsiedade() {
           ))}
           <button className="botao-primario" style={{ width: "100%", justifyContent: "center" }} onClick={() => { setResp(Array(8).fill("")); confirmar("Salvo!"); }}>
             {msg || "Salvar respostas"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Preview: Registro ABC de Pensamentos ───────────────────────
+// Porta fiel da ferramenta real (clinica/app.js, FerramentaABC): 4
+// passos (Situação, Pensamento, Emoção, Resposta Racional) com barra
+// de progresso. Aqui não grava nada — mesmo espírito do preview de
+// Gestão da Ansiedade acima.
+function PreviewFerramentaABC() {
+  const EMOCOES = ["Ansiedade", "Tristeza", "Raiva", "Medo", "Vergonha", "Culpa", "Frustração", "Insegurança", "Alívio", "Esperança"];
+  const PASSOS_INFO = [
+    { n: 1, letra: "A", titulo: "Situação", subtitulo: "O que aconteceu?", dica: "Descreva a situação de forma objetiva — onde estava, com quem, o que aconteceu. Sem interpretações ainda.", placeholder: "Ex: Meu chefe me chamou para uma conversa inesperada..." },
+    { n: 2, letra: "B", titulo: "Pensamento Automático", subtitulo: "O que passou pela sua cabeça?", dica: "Escreva exatamente como o pensamento veio à mente, sem filtrar.", placeholder: "Ex: Vou ser demitido(a), eu fiz tudo errado..." },
+    { n: 3, letra: "C", titulo: "Emoção e Intensidade", subtitulo: "O que você sentiu?", dica: "Escolha a emoção mais próxima e avalie a intensidade dela." },
+    { n: 4, letra: "D", titulo: "Resposta Racional", subtitulo: "O que a razão diz?", dica: "Questione o pensamento: há evidências reais? Existe outra forma de ver essa situação?", placeholder: "Ex: Não tenho provas de que serei demitido(a); posso perguntar diretamente..." },
+  ];
+
+  const [passo, setPasso] = useState(1);
+  const [draft, setDraft] = useState({ situacao: "", pensamento: "", emocao: "", intensidade: 60, alternativo: "" });
+  const [msg, setMsg] = useState("");
+
+  const passoInfo = PASSOS_INFO[passo - 1];
+  const podeAvancar =
+    (passo === 1 && draft.situacao.trim()) ||
+    (passo === 2 && draft.pensamento.trim()) ||
+    (passo === 3 && draft.emocao) ||
+    (passo === 4 && draft.alternativo.trim());
+
+  function confirmar(texto) {
+    setMsg("✓ " + texto + " (visualização — nada foi salvo de verdade)");
+  }
+
+  if (passo === 5) {
+    return (
+      <div className="cartao-secao" style={{ textAlign: "center" }}>
+        <Icone nome="check-circle-2" tamanho={32} />
+        <h3 style={{ margin: "10px 0 4px" }}>Registro concluído</h3>
+        <p className="texto-vazio">{msg}</p>
+        <button className="botao-secundario" style={{ marginTop: 10 }} onClick={() => { setDraft({ situacao: "", pensamento: "", emocao: "", intensidade: 60, alternativo: "" }); setPasso(1); setMsg(""); }}>
+          <Icone nome="rotate-ccw" tamanho={14} /> Recomeçar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+        {PASSOS_INFO.map((p) => (
+          <div key={p.n} style={{ flex: 1, height: 5, borderRadius: 20, background: p.n <= passo ? "var(--cor-marca)" : "#EADDFC" }} />
+        ))}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 10, background: "#EADDFC", color: "var(--cor-marca)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}>{passoInfo.letra}</div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>{passoInfo.titulo}</div>
+          <div style={{ fontSize: 12.5, color: "var(--texto-suave)" }}>{passoInfo.subtitulo}</div>
+        </div>
+      </div>
+
+      {passoInfo.dica && (
+        <p style={{ fontSize: 12.5, color: "var(--texto-suave)", background: "#F9FAFB", borderRadius: 8, padding: "8px 10px", margin: "10px 0" }}>{passoInfo.dica}</p>
+      )}
+
+      {passo === 1 && <TextAreaVoz className="campo-descricao" rows={4} value={draft.situacao} onChange={(e) => setDraft((d) => ({ ...d, situacao: e.target.value }))} placeholder={passoInfo.placeholder} />}
+      {passo === 2 && <TextAreaVoz className="campo-descricao" rows={4} value={draft.pensamento} onChange={(e) => setDraft((d) => ({ ...d, pensamento: e.target.value }))} placeholder={passoInfo.placeholder} />}
+      {passo === 3 && (
+        <div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+            {EMOCOES.map((em) => (
+              <button
+                key={em}
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, emocao: em }))}
+                style={{ padding: "7px 14px", borderRadius: 20, border: "1.5px solid", borderColor: draft.emocao === em ? "var(--cor-marca)" : "#E5E7EB", background: draft.emocao === em ? "var(--cor-marca)" : "white", color: draft.emocao === em ? "white" : "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+              >
+                {em}
+              </button>
+            ))}
+          </div>
+          <label style={{ fontSize: 13, fontWeight: 600 }}>Intensidade: {draft.intensidade}/100</label>
+          <input type="range" min={0} max={100} value={draft.intensidade} onChange={(e) => setDraft((d) => ({ ...d, intensidade: +e.target.value }))} style={{ width: "100%", accentColor: "var(--cor-marca)" }} />
+        </div>
+      )}
+      {passo === 4 && <TextAreaVoz className="campo-descricao" rows={4} value={draft.alternativo} onChange={(e) => setDraft((d) => ({ ...d, alternativo: e.target.value }))} placeholder={passoInfo.placeholder} />}
+
+      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+        <button className="botao-secundario" style={{ flex: 1 }} disabled={passo === 1} onClick={() => setPasso((p) => p - 1)}>
+          <Icone nome="arrow-left" tamanho={14} /> Anterior
+        </button>
+        {passo < 4 ? (
+          <button className="botao-primario" style={{ flex: 2, justifyContent: "center" }} disabled={!podeAvancar} onClick={() => setPasso((p) => p + 1)}>
+            Próximo <Icone nome="arrow-right" tamanho={14} />
+          </button>
+        ) : (
+          <button className="botao-primario" style={{ flex: 2, justifyContent: "center" }} disabled={!podeAvancar} onClick={() => { confirmar("Registro concluído!"); setPasso(5); }}>
+            <Icone nome="check" tamanho={14} /> Salvar registro
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Preview: Árvore da Decisão ──────────────────────────────────
+// Porta fiel da ferramenta real (clinica/app.js, FerramentaArvore):
+// árvore de decisão ramificada (cada resposta leva a uma tela
+// diferente), não um wizard linear. Sem gravação — só demonstração.
+function PreviewFerramentaArvore() {
+  const [step, setStep] = useState("home");
+  const [preocupacao, setPreocupacao] = useState("");
+  const [acoes, setAcoes] = useState("");
+  const [plano, setPlano] = useState("");
+  const [conclusao, setConclusao] = useState(null);
+
+  const TEXTO_CONCLUSAO = {
+    redirect: { icone: "wind", titulo: "Solte essa preocupação", texto: "Isso não está sob seu controle agora. Tente redirecionar sua atenção para algo que você pode influenciar." },
+    "act-now": { icone: "zap", titulo: "Ótimo, você pode agir agora", texto: "Você já sabe o que fazer — coloque em prática assim que possível." },
+    plan: { icone: "calendar-check", titulo: "Você tem um plano", texto: "Nem tudo precisa ser resolvido agora. Ter um plano já reduz a ansiedade." },
+  };
+
+  function concluir(c) {
+    setConclusao(c);
+    setStep("conclusao");
+  }
+
+  function recomecar() {
+    setPreocupacao(""); setAcoes(""); setPlano(""); setConclusao(null); setStep("home");
+  }
+
+  if (step === "conclusao" && conclusao) {
+    const info = TEXTO_CONCLUSAO[conclusao];
+    return (
+      <div className="cartao-secao" style={{ textAlign: "center" }}>
+        <Icone nome={info.icone} tamanho={30} />
+        <h3 style={{ margin: "10px 0 4px" }}>{info.titulo}</h3>
+        <p className="texto-vazio">{info.texto}</p>
+        <p className="texto-vazio" style={{ fontSize: 11 }}>(visualização — nada foi salvo de verdade)</p>
+        <button className="botao-secundario" style={{ marginTop: 10 }} onClick={recomecar}>
+          <Icone nome="rotate-ccw" tamanho={14} /> Recomeçar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {step === "home" && (
+        <div>
+          <label style={{ fontWeight: 600, fontSize: 13 }}>O que está te preocupando?</label>
+          <TextAreaVoz className="campo-descricao" rows={3} value={preocupacao} onChange={(e) => setPreocupacao(e.target.value)} placeholder="Descreva a preocupação..." />
+          <button className="botao-primario" style={{ marginTop: 12, justifyContent: "center" }} disabled={!preocupacao.trim()} onClick={() => setStep("can-intervene")}>
+            Continuar <Icone nome="arrow-right" tamanho={14} />
+          </button>
+        </div>
+      )}
+      {step === "can-intervene" && (
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>Você pode fazer algo para resolver esta preocupação?</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="botao-primario" style={{ flex: 1, justifyContent: "center" }} onClick={() => setStep("actions")}>
+              <Icone nome="check" tamanho={14} /> Sim, posso agir
+            </button>
+            <button className="botao-secundario" style={{ flex: 1, justifyContent: "center" }} onClick={() => concluir("redirect")}>
+              <Icone nome="x" tamanho={14} /> Não está no meu controle
+            </button>
+          </div>
+        </div>
+      )}
+      {step === "actions" && (
+        <div>
+          <label style={{ fontWeight: 600, fontSize: 13 }}>O que você pode fazer a respeito?</label>
+          <TextAreaVoz className="campo-descricao" rows={3} value={acoes} onChange={(e) => setAcoes(e.target.value)} placeholder="Liste as ações possíveis..." />
+          <button className="botao-primario" style={{ marginTop: 12, justifyContent: "center" }} disabled={!acoes.trim()} onClick={() => setStep("can-act-now")}>
+            Continuar <Icone nome="arrow-right" tamanho={14} />
+          </button>
+        </div>
+      )}
+      {step === "can-act-now" && (
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>Você pode agir agora mesmo?</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="botao-primario" style={{ flex: 1, justifyContent: "center" }} onClick={() => concluir("act-now")}>
+              <Icone nome="zap" tamanho={14} /> Sim, agora
+            </button>
+            <button className="botao-secundario" style={{ flex: 1, justifyContent: "center" }} onClick={() => setStep("plan")}>
+              <Icone nome="calendar" tamanho={14} /> Preciso planejar
+            </button>
+          </div>
+        </div>
+      )}
+      {step === "plan" && (
+        <div>
+          <label style={{ fontWeight: 600, fontSize: 13 }}>Quando e como você vai agir?</label>
+          <TextAreaVoz className="campo-descricao" rows={3} value={plano} onChange={(e) => setPlano(e.target.value)} placeholder="Ex: Vou conversar com meu chefe na sexta-feira..." />
+          <button className="botao-primario" style={{ marginTop: 12, justifyContent: "center" }} disabled={!plano.trim()} onClick={() => concluir("plan")}>
+            <Icone nome="check" tamanho={14} /> Concluir
           </button>
         </div>
       )}

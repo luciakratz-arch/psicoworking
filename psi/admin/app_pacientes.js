@@ -502,6 +502,15 @@ function ToggleModulo({ ativo, onClick }) {
   );
 }
 
+// Ordem e rótulo de cada módulo — nunca mistura ferramenta com fábula
+// com psicoeducação numa mesma seção (era esse o "tudo misturado").
+const ORDEM_MODULOS_RECURSO = ["ferramenta", "fabula", "psicoeducacao"];
+const ROTULO_MODULO_RECURSO = {
+  ferramenta: { titulo: "Ferramentas", icone: "wrench" },
+  fabula: { titulo: "Fábulas Terapêuticas", icone: "book-open" },
+  psicoeducacao: { titulo: "Psicoeducação", icone: "brain" },
+};
+
 function AbaModulosPaciente({ paciente }) {
   const [recursos, setRecursos] = useState([]);
   const [fabulas, setFabulas] = useState([]);
@@ -539,12 +548,14 @@ function AbaModulosPaciente({ paciente }) {
     return okTipo && okBusca;
   });
 
-  const porCategoria = {};
+  // Agrupa primeiro por MÓDULO (Ferramentas / Fábulas / Psicoeducação) —
+  // igual ao modelo, que nunca mistura tipos diferentes numa mesma
+  // seção — e só depois por macrocategoria clínica dentro de cada um.
+  const porTipo = {};
   filtrados.forEach((it) => {
-    const cat = it.categoria || "outros";
-    (porCategoria[cat] = porCategoria[cat] || []).push(it);
+    (porTipo[it.tipo] = porTipo[it.tipo] || []).push(it);
   });
-  const categorias = Object.keys(porCategoria).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const tiposComItens = ORDEM_MODULOS_RECURSO.filter((tipo) => porTipo[tipo]?.length);
 
   async function alternar(item) {
     const atual = config[item.id] || {};
@@ -601,38 +612,59 @@ function AbaModulosPaciente({ paciente }) {
         onChange={(e) => setBusca(e.target.value)}
       />
 
-      {categorias.length === 0 && <p className="texto-vazio">Nenhum item encontrado.</p>}
+      {tiposComItens.length === 0 && <p className="texto-vazio">Nenhum item encontrado.</p>}
 
-      {categorias.map((cat) => {
-        const cores = corDaCategoria(cat);
+      {tiposComItens.map((tipo) => {
+        const itensDoTipo = porTipo[tipo];
+        const rotuloModulo = ROTULO_MODULO_RECURSO[tipo];
+        const porCategoria = {};
+        itensDoTipo.forEach((it) => {
+          const cat = it.categoria || "outros";
+          (porCategoria[cat] = porCategoria[cat] || []).push(it);
+        });
+        const categorias = Object.keys(porCategoria).sort((a, b) => a.localeCompare(b, "pt-BR"));
+
         return (
-          <div key={cat} className="grupo-status">
-            <div className="titulo-grupo-status">
-              <span className="etiqueta-categoria-recurso" style={{ "--cor-cat": cores.cor, "--bg-cat": cores.bg }}>
-                {formatarCategoria(cat)}
-              </span>
-              ({porCategoria[cat].length})
+          <div key={tipo} style={{ marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 700, color: "var(--cor-marca)", marginBottom: 12, paddingBottom: 8, borderBottom: "2px solid #EADDFC" }}>
+              <Icone nome={rotuloModulo.icone} tamanho={17} />
+              {rotuloModulo.titulo}
+              <span style={{ fontWeight: 500, color: "var(--texto-suave)", fontSize: 13 }}>({itensDoTipo.length})</span>
             </div>
-            <div className="cartao-lista-pacientes">
-              {porCategoria[cat].map((item) => {
-                const ativo = !!config[item.id]?.ativo;
-                return (
-                  <div key={item.id} className="linha-modulo" style={{ "--cor-cat": cores.cor }}>
-                    <div className="info-lancamento">
-                      <div className="descricao-lancamento">{item.titulo}</div>
-                      {item.descricao && <div className="detalhe-lancamento">{item.descricao}</div>}
-                      {ativo && config[item.id]?.dataInicio && (
-                        <div className="detalhe-lancamento">Ativado em {config[item.id].dataInicio.split("-").reverse().join("/")}</div>
-                      )}
-                    </div>
-                    <button className="botao-icone" onClick={() => setVisualizando(item)} title="Visualizar">
-                      <Icone nome="eye" tamanho={15} />
-                    </button>
-                    <ToggleModulo ativo={ativo} onClick={() => alternar(item)} />
+
+            {categorias.map((cat) => {
+              const cores = corDaCategoria(cat);
+              return (
+                <div key={cat} className="grupo-status">
+                  <div className="titulo-grupo-status">
+                    <span className="etiqueta-categoria-recurso" style={{ "--cor-cat": cores.cor, "--bg-cat": cores.bg }}>
+                      {formatarCategoria(cat)}
+                    </span>
+                    ({porCategoria[cat].length})
                   </div>
-                );
-              })}
-            </div>
+                  <div className="cartao-lista-pacientes">
+                    {porCategoria[cat].map((item) => {
+                      const ativo = !!config[item.id]?.ativo;
+                      return (
+                        <div key={item.id} className="linha-modulo" style={{ "--cor-cat": cores.cor }}>
+                          <div className="info-lancamento">
+                            <div className="descricao-lancamento">{item.titulo}</div>
+                            {item.descricao && <div className="detalhe-lancamento">{item.descricao}</div>}
+                            {ativo && config[item.id]?.dataInicio && (
+                              <div className="detalhe-lancamento">Ativado em {config[item.id].dataInicio.split("-").reverse().join("/")}</div>
+                            )}
+                          </div>
+                          <button className="botao-icone" onClick={() => setVisualizando(item)} title="Visualizar">
+                            <Icone nome="eye" tamanho={15} />
+                          </button>
+                          <ToggleModulo ativo={ativo} onClick={() => alternar(item)} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
       })}
