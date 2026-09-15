@@ -191,16 +191,27 @@ service cloud.firestore {
 
     // ── Biblioteca de recursos terapêuticos — compartilhada por toda
     // a plataforma (não é psi_id, é conteúdo editorial da própria
-    // PsiCoWorking, igual um "catálogo"). Pacientes não leem direto
-    // daqui ainda — só a equipe, até o Portal do Paciente existir.
+    // PsiCoWorking, igual um "catálogo"). Qualquer pessoa logada lê
+    // (paciente também, agora que o Portal do Paciente existe) — só
+    // a equipe da clínica edita o catálogo.
     match /recursos_terapeuticos/{id} {
-      allow read, write: if ehEquipeDeAlgumaClinica();
+      allow read: if estaLogado();
+      allow write: if ehEquipeDeAlgumaClinica();
     }
     match /fabulas_terapeuticas/{id} {
-      allow read, write: if ehEquipeDeAlgumaClinica();
+      allow read: if estaLogado();
+      allow write: if ehEquipeDeAlgumaClinica();
     }
     match /psicoeducacao_conteudos/{id} {
-      allow read, write: if ehEquipeDeAlgumaClinica();
+      allow read: if estaLogado();
+      allow write: if ehEquipeDeAlgumaClinica();
+    }
+
+    // ── Reflexões escritas pelo paciente ao final de uma fábula ──
+    match /clinica_reflexoes/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, create: if estaLogado() && carimboPapel() == 'paciente'
+                           && request.resource.data.psi_id == carimboClinica();
     }
 
     // ── Trilha de auditoria: só a Cloud Function grava, ninguém apaga ──
