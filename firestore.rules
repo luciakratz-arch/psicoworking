@@ -84,6 +84,9 @@ service cloud.firestore {
     match /clinica_sessoes/{sessaoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+      // Paciente vê as próprias sessões (Próxima Sessão no Painel) e
+      // pode confirmar presença (atualiza só o status de confirmação).
+      allow read, update: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
     }
 
     match /clinica_pacotes/{pacoteId} {

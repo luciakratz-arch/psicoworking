@@ -136,6 +136,8 @@
     label { display: block; font-size: 12px; font-weight: 600; color: #6B7280; margin: 12px 0 5px; }
 
     .erro-p { background: #FEE2E2; color: #DC2626; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-top: 10px; }
+    .cartao-sessao-painel { border: 1.5px solid var(--cor-marca, #6A2BD9); }
+    .etiqueta-confirmada { display: inline-flex; align-items: center; gap: 6px; background: #DCFCE7; color: #166534; font-weight: 700; font-size: 12.5px; padding: 6px 12px; border-radius: 10px; }
     .texto-vazio-p { color: #9CA3AF; font-size: 13.5px; }
     .link-p { background: none; border: none; color: var(--cor-marca, #6A2BD9); font-size: 13px; cursor: pointer; padding: 0; margin-top: 12px; }
     .icone-lucide { display: inline-block; vertical-align: middle; }
@@ -153,9 +155,12 @@
       messagingSenderId: "176262015536",
       appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
     };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    // Nome próprio (não "[DEFAULT]") — evita que essa sessão de
+    // paciente dispute, no mesmo navegador, com a sessão da equipe
+    // logada no admin (mesmo projeto Firebase, mesma origem).
+    const appPaciente = firebase.initializeApp(firebaseConfig, "psicoworking-paciente");
+    const auth = appPaciente.auth();
+    const db = appPaciente.firestore();
   </script>
 
   <script type="text/babel" data-presets="react" src="app.js"></script>

@@ -262,16 +262,29 @@ function App() {
       </div>
 
       <div className="nav-abas">
-        <button className={"nav-aba" + (tela === "painel" ? " nav-aba-ativa" : "")} onClick={() => { setTela("painel"); setRecursoAberto(null); }}>
-          <Icone nome="layout-dashboard" tamanho={15} /> Meu Painel
-        </button>
-        <button className={"nav-aba" + (tela === "recursos" ? " nav-aba-ativa" : "")} onClick={() => { setTela("recursos"); setRecursoAberto(null); }}>
-          <Icone nome="wrench" tamanho={15} /> Recursos Terapêuticos
-        </button>
+        {[
+          { id: "painel", rotulo: "Meu Painel", icone: "layout-dashboard" },
+          { id: "humor", rotulo: "Check-in Diário", icone: "heart" },
+          { id: "recursos", rotulo: "Recursos Terapêuticos", icone: "wrench" },
+          { id: "metas", rotulo: "Minhas Metas", icone: "target" },
+          { id: "diario", rotulo: "Diário Terapêutico", icone: "book-open" },
+          { id: "avaliar", rotulo: "Avaliar", icone: "star" },
+        ].map((item) => (
+          <button key={item.id} className={"nav-aba" + (tela === item.id ? " nav-aba-ativa" : "")} onClick={() => { setTela(item.id); setRecursoAberto(null); }}>
+            <Icone nome={item.icone} tamanho={15} /> {item.rotulo}
+          </button>
+        ))}
       </div>
 
       <div className="conteudo">
-        {tela === "painel" && <TelaPainel paciente={paciente} usuario={usuario} aoAbrirRecursos={() => setTela("recursos")} />}
+        {tela === "painel" && (
+          <TelaPainel
+            paciente={paciente}
+            usuario={usuario}
+            aoAbrirRecursos={() => setTela("recursos")}
+            aoAbrirMetas={() => setTela("metas")}
+          />
+        )}
         {tela === "recursos" && (
           <TelaRecursosPaciente
             paciente={paciente}
@@ -280,16 +293,74 @@ function App() {
             setRecursoAberto={setRecursoAberto}
           />
         )}
+        {tela === "humor" && <TelaCheckinHumor usuario={usuario} />}
+        {tela === "metas" && <TelaMinhasMetas usuario={usuario} />}
+        {tela === "diario" && <TelaDiario usuario={usuario} paciente={paciente} />}
+        {tela === "avaliar" && <TelaAvaliar usuario={usuario} />}
       </div>
     </div>
   );
 }
 
 // ─── Meu Painel ──────────────────────────────────────────────────
-function TelaPainel({ paciente, usuario, aoAbrirRecursos }) {
+function TelaPainel({ paciente, usuario, aoAbrirRecursos, aoAbrirMetas }) {
   const ativos = paciente?.modulosConfig
     ? Object.values(paciente.modulosConfig).filter((m) => m && m.ativo).length
     : 0;
+  const [proximaSessao, setProximaSessao] = useState(null);
+  const [carregandoSessao, setCarregandoSessao] = useState(true);
+  const [confirmando, setConfirmando] = useState(false);
+  const [humorHoje, setHumorHoje] = useState(null);
+  const [metasAtivas, setMetasAtivas] = useState(0);
+
+  useEffect(() => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    db.collection("clinica_sessoes")
+      .where("pacienteId", "==", usuario.uid)
+      .where("status", "==", "agendado")
+      .get()
+      .then((snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+          .filter((s) => s.data >= hoje)
+          .sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+        setProximaSessao(docs[0] || null);
+        setCarregandoSessao(false);
+      })
+      .catch(() => setCarregandoSessao(false));
+  }, [usuario.uid]);
+
+  useEffect(() => {
+    const hojeFmt = new Date().toLocaleDateString("pt-BR");
+    db.collection("clinica_humor")
+      .where("pacienteId", "==", usuario.uid)
+      .where("data", "==", hojeFmt)
+      .limit(1)
+      .get()
+      .then((snap) => setHumorHoje(snap.empty ? null : snap.docs[0].data()))
+      .catch(() => {});
+    db.collection("clinica_metas")
+      .where("pacienteId", "==", usuario.uid)
+      .where("status", "==", "ativa")
+      .get()
+      .then((snap) => setMetasAtivas(snap.size))
+      .catch(() => {});
+  }, [usuario.uid]);
+
+  async function confirmarPresenca() {
+    if (!proximaSessao) return;
+    setConfirmando(true);
+    try {
+      await db.collection("clinica_sessoes").doc(proximaSessao.id).update({
+        statusConfirmacao: "confirmado",
+        confirmadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setProximaSessao((p) => ({ ...p, statusConfirmacao: "confirmado" }));
+    } catch (e) {
+      alert("Não foi possível confirmar: " + e.message);
+    } finally {
+      setConfirmando(false);
+    }
+  }
 
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
@@ -298,12 +369,18 @@ function TelaPainel({ paciente, usuario, aoAbrirRecursos }) {
     <div>
       <div className="cartao">
         <div className="saudacao">{saudacao}, {paciente?.nome ? paciente.nome.split(" ")[0] : ""}</div>
-        <div className="saudacao-sub">Que bom te ver por aqui.</div>
+        <div className="saudacao-sub">
+          {humorHoje ? `Humor registrado hoje: ${humorHoje.valor}/10` : "Que bom te ver por aqui."}
+        </div>
 
         <div className="grade-stat">
           <div>
             <div className="stat-num">{ativos}</div>
             <div className="stat-label">recurso(s) disponível(is) pra você</div>
+          </div>
+          <div>
+            <div className="stat-num">{metasAtivas}</div>
+            <div className="stat-label">meta(s) em andamento</div>
           </div>
         </div>
 
@@ -312,11 +389,280 @@ function TelaPainel({ paciente, usuario, aoAbrirRecursos }) {
         </button>
       </div>
 
+      {!carregandoSessao && proximaSessao && (
+        <div className="cartao cartao-sessao-painel">
+          <div className="icone-tipo" style={{ marginBottom: 10 }}>
+            <Icone nome="calendar" tamanho={20} />
+          </div>
+          <span className="etiqueta-tipo">Próxima Sessão</span>
+          <div style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}>
+            {new Date(proximaSessao.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+            {proximaSessao.hora ? ` às ${proximaSessao.hora}` : ""}
+          </div>
+          <div style={{ marginTop: 12 }}>
+            {proximaSessao.statusConfirmacao === "confirmado" ? (
+              <span className="etiqueta-confirmada"><Icone nome="check" tamanho={13} /> Presença confirmada</span>
+            ) : (
+              <button className="botao-primario-p" style={{ width: "auto", padding: "9px 16px" }} onClick={confirmarPresenca} disabled={confirmando}>
+                <Icone nome="check" tamanho={14} /> {confirmando ? "Confirmando..." : "Confirmar presença"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {!paciente && (
         <div className="cartao">
           <p className="texto-vazio-p">Carregando seus dados...</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Check-in de Humor (dentro de Recursos, acessível também no Painel) ─
+function TelaCheckinHumor({ usuario }) {
+  const [valor, setValor] = useState(5);
+  const [nota, setNota] = useState("");
+  const [msg, setMsg] = useState("");
+  const [historico, setHistorico] = useState([]);
+
+  useEffect(() => {
+    db.collection("clinica_humor")
+      .where("pacienteId", "==", usuario.uid)
+      .get()
+      .then((snap) => {
+        const docs = snap.docs.map((d) => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        setHistorico(docs.slice(0, 10));
+      })
+      .catch(() => {});
+  }, [usuario.uid]);
+
+  const cor = valor <= 3 ? "#dc2626" : valor <= 5 ? "#d97706" : valor <= 7 ? "#65a30d" : "#059669";
+
+  async function registrar() {
+    setMsg("Salvando...");
+    try {
+      await db.collection("clinica_humor").add({
+        psi_id: usuario.psiId, pacienteId: usuario.uid,
+        valor, nota,
+        data: new Date().toLocaleDateString("pt-BR"),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setHistorico((h) => [{ valor, nota, data: new Date().toLocaleDateString("pt-BR") }, ...h].slice(0, 10));
+      setNota("");
+      setMsg("Registrado!");
+      setTimeout(() => setMsg(""), 2000);
+    } catch (e) {
+      setMsg("Erro ao salvar: " + e.message);
+    }
+  }
+
+  return (
+    <div className="cartao">
+      <strong>Como você está se sentindo hoje?</strong>
+      <div style={{ textAlign: "center", margin: "16px 0" }}>
+        <div style={{ fontSize: 48, fontWeight: 900, color: cor, lineHeight: 1 }}>{valor}</div>
+        <div style={{ fontSize: 12, color: "#9CA3AF" }}>/10</div>
+      </div>
+      <input type="range" min={1} max={10} value={valor} onChange={(e) => setValor(+e.target.value)} style={{ width: "100%", accentColor: cor, marginBottom: 14 }} />
+      <textarea rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Quer contar mais alguma coisa? (opcional)" />
+      <button className="botao-primario-p" style={{ marginTop: 10 }} onClick={registrar}>{msg || "Registrar humor"}</button>
+
+      {historico.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <strong style={{ fontSize: 13 }}>Últimos registros</strong>
+          {historico.map((h, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, padding: "8px 10px", background: "#F9FAFB", borderRadius: 8, marginTop: 6, fontSize: 12.5 }}>
+              <span style={{ fontWeight: 700, color: "var(--cor-marca)" }}>{h.valor}/10</span>
+              <span style={{ flex: 1, color: "#6B7280" }}>{h.nota || "—"}</span>
+              <span style={{ color: "#9CA3AF" }}>{h.data}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Minhas Metas ────────────────────────────────────────────────
+function TelaMinhasMetas({ usuario }) {
+  const [metas, setMetas] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    const cancelar = db.collection("clinica_metas")
+      .where("pacienteId", "==", usuario.uid)
+      .onSnapshot((snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((m) => m.status !== "arquivada");
+        docs.sort((a, b) => (b.criadoEm?.toMillis?.() || 0) - (a.criadoEm?.toMillis?.() || 0));
+        setMetas(docs);
+        setCarregando(false);
+      }, () => setCarregando(false));
+    return cancelar;
+  }, [usuario.uid]);
+
+  async function atualizarProgresso(meta, delta) {
+    const novo = Math.max(0, Math.min(100, (meta.progresso || 0) + delta));
+    try {
+      await db.collection("clinica_metas").doc(meta.id).update({
+        progresso: novo,
+        status: novo >= 100 ? "concluida" : "ativa",
+        atualizadoPor: "paciente",
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (e) {}
+  }
+
+  if (carregando) return <p className="texto-vazio-p">Carregando...</p>;
+
+  if (metas.length === 0) {
+    return (
+      <div className="cartao" style={{ textAlign: "center" }}>
+        <Icone nome="target" tamanho={32} />
+        <p style={{ fontWeight: 600, marginTop: 10 }}>Nenhuma meta por enquanto</p>
+        <p className="texto-vazio-p">Suas metas terapêuticas vão aparecer aqui assim que forem definidas com sua psicóloga.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {metas.map((m) => {
+        const p = m.progresso || 0;
+        const completa = p >= 100;
+        return (
+          <div key={m.id} className="cartao" style={completa ? { border: "1.5px solid #059669" } : {}}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{m.titulo}</div>
+                {m.categoria && <span className="etiqueta-tipo">{m.categoria}</span>}
+              </div>
+              <span style={{ fontWeight: 700, color: completa ? "#059669" : "var(--cor-marca)" }}>{p}%</span>
+            </div>
+            {m.descricao && <p style={{ fontSize: 13, color: "#6B7280", marginTop: 8 }}>{m.descricao}</p>}
+            <div style={{ height: 8, background: "#F3F4F6", borderRadius: 20, marginTop: 12, overflow: "hidden" }}>
+              <div style={{ width: p + "%", height: "100%", background: completa ? "#059669" : "var(--cor-marca)", borderRadius: 20, transition: "width .3s" }} />
+            </div>
+            {!completa && (
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button className="botao-secundario-p" onClick={() => atualizarProgresso(m, -10)}>-10%</button>
+                <button className="botao-secundario-p" onClick={() => atualizarProgresso(m, 10)}>+10%</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Diário Terapêutico ──────────────────────────────────────────
+function TelaDiario({ usuario, paciente }) {
+  const [texto, setTexto] = useState("");
+  const [msg, setMsg] = useState("");
+  const [entradas, setEntradas] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    const cancelar = db.collection("clinica_diario")
+      .where("pacienteId", "==", usuario.uid)
+      .onSnapshot((snap) => {
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        docs.sort((a, b) => (b.criadoEm?.toMillis?.() || 0) - (a.criadoEm?.toMillis?.() || 0));
+        setEntradas(docs);
+        setCarregando(false);
+      }, () => setCarregando(false));
+    return cancelar;
+  }, [usuario.uid]);
+
+  async function salvar() {
+    if (!texto.trim()) return;
+    setMsg("Salvando...");
+    try {
+      await db.collection("clinica_diario").add({
+        psi_id: usuario.psiId, pacienteId: usuario.uid, pacienteNome: paciente?.nome || "",
+        texto,
+        data: new Date().toLocaleDateString("pt-BR"),
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setTexto("");
+      setMsg("Salvo!");
+      setTimeout(() => setMsg(""), 2000);
+    } catch (e) {
+      setMsg("Erro ao salvar: " + e.message);
+    }
+  }
+
+  return (
+    <div>
+      <div className="cartao">
+        <strong>Escreva livremente</strong>
+        <p className="texto-vazio-p" style={{ marginBottom: 10 }}>Sem julgamento, sem estrutura — um espaço só seu.</p>
+        <textarea rows={5} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Como foi o seu dia?" />
+        <button className="botao-primario-p" style={{ marginTop: 10 }} onClick={salvar}>{msg || "Salvar entrada"}</button>
+      </div>
+
+      {!carregando && entradas.length > 0 && (
+        <div>
+          {entradas.map((e) => (
+            <div key={e.id} className="cartao">
+              <div style={{ fontSize: 11.5, color: "#9CA3AF", marginBottom: 6 }}>{e.data}</div>
+              <p style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{e.texto}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Avaliar ─────────────────────────────────────────────────────
+function TelaAvaliar({ usuario }) {
+  const [estrelas, setEstrelas] = useState(0);
+  const [texto, setTexto] = useState("");
+  const [enviado, setEnviado] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function enviar() {
+    if (!estrelas) { setErro("Escolha de 1 a 5 estrelas."); return; }
+    setErro("");
+    try {
+      await db.collection("psi_depoimentos").add({
+        psi_id: usuario.psiId, estrelas, texto,
+        aprovado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setEnviado(true);
+    } catch (e) {
+      setErro(e.message || "Não foi possível enviar.");
+    }
+  }
+
+  if (enviado) {
+    return (
+      <div className="cartao" style={{ textAlign: "center" }}>
+        <Icone nome="check-circle-2" tamanho={32} />
+        <p style={{ fontWeight: 600, marginTop: 10 }}>Obrigado pela sua avaliação!</p>
+        <p className="texto-vazio-p">Ela é anônima e ajuda sua psicóloga a melhorar o atendimento.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="cartao">
+      <strong>Como está sendo sua experiência?</strong>
+      <p className="texto-vazio-p" style={{ marginBottom: 14 }}>Sua avaliação é anônima — a psicóloga não vê quem escreveu.</p>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" onClick={() => setEstrelas(n)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: n <= estrelas ? "var(--cor-marca)" : "#D1D5DB" }}>
+            <Icone nome="star" tamanho={28} />
+          </button>
+        ))}
+      </div>
+      <textarea rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Quer contar mais alguma coisa? (opcional)" />
+      {erro && <p className="erro-p">{erro}</p>}
+      <button className="botao-primario-p" style={{ marginTop: 10 }} onClick={enviar}>Enviar avaliação</button>
     </div>
   );
 }

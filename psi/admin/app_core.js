@@ -21,10 +21,15 @@ const firebaseConfig = {
   appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
 };
 
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
-const functions = firebase.functions();
+// Nome próprio do app (não "[DEFAULT]") — evita que o login daqui
+// (equipe da clínica) e o login do Portal do Paciente (mesmo projeto
+// Firebase, mesma origem) disputem a mesma sessão salva no navegador.
+// Sem isso, entrar como paciente numa aba podia "roubar" a sessão da
+// psicóloga logada em outra aba do mesmo navegador.
+const appAdmin = firebase.apps.find((a) => a.name === "psicoworking-admin") || firebase.initializeApp(firebaseConfig, "psicoworking-admin");
+const auth = appAdmin.auth();
+const db = appAdmin.firestore();
+const functions = appAdmin.functions();
 
 // ─── Cloud Functions usadas pelo admin ────────────────────────────
 const chamarCadastrarPaciente = functions.httpsCallable("cadastrarPaciente");

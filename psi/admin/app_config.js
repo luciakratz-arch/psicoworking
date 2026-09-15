@@ -6,7 +6,7 @@
 //  Foto e logo vão pro Storage em logos/{psi_id}/... (storage.rules).
 // ═══════════════════════════════════════════════════════════════
 
-const storage = firebase.storage();
+const storage = appAdmin.storage();
 
 function TelaConfiguracoes({ usuario }) {
   const [nome, setNome] = useState("");

@@ -10,6 +10,15 @@
 //  resto do sistema (CLAUDE.md REGRA 9).
 // ═══════════════════════════════════════════════════════════════
 
+// Abre o WhatsApp já com a mensagem de boas-vindas + link de definir
+// senha preenchidos, pra psicóloga só clicar em enviar (sem precisar
+// copiar e colar nada). Usa o telefone que ela cadastrou no paciente.
+function enviarWhatsAppCredenciais(paciente, link) {
+  const numero = (paciente.telefone || "").replace(/\D/g, "");
+  const mensagem = `Olá, ${paciente.nome}!\n\n` + `Seu cadastro foi feito com sucesso. Para acessar o Portal do Paciente, primeiro defina sua senha pelo link abaixo:\n\n` + `${link}\n\n` + `Depois é só entrar com seu e-mail e a senha que você escolher. Qualquer dúvida, estou à disposição.`;
+  const url = numero ? `https://wa.me/55${numero}?text=${encodeURIComponent(mensagem)}` : `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+  window.open(url, "_blank");
+}
 const GENEROS = ["Feminino", "Masculino", "Não-binário", "Não informar"];
 const STATUS_PACIENTE = [{
   valor: "ativo",
@@ -352,7 +361,17 @@ function FormNovoPaciente({
     readOnly: true,
     className: "campo-link",
     value: linkSucesso
-  }), /*#__PURE__*/React.createElement("div", {
+  }), form.telefone && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    style: {
+      marginTop: 10
+    },
+    onClick: () => enviarWhatsAppCredenciais(form, linkSucesso)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "message-circle",
+    tamanho: 15
+  }), " Enviar por WhatsApp"), /*#__PURE__*/React.createElement("div", {
     className: "acoes-modal"
   }, /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
