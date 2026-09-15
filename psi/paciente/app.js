@@ -111,19 +111,23 @@ function TelaLogin({ configClinica }) {
     }
   }
 
-  const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl);
+  const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl || configClinica.fotoUrl);
 
   return (
     <div className="tela-login-split">
       <div className="painel-marca-p">
         <div className="painel-marca-p-conteudo">
+          <span className="etiqueta-tipo-portal">Portal do Paciente</span>
           {temMarca ? (
             <div className="marca-clinica-login">
-              {configClinica.logoUrl ? (
-                <img src={configClinica.logoUrl} alt="Logo" className="logo-clinica-login" />
-              ) : (
-                <div className="avatar-clinica-login">{(configClinica.nome || "?").trim().charAt(0).toUpperCase()}</div>
-              )}
+              <div className="foto-profissional-login-caixa">
+                {configClinica.fotoUrl ? (
+                  <img src={configClinica.fotoUrl} alt={configClinica.nome} className="foto-profissional-login" />
+                ) : (
+                  <div className="avatar-clinica-login">{(configClinica.nome || "?").trim().charAt(0).toUpperCase()}</div>
+                )}
+                {configClinica.logoUrl && <img src={configClinica.logoUrl} alt="Logo" className="selo-logo-login" />}
+              </div>
               <span className="nome-clinica-login">{configClinica.nome}</span>
             </div>
           ) : (

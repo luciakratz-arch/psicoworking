@@ -76,8 +76,34 @@ function useUsuarioLogado() {
   };
 }
 
+// Descobre de qual clínica é quem está logando ANTES do login (o
+// custom claim só existe depois de autenticar) — do parâmetro ?psi=
+// na URL ou, se já logou aqui antes, do que ficou guardado no
+// navegador. Mesmo mecanismo usado no Portal do Paciente.
+function pegarPsiIdConhecido() {
+  const daUrl = new URLSearchParams(window.location.search).get("psi");
+  if (daUrl) return daUrl;
+  try {
+    return localStorage.getItem("psicoworking_psi_id") || "";
+  } catch (e) {
+    return "";
+  }
+}
+function usarConfiguracaoPreLogin(psiId) {
+  const [config, setConfig] = useState(null);
+  useEffect(() => {
+    if (!psiId) return;
+    db.collection("psi_config").doc(psiId).get().then(doc => {
+      if (doc.exists) setConfig(doc.data());
+    }).catch(() => {});
+  }, [psiId]);
+  return config;
+}
+
 // ─── Tela de Login ─────────────────────────────────────────────
-function TelaLogin() {
+function TelaLogin({
+  configClinica
+}) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
@@ -109,13 +135,36 @@ function TelaLogin() {
       setErro("Não foi possível enviar o e-mail de recuperação.");
     }
   }
+  const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl || configClinica.fotoUrl);
   return /*#__PURE__*/React.createElement("div", {
     className: "tela-login-split"
   }, /*#__PURE__*/React.createElement("div", {
     className: "painel-marca"
   }, /*#__PURE__*/React.createElement("div", {
     className: "painel-marca-conteudo"
-  }, /*#__PURE__*/React.createElement("h1", null, "Bem-vinda(o) de volta"), /*#__PURE__*/React.createElement("p", null, "Acesse o painel e continue de onde parou."))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "etiqueta-tipo-portal"
+  }, "Painel da Psic\xF3loga"), temMarca && /*#__PURE__*/React.createElement("div", {
+    className: "marca-clinica-login"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "foto-profissional-login-caixa"
+  }, configClinica.fotoUrl ? /*#__PURE__*/React.createElement("img", {
+    src: configClinica.fotoUrl,
+    alt: configClinica.nome,
+    className: "foto-profissional-login"
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "avatar-clinica-login"
+  }, (configClinica.nome || "?").trim().charAt(0).toUpperCase()), configClinica.logoUrl && /*#__PURE__*/React.createElement("img", {
+    src: configClinica.logoUrl,
+    alt: "Logo",
+    className: "selo-logo-login"
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "nome-clinica-login"
+  }, configClinica.nome)), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      marginTop: temMarca ? 16 : 0
+    }
+  }, "Bem-vinda(o) de volta"), /*#__PURE__*/React.createElement("p", null, "Acesse o painel e continue de onde parou."))), /*#__PURE__*/React.createElement("div", {
     className: "painel-formulario"
   }, /*#__PURE__*/React.createElement("form", {
     className: "cartao-login",

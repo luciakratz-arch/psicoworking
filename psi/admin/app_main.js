@@ -53,17 +53,27 @@ function App() {
   const [telaAtiva, setTelaAtiva] = useState("dashboard");
   const statusConexaoGoogle = usarConexaoGoogleAgenda(usuario);
   const configClinica = usarConfiguracaoClinica(usuario && usuario.psiId);
+  const configPreLogin = usarConfiguracaoPreLogin(!usuario ? pegarPsiIdConhecido() : null);
 
   useEffect(() => {
     if (statusConexaoGoogle === "ok") setTelaAtiva("agenda");
   }, [statusConexaoGoogle]);
+
+  // Guarda o psi_id assim que ele fica conhecido de verdade (custom
+  // claim, pós-login), pra reconhecer a clínica em visitas futuras
+  // mesmo sem o ?psi= na URL.
+  useEffect(() => {
+    if (usuario?.psiId) {
+      try { localStorage.setItem("psicoworking_psi_id", usuario.psiId); } catch (e) {}
+    }
+  }, [usuario]);
 
   if (carregando) {
     return <div className="tela-central"><p>Carregando...</p></div>;
   }
 
   if (!usuario) {
-    return <TelaLogin />;
+    return <TelaLogin configClinica={configPreLogin} />;
   }
 
   const podeAcessarAdmin = usuario.role === "psi" || usuario.role === "secretaria";

@@ -71,8 +71,29 @@ function useUsuarioLogado() {
   return { usuario, carregando };
 }
 
+// Descobre de qual clínica é quem está logando ANTES do login (o
+// custom claim só existe depois de autenticar) — do parâmetro ?psi=
+// na URL ou, se já logou aqui antes, do que ficou guardado no
+// navegador. Mesmo mecanismo usado no Portal do Paciente.
+function pegarPsiIdConhecido() {
+  const daUrl = new URLSearchParams(window.location.search).get("psi");
+  if (daUrl) return daUrl;
+  try { return localStorage.getItem("psicoworking_psi_id") || ""; } catch (e) { return ""; }
+}
+
+function usarConfiguracaoPreLogin(psiId) {
+  const [config, setConfig] = useState(null);
+  useEffect(() => {
+    if (!psiId) return;
+    db.collection("psi_config").doc(psiId).get().then((doc) => {
+      if (doc.exists) setConfig(doc.data());
+    }).catch(() => {});
+  }, [psiId]);
+  return config;
+}
+
 // ─── Tela de Login ─────────────────────────────────────────────
-function TelaLogin() {
+function TelaLogin({ configClinica }) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
@@ -107,14 +128,27 @@ function TelaLogin() {
     }
   }
 
+  const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl || configClinica.fotoUrl);
+
   return (
     <div className="tela-login-split">
       <div className="painel-marca">
         <div className="painel-marca-conteudo">
-          {/* Este espaço em destaque é reservado para o nome/logo de
-              CADA psicóloga (via psi_config, ainda não construído).
-              Por enquanto mostra um texto de boas-vindas neutro. */}
-          <h1>Bem-vinda(o) de volta</h1>
+          <span className="etiqueta-tipo-portal">Painel da Psicóloga</span>
+          {temMarca && (
+            <div className="marca-clinica-login">
+              <div className="foto-profissional-login-caixa">
+                {configClinica.fotoUrl ? (
+                  <img src={configClinica.fotoUrl} alt={configClinica.nome} className="foto-profissional-login" />
+                ) : (
+                  <div className="avatar-clinica-login">{(configClinica.nome || "?").trim().charAt(0).toUpperCase()}</div>
+                )}
+                {configClinica.logoUrl && <img src={configClinica.logoUrl} alt="Logo" className="selo-logo-login" />}
+              </div>
+              <span className="nome-clinica-login">{configClinica.nome}</span>
+            </div>
+          )}
+          <h1 style={{ marginTop: temMarca ? 16 : 0 }}>Bem-vinda(o) de volta</h1>
           <p>Acesse o painel e continue de onde parou.</p>
         </div>
       </div>
