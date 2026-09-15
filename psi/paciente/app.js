@@ -14,13 +14,60 @@
 //  visualização de leitura por enquanto — ver PENDÊNCIAS no final.
 // ═══════════════════════════════════════════════════════════════
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 function Icone({ nome, tamanho = 16 }) {
   useEffect(() => {
     if (window.lucide) window.lucide.createIcons();
   });
   return <i data-lucide={nome} className="icone-lucide" style={{ width: tamanho, height: tamanho }}></i>;
+}
+
+// Campo de texto com ditado por voz — mesmo componente usado em todo
+// o admin (app_core.js). Regra permanente: todo campo de texto livre
+// no PsiCoWorking tem esse microfone, nunca um <textarea> cru (ver
+// memória "Padrão de UI PsiCoWorking"). Arquivo separado do admin,
+// sem escopo compartilhado, por isso a mesma lógica é duplicada aqui.
+function TextAreaVoz({ value, onChange, rows, placeholder }) {
+  const [gravando, setGravando] = useState(false);
+  const reconhecimentoRef = useRef(null);
+  const temSuporte = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  function alternarGravacao() {
+    if (gravando) {
+      reconhecimentoRef.current?.stop();
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = "pt-BR";
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      let textoNovo = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) textoNovo += e.results[i][0].transcript;
+      }
+      if (textoNovo) {
+        onChange({ target: { value: (value ? value + " " : "") + textoNovo } });
+      }
+    };
+    rec.onend = () => setGravando(false);
+    rec.start();
+    reconhecimentoRef.current = rec;
+    setGravando(true);
+  }
+
+  return (
+    <div className="campo-com-mic">
+      <textarea rows={rows} placeholder={placeholder} value={value} onChange={onChange} />
+      {temSuporte && (
+        <button type="button" className={"botao-mic" + (gravando ? " botao-mic-gravando" : "")} onClick={alternarGravacao} title="Falar em vez de digitar">
+          <Icone nome={gravando ? "square" : "mic"} tamanho={14} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 // ─── Sessão / login ────────────────────────────────────────────
@@ -579,7 +626,7 @@ function TelaCheckinHumor({ usuario }) {
         <div style={{ fontSize: 12, color: "#9CA3AF" }}>/10</div>
       </div>
       <input type="range" min={1} max={10} value={valor} onChange={(e) => setValor(+e.target.value)} style={{ width: "100%", accentColor: cor, marginBottom: 14 }} />
-      <textarea rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Quer contar mais alguma coisa? (opcional)" />
+      <TextAreaVoz rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Quer contar mais alguma coisa? (opcional)" />
       <button className="botao-primario-p" style={{ marginTop: 10 }} onClick={registrar}>{msg || "Registrar humor"}</button>
 
       {historico.length > 0 && (
@@ -712,7 +759,7 @@ function TelaDiario({ usuario, paciente }) {
       <div className="cartao">
         <strong>Escreva livremente</strong>
         <p className="texto-vazio-p" style={{ marginBottom: 10 }}>Sem julgamento, sem estrutura — um espaço só seu.</p>
-        <textarea rows={5} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Como foi o seu dia?" />
+        <TextAreaVoz rows={5} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Como foi o seu dia?" />
         <button className="botao-primario-p" style={{ marginTop: 10 }} onClick={salvar}>{msg || "Salvar entrada"}</button>
       </div>
 
@@ -773,7 +820,7 @@ function TelaAvaliar({ usuario }) {
           </button>
         ))}
       </div>
-      <textarea rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Quer contar mais alguma coisa? (opcional)" />
+      <TextAreaVoz rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Quer contar mais alguma coisa? (opcional)" />
       {erro && <p className="erro-p">{erro}</p>}
       <button className="botao-primario-p" style={{ marginTop: 10 }} onClick={enviar}>Enviar avaliação</button>
     </div>
@@ -1088,7 +1135,7 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
             <div style={{ fontSize: 13, fontWeight: 600, color: corEstresse }}>{DESC_ESTRESSE[stress]}</div>
           </div>
           <input type="range" min={1} max={10} value={stress} onChange={(e) => setStress(+e.target.value)} style={{ width: "100%", accentColor: corEstresse, marginBottom: 14 }} />
-          <textarea rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Observações..." />
+          <TextAreaVoz rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Observações..." />
           <button className="botao-primario-p" style={{ marginTop: 10 }} onClick={registrarEstresse}>{msg || "Registrar"}</button>
 
           {historico.length > 0 && (
@@ -1140,7 +1187,7 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
           {PERGUNTAS.map((p, i) => (
             <div key={i} style={{ marginBottom: 14 }}>
               <label style={{ fontWeight: 600, fontSize: 13 }}>{i + 1}. {p}</label>
-              <textarea rows={2} value={resp[i]} onChange={(e) => { const r = [...resp]; r[i] = e.target.value; setResp(r); }} placeholder="Sua resposta..." />
+              <TextAreaVoz rows={2} value={resp[i]} onChange={(e) => { const r = [...resp]; r[i] = e.target.value; setResp(r); }} placeholder="Sua resposta..." />
             </div>
           ))}
           <button className="botao-primario-p" onClick={salvarPensamentos}>{msg || "Salvar respostas"}</button>
@@ -1208,7 +1255,7 @@ function LeitorFabula({ usuario, paciente, recurso }) {
           {perguntas.map((p, i) => (
             <div key={i} style={{ marginTop: 12 }}>
               <label style={{ fontWeight: 600, fontSize: 13 }}>{i + 1}. {p}</label>
-              <textarea rows={2} value={respostas[i] || ""} onChange={(e) => setRespostas((r) => ({ ...r, [i]: e.target.value }))} placeholder="Escreva sua reflexão..." />
+              <TextAreaVoz rows={2} value={respostas[i] || ""} onChange={(e) => setRespostas((r) => ({ ...r, [i]: e.target.value }))} placeholder="Escreva sua reflexão..." />
             </div>
           ))}
           <button className="botao-primario-p" style={{ marginTop: 10 }} onClick={salvarReflexoes}>{msg || "Salvar minhas reflexões"}</button>
