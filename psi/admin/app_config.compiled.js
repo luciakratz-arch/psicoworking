@@ -65,8 +65,9 @@ function TelaConfiguracoes({
         merge: true
       });
 
-      // Aplica a cor imediatamente nesta sessão, sem precisar recarregar.
-      document.documentElement.style.setProperty("--cor-marca", corPrimaria);
+      // Aplica a cor (e as variações clara/escura dos degradês)
+      // imediatamente nesta sessão, sem precisar recarregar.
+      aplicarCorMarca(corPrimaria);
       setMensagem("Configurações salvas!");
     } catch (e) {
       setErro(e.message || "Não foi possível salvar.");

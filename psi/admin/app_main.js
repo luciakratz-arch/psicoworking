@@ -38,9 +38,7 @@ function usarConfiguracaoClinica(psiId) {
       .onSnapshot((doc) => {
         const dados = doc.exists ? doc.data() : {};
         setConfig(dados);
-        if (dados.corPrimaria) {
-          document.documentElement.style.setProperty("--cor-marca", dados.corPrimaria);
-        }
+        aplicarCorMarca(dados.corPrimaria);
       });
     return cancelar;
   }, [psiId]);

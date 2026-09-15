@@ -73,11 +73,32 @@ function usarConfiguracaoPreLogin(psiId) {
       if (doc.exists) {
         const dados = doc.data();
         setConfig(dados);
-        if (dados.corPrimaria) document.documentElement.style.setProperty("--cor-marca", dados.corPrimaria);
+        aplicarCorMarca(dados.corPrimaria);
       }
     }).catch(() => {});
   }, [psiId]);
   return config;
+}
+
+// psi_config só guarda UMA cor (corPrimaria) — as variações mais
+// clara/escura usadas no degradê do painel de login são calculadas a
+// partir dela, pra tudo ficar de fato na identidade visual da
+// psicóloga (mesmo cálculo usado no admin).
+function ajustarClaridadeCor(hex, percentual) {
+  const num = parseInt(hex.replace("#", ""), 16);
+  let r = (num >> 16) & 0xff, g = (num >> 8) & 0xff, b = num & 0xff;
+  const ajustar = (canal) => (percentual >= 0 ? canal + (255 - canal) * (percentual / 100) : canal * (1 + percentual / 100));
+  r = Math.min(255, Math.max(0, Math.round(ajustar(r))));
+  g = Math.min(255, Math.max(0, Math.round(ajustar(g))));
+  b = Math.min(255, Math.max(0, Math.round(ajustar(b))));
+  return "#" + [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
+}
+
+function aplicarCorMarca(corPrimaria) {
+  if (!corPrimaria) return;
+  document.documentElement.style.setProperty("--cor-marca", corPrimaria);
+  document.documentElement.style.setProperty("--cor-marca-clara", ajustarClaridadeCor(corPrimaria, 35));
+  document.documentElement.style.setProperty("--cor-marca-escura", ajustarClaridadeCor(corPrimaria, -45));
 }
 
 function TelaLogin({ configClinica }) {
@@ -171,7 +192,7 @@ function usarConfiguracaoClinica(psiId) {
     const cancelar = db.collection("psi_config").doc(psiId).onSnapshot((doc) => {
       const dados = doc.exists ? doc.data() : {};
       setConfig(dados);
-      if (dados.corPrimaria) document.documentElement.style.setProperty("--cor-marca", dados.corPrimaria);
+      aplicarCorMarca(dados.corPrimaria);
     });
     return cancelar;
   }, [psiId]);

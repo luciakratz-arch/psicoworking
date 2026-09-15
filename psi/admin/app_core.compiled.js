@@ -94,10 +94,37 @@ function usarConfiguracaoPreLogin(psiId) {
   useEffect(() => {
     if (!psiId) return;
     db.collection("psi_config").doc(psiId).get().then(doc => {
-      if (doc.exists) setConfig(doc.data());
+      if (doc.exists) {
+        const dados = doc.data();
+        setConfig(dados);
+        aplicarCorMarca(dados.corPrimaria);
+      }
     }).catch(() => {});
   }, [psiId]);
   return config;
+}
+
+// ─── Cor da marca de cada clínica ────────────────────────────────
+// psi_config só guarda UMA cor (corPrimaria) — as variações mais
+// clara/escura usadas nos degradês (barra lateral, tela de login) são
+// calculadas a partir dela, pra tudo ficar de fato na identidade
+// visual da psicóloga, não só o botão sólido.
+function ajustarClaridadeCor(hex, percentual) {
+  const num = parseInt(hex.replace("#", ""), 16);
+  let r = num >> 16 & 0xff,
+    g = num >> 8 & 0xff,
+    b = num & 0xff;
+  const ajustar = canal => percentual >= 0 ? canal + (255 - canal) * (percentual / 100) : canal * (1 + percentual / 100);
+  r = Math.min(255, Math.max(0, Math.round(ajustar(r))));
+  g = Math.min(255, Math.max(0, Math.round(ajustar(g))));
+  b = Math.min(255, Math.max(0, Math.round(ajustar(b))));
+  return "#" + [r, g, b].map(c => c.toString(16).padStart(2, "0")).join("");
+}
+function aplicarCorMarca(corPrimaria) {
+  if (!corPrimaria) return;
+  document.documentElement.style.setProperty("--cor-marca", corPrimaria);
+  document.documentElement.style.setProperty("--cor-marca-clara", ajustarClaridadeCor(corPrimaria, 35));
+  document.documentElement.style.setProperty("--cor-marca-escura", ajustarClaridadeCor(corPrimaria, -45));
 }
 
 // ─── Tela de Login ─────────────────────────────────────────────
