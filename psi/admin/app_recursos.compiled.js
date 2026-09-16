@@ -38,88 +38,391 @@ const ABAS_RECURSOS = [{
   tipo: "psicoeducacao"
 }];
 
-// Cores por categoria, no espírito das macrocategorias do sistema
-// real (cada uma com uma cor de destaque + fundo claro). Categorias
-// que não estão no mapa caem numa paleta de reserva, sempre a mesma
-// cor pra mesma categoria (hash do nome), pra nunca ficar tudo cinza.
-const PALETA_CATEGORIAS = {
-  tcc: {
-    cor: "#7B00C4",
-    bg: "#f3e6ff"
-  },
-  ansiedade: {
-    cor: "#7B00C4",
-    bg: "#f3e6ff"
-  },
-  relaxamento: {
-    cor: "#0891b2",
-    bg: "#e0f2fe"
-  },
-  avaliacao: {
-    cor: "#6366f1",
-    bg: "#e0e7ff"
-  },
-  musicoterapia: {
-    cor: "#7B00C4",
-    bg: "#f3e6ff"
-  },
-  depressao: {
-    cor: "#db2777",
-    bg: "#fce7f3"
-  },
-  humor: {
-    cor: "#db2777",
-    bg: "#fce7f3"
-  },
-  habitos: {
-    cor: "#16a34a",
-    bg: "#dcfce7"
-  },
-  autocuidado: {
-    cor: "#16a34a",
-    bg: "#dcfce7"
-  },
-  relacionamentos: {
-    cor: "#0891b2",
-    bg: "#e0f2fe"
-  },
-  familia: {
-    cor: "#d97706",
-    bg: "#fef3c7"
-  },
-  outros: {
-    cor: "#6b7280",
-    bg: "#f3f4f6"
-  }
-};
-const PALETA_RESERVA = [{
+// ─── Taxonomia clínica (macrocategorias + subcategorias) ────────
+// Porta fiel do app de referência (admin/psico_ui.js e
+// admin/psifabulas.compiled.js: MACROCATEGORIAS, CATEGORIAS_LEGADO,
+// LEGADO_PARA_MACRO) — cada macrocategoria tem cor/ícone próprios e
+// uma lista de subcategorias específicas. Ferramentas e Psicoeducação
+// guardam o id da SUBcategoria em `categoria`; Fábulas guardam o id
+// da MACROcategoria direto (mesma assimetria do sistema original).
+// Trocamos emoji por nome de ícone Lucide (regra de nunca usar emoji).
+const MACROCATEGORIAS = [{
+  id: "macro_ansiedade",
+  icone: "brain",
+  label: "Ansiedade e Controle dos Pensamentos",
+  cor: "#7B00C4",
+  bg: "#f3e6ff",
+  subs: [{
+    id: "ansiedade_diaria",
+    label: "Ansiedade Diária e Crises"
+  }, {
+    id: "distorcoes",
+    label: "Distorções Cognitivas e Ruminação"
+  }, {
+    id: "crencas_esquemas",
+    label: "Crenças e Esquemas Disfuncionais"
+  }, {
+    id: "autocritica",
+    label: "Autocrítica e Culpa"
+  }, {
+    id: "procrastinacao",
+    label: "Procrastinação e Foco"
+  }]
+}, {
+  id: "macro_humor",
+  icone: "heart",
+  label: "Humor e Regulação Emocional",
+  cor: "#db2777",
+  bg: "#fce7f3",
+  subs: [{
+    id: "depressao",
+    label: "Depressão e Desânimo"
+  }, {
+    id: "desamor",
+    label: "Desamor, Desamparo e Desvalor"
+  }, {
+    id: "regulacao_emocional",
+    label: "Inteligência e Regulação Emocional"
+  }, {
+    id: "burnout",
+    label: "Burnout, Estresse e Frustração"
+  }, {
+    id: "vergonha",
+    label: "Vergonha e Insegurança"
+  }]
+}, {
+  id: "macro_habitos",
+  icone: "leaf",
+  label: "Corpo, Saúde e Autocuidado",
+  cor: "#16a34a",
+  bg: "#dcfce7",
+  subs: [{
+    id: "rotina",
+    label: "Rotina e Organização Diária"
+  }, {
+    id: "sono",
+    label: "Sono e Descanso"
+  }, {
+    id: "motivacao",
+    label: "Motivação e Zona de Conforto"
+  }, {
+    id: "neuroplasticidade",
+    label: "Neuroplasticidade e Novos Hábitos"
+  }, {
+    id: "praticas_autocuidado",
+    label: "Práticas de Autocuidado"
+  }, {
+    id: "alimentacao",
+    label: "Alimentação Emocional e Compulsão"
+  }, {
+    id: "autoimagem",
+    label: "Autoimagem e Aceitação Corporal"
+  }, {
+    id: "nervovago",
+    label: "Regulação do Sistema Nervoso (Nervo Vago)"
+  }, {
+    id: "sintomas_fisicos",
+    label: "Sintomas Físicos da Ansiedade"
+  }, {
+    id: "saude_mental",
+    label: "Integração Saúde Física e Mental"
+  }]
+}, {
+  id: "macro_relacionamentos",
+  icone: "handshake",
+  label: "Conflitos Interpessoais e Relacionamentos",
+  cor: "#0891b2",
+  bg: "#e0f2fe",
+  subs: [{
+    id: "comunicacao",
+    label: "Comunicação Assertiva"
+  }, {
+    id: "dependencia",
+    label: "Dependência Emocional e Apego"
+  }, {
+    id: "limites",
+    label: "Limites e Autoestima"
+  }, {
+    id: "ciumes",
+    label: "Ciúmes e Insegurança na Relação"
+  }, {
+    id: "toxicos",
+    label: "Relacionamentos Tóxicos e Abusivos"
+  }]
+}, {
+  id: "macro_casais",
+  icone: "users",
+  label: "Casais, Família e Parentalidade",
+  cor: "#d97706",
+  bg: "#fef3c7",
+  subs: [{
+    id: "conflitos_casal",
+    label: "Conflitos e Alinhamento de Casal"
+  }, {
+    id: "sexualidade",
+    label: "Sexualidade e Intimidade"
+  }, {
+    id: "parentalidade",
+    label: "Parentalidade e Educação de Filhos"
+  }, {
+    id: "conflitos_familia",
+    label: "Conflitos Familiares e Enteados"
+  }, {
+    id: "traicao",
+    label: "Traição e Reconexão Conjugal"
+  }]
+}, {
+  id: "macro_compulsao",
+  icone: "lock",
+  label: "Compulsão Sexual",
+  cor: "#7c3aed",
+  bg: "#ede9fe",
+  subs: [{
+    id: "compulsao_ciclo",
+    label: "Ciclo do Gatilho e Fissura"
+  }, {
+    id: "compulsao_habitos",
+    label: "Substituição de Hábitos"
+  }, {
+    id: "compulsao_emocional",
+    label: "Regulação Emocional"
+  }, {
+    id: "compulsao_vinculos",
+    label: "Impacto nos Vínculos"
+  }, {
+    id: "compulsao_aval",
+    label: "Rastreamento e Avaliação"
+  }]
+}];
+const CATEGORIAS_LEGADO = [{
+  id: "tcc",
+  label: "TCC",
   cor: "#7B00C4",
   bg: "#f3e6ff"
 }, {
-  cor: "#0891b2",
-  bg: "#e0f2fe"
+  id: "ansiedade",
+  label: "Ansiedade",
+  cor: "#7B00C4",
+  bg: "#f3e6ff"
 }, {
-  cor: "#db2777",
-  bg: "#fce7f3"
+  id: "emocoes",
+  label: "Emoções",
+  cor: "#7B00C4",
+  bg: "#f3e6ff"
 }, {
-  cor: "#16a34a",
-  bg: "#dcfce7"
+  id: "autocuidado",
+  label: "Autocuidado",
+  cor: "#7B00C4",
+  bg: "#f3e6ff"
 }, {
-  cor: "#d97706",
-  bg: "#fef3c7"
+  id: "relacionamentos",
+  label: "Relacionamentos",
+  cor: "#7B00C4",
+  bg: "#f3e6ff"
 }, {
+  id: "corpo",
+  label: "Corpo e Alimentação",
+  cor: "#7B00C4",
+  bg: "#f3e6ff"
+}, {
+  id: "esquema",
+  label: "Terapia do Esquema",
+  cor: "#7B00C4",
+  bg: "#f3e6ff"
+}, {
+  id: "musicoterapia",
+  label: "Musicoterapia",
+  cor: "#7B00C4",
+  bg: "#f3e6ff"
+}, {
+  id: "avaliacao",
+  label: "Avaliação e Anamnese",
   cor: "#6366f1",
   bg: "#e0e7ff"
 }, {
-  cor: "#0d9488",
-  bg: "#ccfbf1"
+  id: "outro",
+  label: "Outros",
+  cor: "#6b7280",
+  bg: "#f3f4f6"
 }];
+const TODAS_SUBCATEGORIAS = MACROCATEGORIAS.flatMap(m => m.subs.map(s => ({
+  ...s,
+  macroId: m.id,
+  macroLabel: m.label,
+  macroIcone: m.icone,
+  cor: m.cor,
+  bg: m.bg
+})));
+
+// Mapa de categorias/formularioKey antigos → macrocategoria nova, pra
+// itens migrados do sistema anterior continuarem se agrupando/
+// colorindo certo mesmo sem terem sido recadastrados.
+const LEGADO_PARA_MACRO = {
+  tcc: "macro_ansiedade",
+  ansiedade: "macro_ansiedade",
+  esquema: "macro_ansiedade",
+  emocoes: "macro_humor",
+  humor: "macro_humor",
+  autocuidado: "macro_habitos",
+  habitos: "macro_habitos",
+  relaxamento: "macro_habitos",
+  corpo: "macro_habitos",
+  alimentacao: "macro_habitos",
+  relacionamentos: "macro_relacionamentos",
+  comunicacao: "macro_relacionamentos",
+  casal: "macro_casais",
+  musicoterapia: "macro_musico",
+  avaliacao: "macro_aval",
+  compulsao_sexual: "macro_compulsao",
+  compulsao: "macro_compulsao",
+  "breathing-478": "macro_habitos",
+  "muscle-relaxation": "macro_habitos",
+  "anxiety-management": "macro_ansiedade",
+  "decision-tree": "macro_ansiedade",
+  "abc-record": "macro_ansiedade",
+  "emotional-eating": "macro_habitos",
+  "roda-vida-integral": "macro_habitos",
+  "treino-neuro-auditivo": "macro_habitos"
+};
+function pertenceAMacro(item, macro) {
+  if (item.categoria === macro.id) return true;
+  if (macro.subs.some(s => s.id === item.categoria)) return true;
+  const macroInferido = LEGADO_PARA_MACRO[item.categoria] || LEGADO_PARA_MACRO[item.formularioKey];
+  return macroInferido === macro.id;
+}
 function corDaCategoria(categoria) {
+  const sub = TODAS_SUBCATEGORIAS.find(s => s.id === categoria);
+  if (sub) return {
+    cor: sub.cor,
+    bg: sub.bg
+  };
+  const macroDireto = MACROCATEGORIAS.find(m => m.id === categoria);
+  if (macroDireto) return {
+    cor: macroDireto.cor,
+    bg: macroDireto.bg
+  };
+  const macroLegado = MACROCATEGORIAS.find(m => m.id === LEGADO_PARA_MACRO[categoria]);
+  if (macroLegado) return {
+    cor: macroLegado.cor,
+    bg: macroLegado.bg
+  };
+  const legado = CATEGORIAS_LEGADO.find(c => c.id === categoria);
+  if (legado) return {
+    cor: legado.cor,
+    bg: legado.bg
+  };
+  const PALETA_RESERVA = [{
+    cor: "#7B00C4",
+    bg: "#f3e6ff"
+  }, {
+    cor: "#0891b2",
+    bg: "#e0f2fe"
+  }, {
+    cor: "#db2777",
+    bg: "#fce7f3"
+  }, {
+    cor: "#16a34a",
+    bg: "#dcfce7"
+  }, {
+    cor: "#d97706",
+    bg: "#fef3c7"
+  }, {
+    cor: "#6366f1",
+    bg: "#e0e7ff"
+  }, {
+    cor: "#0d9488",
+    bg: "#ccfbf1"
+  }];
   const chave = (categoria || "outros").toLowerCase();
-  if (PALETA_CATEGORIAS[chave]) return PALETA_CATEGORIAS[chave];
   let hash = 0;
   for (let i = 0; i < chave.length; i++) hash = hash * 31 + chave.charCodeAt(i) >>> 0;
   return PALETA_RESERVA[hash % PALETA_RESERVA.length];
+}
+
+// Barra de pills de filtro por macrocategoria — reaproveitada nas 3
+// abas (Ferramentas, Fábulas, Psicoeducação). "todos" mostra tudo;
+// clicar de novo na pill ativa volta pra "todos".
+function BarraFiltroCategoria({
+  itens,
+  filtro,
+  setFiltro
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 16,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setFiltro("todos"),
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "6px 13px",
+      borderRadius: 20,
+      border: "2px solid var(--cor-marca)",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 600,
+      background: filtro === "todos" ? "var(--cor-marca)" : "white",
+      color: filtro === "todos" ? "white" : "var(--cor-marca)"
+    }
+  }, "Todas ", itens.length), MACROCATEGORIAS.map(m => {
+    const n = itens.filter(it => pertenceAMacro(it, m)).length;
+    const ativo = filtro === m.id;
+    return /*#__PURE__*/React.createElement("button", {
+      key: m.id,
+      type: "button",
+      onClick: () => setFiltro(ativo ? "todos" : m.id),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 13px",
+        borderRadius: 20,
+        border: "2px solid",
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+        borderColor: ativo ? m.cor : m.cor + "50",
+        background: ativo ? m.cor : m.bg,
+        color: ativo ? "white" : m.cor
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: m.icone,
+      tamanho: 13
+    }), " ", m.label, " ", n > 0 ? "(" + n + ")" : "");
+  }), ["musicoterapia", "avaliacao"].map(cid => {
+    const cat = CATEGORIAS_LEGADO.find(c => c.id === cid);
+    const n = itens.filter(it => it.categoria === cid).length;
+    if (!cat || n === 0) return null;
+    const ativo = filtro === cid;
+    return /*#__PURE__*/React.createElement("button", {
+      key: cid,
+      type: "button",
+      onClick: () => setFiltro(ativo ? "todos" : cid),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 13px",
+        borderRadius: 20,
+        border: "2px solid var(--cor-marca)",
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 600,
+        background: ativo ? "var(--cor-marca)" : "#F3E6FF",
+        color: ativo ? "white" : "var(--cor-marca)"
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: cid === "musicoterapia" ? "music" : "clipboard-list",
+      tamanho: 13
+    }), " ", cat.label, " ", n > 0 ? "(" + n + ")" : "");
+  }));
 }
 const ICONE_POR_TIPO = {
   ferramenta: "wrench",
@@ -137,10 +440,12 @@ function TelaRecursos({
   });
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
+  const [filtroCateg, setFiltroCateg] = useState("todos");
   const [mostrarForm, setMostrarForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
   const [enviarItem, setEnviarItem] = useState(null);
   const [visualizando, setVisualizando] = useState(null);
+  const [buscaIA, setBuscaIA] = useState(false);
   const abaAtual = ABAS_RECURSOS.find(a => a.id === aba);
   const itens = itensPorColecao[abaAtual.colecao] || [];
   useEffect(() => {
@@ -156,13 +461,24 @@ function TelaRecursos({
     }, () => setCarregando(false)));
     return () => cancelamentos.forEach(c => c());
   }, []);
-  const filtrados = itens.filter(it => {
+  function trocarAba(id) {
+    setAba(id);
+    setFiltroCateg("todos");
+    setBusca("");
+  }
+  const itensDaAba = itens.filter(it => {
     // "avaliacao" (Anamnese, Entrevista Clínica, Rastreamentos DSM-5...)
     // não é ferramenta de biblioteca compartilhada — é questionário
     // individual do paciente, mora na aba Questionários do perfil dele.
-    if (aba === "ferramentas" && it.categoria === "avaliacao") return false;
+    return !(aba === "ferramentas" && it.categoria === "avaliacao");
+  });
+  const filtrados = itensDaAba.filter(it => {
     const titulo = it.titulo || it.nome || "";
-    return !busca || titulo.toLowerCase().includes(busca.toLowerCase());
+    const okBusca = !busca || titulo.toLowerCase().includes(busca.toLowerCase());
+    if (!okBusca) return false;
+    if (filtroCateg === "todos") return true;
+    const macro = MACROCATEGORIAS.find(m => m.id === filtroCateg);
+    return macro ? pertenceAMacro(it, macro) : it.categoria === filtroCateg;
   });
   const porCategoria = {};
   filtrados.forEach(it => {
@@ -174,27 +490,39 @@ function TelaRecursos({
     if (!confirm(`Excluir "${item.titulo || item.nome}" da biblioteca? Isso não desativa quem já usa — só remove do catálogo.`)) return;
     await db.collection(abaAtual.colecao).doc(item.id).delete();
   }
+  function abrirNovoItem() {
+    setItemEditando(null);
+    setMostrarForm(true);
+  }
   return /*#__PURE__*/React.createElement("div", {
     className: "conteudo conteudo-larga"
   }, /*#__PURE__*/React.createElement("div", {
     className: "cabecalho-secao"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", null, "Recursos Terap\xEAuticos"), /*#__PURE__*/React.createElement("p", {
     className: "subtitulo-pagina"
-  }, "Cat\xE1logo de ferramentas, f\xE1bulas e psicoeduca\xE7\xE3o \u2014 compartilhado com toda a plataforma")), /*#__PURE__*/React.createElement("button", {
-    className: "botao-primario",
-    onClick: () => {
-      setItemEditando(null);
-      setMostrarForm(true);
+  }, "Cat\xE1logo de ferramentas, f\xE1bulas e psicoeduca\xE7\xE3o \u2014 compartilhado com toda a plataforma")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
     }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: () => setBuscaIA(true)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "sparkles",
+    tamanho: 16
+  }), " Busca por sintoma"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: abrirNovoItem
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "plus",
     tamanho: 16
-  }), " Novo Item")), /*#__PURE__*/React.createElement("div", {
+  }), " ", abaAtual.id === "ferramentas" ? "Nova Ferramenta" : abaAtual.id === "fabulas" ? "Nova Fábula" : "Nova Psicoeducação"))), /*#__PURE__*/React.createElement("div", {
     className: "abas-financeiro"
   }, ABAS_RECURSOS.map(a => /*#__PURE__*/React.createElement("button", {
     key: a.id,
     className: "aba-financeiro" + (aba === a.id ? " aba-financeiro-ativa" : ""),
-    onClick: () => setAba(a.id)
+    onClick: () => trocarAba(a.id)
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: a.icone,
     tamanho: 15
@@ -203,9 +531,13 @@ function TelaRecursos({
     placeholder: "Buscar por nome...",
     value: busca,
     onChange: e => setBusca(e.target.value)
+  }), /*#__PURE__*/React.createElement(BarraFiltroCategoria, {
+    itens: itensDaAba,
+    filtro: filtroCateg,
+    setFiltro: setFiltroCateg
   }), carregando && /*#__PURE__*/React.createElement("p", null, "Carregando..."), !carregando && categorias.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
-  }, "Nenhum item cadastrado ainda nesta aba. Use a ferramenta de migra\xE7\xE3o de dados (Passo 5) pra trazer o cat\xE1logo do sistema anterior, ou clique em \"Novo Item\" pra cadastrar direto."), categorias.map(cat => {
+  }, "Nenhum item cadastrado ainda nesta aba/categoria. Use a ferramenta de migra\xE7\xE3o de dados (Passo 5) pra trazer o cat\xE1logo do sistema anterior, ou clique em \"Nova ", abaAtual.id === "ferramentas" ? "Ferramenta" : abaAtual.id === "fabulas" ? "Fábula" : "Psicoeducação", "\" pra cadastrar direto."), categorias.map(cat => {
     const cores = corDaCategoria(cat);
     return /*#__PURE__*/React.createElement("div", {
       key: cat,
@@ -232,13 +564,23 @@ function TelaRecursos({
     }, /*#__PURE__*/React.createElement("div", {
       className: "icone-cartao-recurso"
     }, /*#__PURE__*/React.createElement(Icone, {
-      nome: ICONE_POR_TIPO[abaAtual.tipo],
+      nome: item.icone || ICONE_POR_TIPO[abaAtual.tipo],
       tamanho: 20
     })), /*#__PURE__*/React.createElement("div", {
       className: "titulo-cartao-recurso"
-    }, item.titulo || item.nome)), item.descricao && /*#__PURE__*/React.createElement("p", {
+    }, item.titulo || item.nome)), abaAtual.id === "fabulas" && item.moral && /*#__PURE__*/React.createElement("p", {
+      className: "descricao-cartao-recurso",
+      style: {
+        fontStyle: "italic"
+      }
+    }, "\"", item.moral, "\""), abaAtual.id !== "fabulas" && item.descricao && /*#__PURE__*/React.createElement("p", {
       className: "descricao-cartao-recurso"
-    }, item.descricao), /*#__PURE__*/React.createElement("div", {
+    }, item.descricao), abaAtual.id === "fabulas" && /*#__PURE__*/React.createElement("p", {
+      className: "texto-vazio",
+      style: {
+        margin: 0
+      }
+    }, (item.paginas || []).length, " p\xE1g. \xB7 ", (item.perguntas || []).length, " reflex\xF5es"), /*#__PURE__*/React.createElement("div", {
       className: "acoes-cartao-recurso"
     }, /*#__PURE__*/React.createElement("button", {
       className: "botao-secundario",
@@ -271,7 +613,13 @@ function TelaRecursos({
       nome: "send",
       tamanho: 14
     }), " Enviar para paciente")))));
-  }), mostrarForm && /*#__PURE__*/React.createElement(FormRecurso, {
+  }), mostrarForm && abaAtual.id === "fabulas" && /*#__PURE__*/React.createElement(WizardNovaFabula, {
+    item: itemEditando,
+    aoFechar: () => {
+      setMostrarForm(false);
+      setItemEditando(null);
+    }
+  }), mostrarForm && abaAtual.id !== "fabulas" && /*#__PURE__*/React.createElement(WizardNovaFerramenta, {
     colecao: abaAtual.colecao,
     item: itemEditando,
     aoFechar: () => {
@@ -286,6 +634,18 @@ function TelaRecursos({
   }), visualizando && /*#__PURE__*/React.createElement(VisualizarRecursoModal, {
     item: visualizando,
     aoFechar: () => setVisualizando(null)
+  }), buscaIA && /*#__PURE__*/React.createElement(BuscaPorSintoma, {
+    itens: itensDaAba,
+    tipo: abaAtual.tipo,
+    aoFechar: () => setBuscaIA(false),
+    aoEnviar: item => {
+      setBuscaIA(false);
+      setEnviarItem(item);
+    },
+    aoVisualizar: item => {
+      setBuscaIA(false);
+      setVisualizando(item);
+    }
   }));
 }
 
@@ -320,23 +680,997 @@ const FERRAMENTAS_INTERATIVAS_DISPONIVEIS = [{
   valor: "treino-neuro-auditivo",
   rotulo: "Treino Neuro-Auditivo"
 }];
-function FormRecurso({
+
+// Cada tipo de bloco tem seu formato de dados default — porta fiel de
+// admin/psico_ui.js (novoBloco). Emoji trocado por nome de ícone
+// Lucide nos rótulos do seletor (regra de nunca usar emoji).
+const TIPOS_BLOCO = [{
+  id: "banner",
+  label: "Banner",
+  icone: "flag",
+  desc: "Cabeçalho colorido com título e ícone"
+}, {
+  id: "texto",
+  label: "Texto",
+  icone: "file-text",
+  desc: "Parágrafo de texto livre"
+}, {
+  id: "card",
+  label: "Card",
+  icone: "square",
+  desc: "Card com ícone, título e texto"
+}, {
+  id: "lista",
+  label: "Lista",
+  icone: "list",
+  desc: "Lista de itens"
+}, {
+  id: "imagem",
+  label: "Imagem",
+  icone: "image",
+  desc: "Imagem via URL"
+}, {
+  id: "grafico_barras",
+  label: "Gráfico Barras",
+  icone: "bar-chart-3",
+  desc: "Gráfico de barras comparativo"
+}, {
+  id: "grafico_radar",
+  label: "Gráfico Teia",
+  icone: "hexagon",
+  desc: "Gráfico radar/teia"
+}, {
+  id: "grafico_pizza",
+  label: "Gráfico Pizza",
+  icone: "pie-chart",
+  desc: "Gráfico circular/pizza"
+}, {
+  id: "slider",
+  label: "Slider",
+  icone: "sliders-horizontal",
+  desc: "Escala de intensidade (0 a 10)"
+}, {
+  id: "pergunta",
+  label: "Pergunta Aberta",
+  icone: "help-circle",
+  desc: "Campo para a paciente responder"
+}, {
+  id: "audio",
+  label: "Áudio/Vídeo",
+  icone: "music",
+  desc: "Link de áudio ou vídeo"
+}, {
+  id: "estrelas",
+  label: "Avaliação",
+  icone: "star",
+  desc: "Avaliação de 1 a 5 estrelas"
+}, {
+  id: "checklist",
+  label: "Checklist",
+  icone: "check-square",
+  desc: "Lista de itens para marcar"
+}, {
+  id: "selecao",
+  label: "Seleção",
+  icone: "list-checks",
+  desc: "Múltipla escolha ou escolha única"
+}];
+function novoBloco(tipo) {
+  const defaults = {
+    banner: {
+      cor: "#7B00C4",
+      icone: "sparkles",
+      titulo: ""
+    },
+    texto: {
+      conteudo: ""
+    },
+    card: {
+      icone: "lightbulb",
+      titulo: "",
+      texto: ""
+    },
+    lista: {
+      itens: [""]
+    },
+    imagem: {
+      url: "",
+      legenda: ""
+    },
+    grafico_barras: {
+      titulo: "",
+      itens: [{
+        label: "",
+        valor: 0
+      }, {
+        label: "",
+        valor: 0
+      }]
+    },
+    grafico_radar: {
+      titulo: "",
+      eixos: [{
+        label: "",
+        valor: 0
+      }, {
+        label: "",
+        valor: 0
+      }, {
+        label: "",
+        valor: 0
+      }]
+    },
+    grafico_pizza: {
+      titulo: "",
+      fatias: [{
+        label: "",
+        valor: 50
+      }, {
+        label: "",
+        valor: 50
+      }]
+    },
+    slider: {
+      pergunta: "",
+      min: 0,
+      max: 10,
+      labelMin: "Nada",
+      labelMax: "Muito"
+    },
+    pergunta: {
+      pergunta: "",
+      placeholder: "Escreva aqui..."
+    },
+    audio: {
+      url: "",
+      legenda: ""
+    },
+    estrelas: {
+      pergunta: "",
+      max: 5
+    },
+    checklist: {
+      titulo: "",
+      itens: [""]
+    },
+    selecao: {
+      pergunta: "",
+      tipo_sel: "unica",
+      opcoes: ["", ""]
+    }
+  };
+  return {
+    id: Date.now() + "_" + Math.random().toString(36).slice(2),
+    tipo,
+    ...defaults[tipo]
+  };
+}
+
+// Grid de categoria em duas camadas: cada macrocategoria como
+// cabeçalho colorido, com pills de subcategoria dentro — porta fiel
+// de admin/psico_ui.js (Passo 1 do wizard). `comEspecializadas` add
+// a linha extra Musicoterapia/Avaliação/Outros (só nas Ferramentas).
+function GradeCategoria({
+  categoria,
+  setCategoria,
+  comEspecializadas
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Categoria"), MACROCATEGORIAS.map(m => /*#__PURE__*/React.createElement("div", {
+    key: m.id,
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: m.cor,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 6,
+      display: "flex",
+      alignItems: "center",
+      gap: 5
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: m.icone,
+    tamanho: 13
+  }), " ", m.label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
+    }
+  }, m.subs.map(s => /*#__PURE__*/React.createElement("button", {
+    key: s.id,
+    type: "button",
+    onClick: () => setCategoria(s.id),
+    style: {
+      padding: "6px 12px",
+      borderRadius: 20,
+      border: "1.5px solid",
+      cursor: "pointer",
+      fontSize: 12,
+      borderColor: categoria === s.id ? m.cor : "#E5E7EB",
+      background: categoria === s.id ? m.bg : "white",
+      color: categoria === s.id ? m.cor : "#6B7280",
+      fontWeight: categoria === s.id ? 600 : 400
+    }
+  }, s.label))))), comEspecializadas && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#6B7280",
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 6
+    }
+  }, "Especializadas"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap"
+    }
+  }, [{
+    id: "musicoterapia",
+    label: "Musicoterapia",
+    icone: "music"
+  }, {
+    id: "avaliacao",
+    label: "Avaliação e Anamnese",
+    icone: "clipboard-list"
+  }, {
+    id: "outro",
+    label: "Outros",
+    icone: "wrench"
+  }].map(c => /*#__PURE__*/React.createElement("button", {
+    key: c.id,
+    type: "button",
+    onClick: () => setCategoria(c.id),
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      padding: "6px 12px",
+      borderRadius: 20,
+      border: "1.5px solid",
+      cursor: "pointer",
+      fontSize: 12,
+      borderColor: categoria === c.id ? "var(--cor-marca)" : "#E5E7EB",
+      background: categoria === c.id ? "#F3E6FF" : "white",
+      color: categoria === c.id ? "var(--cor-marca)" : "#6B7280",
+      fontWeight: categoria === c.id ? 600 : 400
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: c.icone,
+    tamanho: 12
+  }), " ", c.label)))));
+}
+
+// Editor de um bloco de conteúdo — um switch por tipo, porta fiel de
+// admin/psico_ui.js (Passo 2 do wizard). `bloco`/`atualizar` isolam
+// cada bloco da lista maior.
+function EditorBloco({
+  bloco,
+  atualizar
+}) {
+  const t = bloco.tipo;
+  if (t === "banner") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("label", null, "T\xEDtulo do banner"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.titulo,
+      onChange: e => atualizar({
+        titulo: e.target.value
+      }),
+      placeholder: "T\xEDtulo..."
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 110
+      }
+    }, /*#__PURE__*/React.createElement("label", null, "\xCDcone"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.icone,
+      onChange: e => atualizar({
+        icone: e.target.value
+      }),
+      placeholder: "ex: sparkles"
+    }))), /*#__PURE__*/React.createElement("label", null, "Cor de fundo"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        alignItems: "center"
+      }
+    }, ["#7B00C4", "#0891b2", "#059669", "#d97706", "#dc2626", "#db2777", "#6366f1", "#374151"].map(cor => /*#__PURE__*/React.createElement("button", {
+      key: cor,
+      type: "button",
+      onClick: () => atualizar({
+        cor
+      }),
+      style: {
+        width: 26,
+        height: 26,
+        borderRadius: "50%",
+        background: cor,
+        border: bloco.cor === cor ? "3px solid white" : "2px solid transparent",
+        outline: bloco.cor === cor ? "2px solid " + cor : "none",
+        cursor: "pointer"
+      }
+    })), /*#__PURE__*/React.createElement("input", {
+      type: "color",
+      value: bloco.cor,
+      onChange: e => atualizar({
+        cor: e.target.value
+      }),
+      style: {
+        width: 26,
+        height: 26,
+        border: "none",
+        cursor: "pointer",
+        padding: 0
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        borderRadius: 10,
+        padding: "12px 16px",
+        background: bloco.cor,
+        color: "white",
+        display: "flex",
+        alignItems: "center",
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: bloco.icone || "sparkles",
+      tamanho: 20
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: 14
+      }
+    }, bloco.titulo || "Prévia do banner")));
+  }
+  if (t === "texto") {
+    return /*#__PURE__*/React.createElement(TextAreaVoz, {
+      className: "campo-descricao",
+      rows: 4,
+      value: bloco.conteudo,
+      onChange: e => atualizar({
+        conteudo: e.target.value
+      }),
+      placeholder: "Escreva o texto aqui..."
+    });
+  }
+  if (t === "card") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 110
+      }
+    }, /*#__PURE__*/React.createElement("label", null, "\xCDcone"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.icone,
+      onChange: e => atualizar({
+        icone: e.target.value
+      }),
+      placeholder: "ex: lightbulb"
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("label", null, "T\xEDtulo"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.titulo,
+      onChange: e => atualizar({
+        titulo: e.target.value
+      }),
+      placeholder: "T\xEDtulo do card..."
+    }))), /*#__PURE__*/React.createElement(TextAreaVoz, {
+      className: "campo-descricao",
+      rows: 3,
+      value: bloco.texto,
+      onChange: e => atualizar({
+        texto: e.target.value
+      }),
+      placeholder: "Texto do card..."
+    }));
+  }
+  if (t === "lista" || t === "checklist") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, t === "checklist" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "T\xEDtulo"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.titulo,
+      onChange: e => atualizar({
+        titulo: e.target.value
+      }),
+      placeholder: "Ex: Minha lista de autocuidado",
+      style: {
+        marginBottom: 10
+      }
+    })), bloco.itens.map((val, ii) => /*#__PURE__*/React.createElement("div", {
+      key: ii,
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: t === "checklist" ? "square" : "circle",
+      tamanho: 14
+    }), /*#__PURE__*/React.createElement("input", {
+      style: {
+        flex: 1
+      },
+      value: val,
+      onChange: e => atualizar({
+        itens: bloco.itens.map((v, i) => i === ii ? e.target.value : v)
+      }),
+      placeholder: `Item ${ii + 1}...`
+    }), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-icone",
+      onClick: () => atualizar({
+        itens: bloco.itens.filter((_, i) => i !== ii)
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "x",
+      tamanho: 14
+    })))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-secundario",
+      style: {
+        fontSize: 12
+      },
+      onClick: () => atualizar({
+        itens: [...bloco.itens, ""]
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "plus",
+      tamanho: 13
+    }), " Adicionar item"));
+  }
+  if (t === "imagem") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "URL da imagem"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.url,
+      onChange: e => atualizar({
+        url: e.target.value
+      }),
+      placeholder: "https://...",
+      style: {
+        marginBottom: 8
+      }
+    }), /*#__PURE__*/React.createElement("label", null, "Legenda ", /*#__PURE__*/React.createElement("span", {
+      className: "opcional"
+    }, "(opcional)")), /*#__PURE__*/React.createElement("input", {
+      value: bloco.legenda,
+      onChange: e => atualizar({
+        legenda: e.target.value
+      }),
+      placeholder: "Legenda da imagem..."
+    }), bloco.url && /*#__PURE__*/React.createElement("img", {
+      src: bloco.url,
+      alt: "",
+      style: {
+        marginTop: 10,
+        maxWidth: "100%",
+        borderRadius: 8,
+        maxHeight: 160,
+        objectFit: "cover"
+      },
+      onError: e => {
+        e.target.style.display = "none";
+      }
+    }));
+  }
+  if (t === "grafico_barras") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "T\xEDtulo do gr\xE1fico"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.titulo,
+      onChange: e => atualizar({
+        titulo: e.target.value
+      }),
+      placeholder: "Ex: \xC1reas da minha vida",
+      style: {
+        marginBottom: 10
+      }
+    }), bloco.itens.map((item, ii) => /*#__PURE__*/React.createElement("div", {
+      key: ii,
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      style: {
+        flex: 2
+      },
+      value: item.label,
+      onChange: e => atualizar({
+        itens: bloco.itens.map((v, i) => i === ii ? {
+          ...v,
+          label: e.target.value
+        } : v)
+      }),
+      placeholder: `Rótulo ${ii + 1}`
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      style: {
+        width: 80
+      },
+      min: 0,
+      max: 100,
+      value: item.valor,
+      onChange: e => atualizar({
+        itens: bloco.itens.map((v, i) => i === ii ? {
+          ...v,
+          valor: Number(e.target.value)
+        } : v)
+      })
+    }), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-icone",
+      onClick: () => atualizar({
+        itens: bloco.itens.filter((_, i) => i !== ii)
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "x",
+      tamanho: 14
+    })))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-secundario",
+      style: {
+        fontSize: 12
+      },
+      onClick: () => atualizar({
+        itens: [...bloco.itens, {
+          label: "",
+          valor: 0
+        }]
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "plus",
+      tamanho: 13
+    }), " Adicionar barra"));
+  }
+  if (t === "grafico_radar") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "T\xEDtulo do gr\xE1fico"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.titulo,
+      onChange: e => atualizar({
+        titulo: e.target.value
+      }),
+      placeholder: "Ex: Roda da Vida",
+      style: {
+        marginBottom: 10
+      }
+    }), bloco.eixos.map((eixo, ii) => /*#__PURE__*/React.createElement("div", {
+      key: ii,
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      style: {
+        flex: 2
+      },
+      value: eixo.label,
+      onChange: e => atualizar({
+        eixos: bloco.eixos.map((v, i) => i === ii ? {
+          ...v,
+          label: e.target.value
+        } : v)
+      }),
+      placeholder: `Eixo ${ii + 1}`
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      style: {
+        width: 80
+      },
+      min: 0,
+      max: 10,
+      value: eixo.valor,
+      onChange: e => atualizar({
+        eixos: bloco.eixos.map((v, i) => i === ii ? {
+          ...v,
+          valor: Number(e.target.value)
+        } : v)
+      })
+    }), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-icone",
+      onClick: () => atualizar({
+        eixos: bloco.eixos.filter((_, i) => i !== ii)
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "x",
+      tamanho: 14
+    })))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-secundario",
+      style: {
+        fontSize: 12
+      },
+      onClick: () => atualizar({
+        eixos: [...bloco.eixos, {
+          label: "",
+          valor: 0
+        }]
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "plus",
+      tamanho: 13
+    }), " Adicionar eixo"));
+  }
+  if (t === "grafico_pizza") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "T\xEDtulo do gr\xE1fico"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.titulo,
+      onChange: e => atualizar({
+        titulo: e.target.value
+      }),
+      placeholder: "Ex: Como uso meu tempo",
+      style: {
+        marginBottom: 10
+      }
+    }), bloco.fatias.map((fatia, ii) => /*#__PURE__*/React.createElement("div", {
+      key: ii,
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      style: {
+        flex: 2
+      },
+      value: fatia.label,
+      onChange: e => atualizar({
+        fatias: bloco.fatias.map((v, i) => i === ii ? {
+          ...v,
+          label: e.target.value
+        } : v)
+      }),
+      placeholder: `Fatia ${ii + 1}`
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      style: {
+        width: 80
+      },
+      min: 0,
+      max: 100,
+      value: fatia.valor,
+      onChange: e => atualizar({
+        fatias: bloco.fatias.map((v, i) => i === ii ? {
+          ...v,
+          valor: Number(e.target.value)
+        } : v)
+      })
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "var(--texto-suave)"
+      }
+    }, "%"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-icone",
+      onClick: () => atualizar({
+        fatias: bloco.fatias.filter((_, i) => i !== ii)
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "x",
+      tamanho: 14
+    })))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-secundario",
+      style: {
+        fontSize: 12
+      },
+      onClick: () => atualizar({
+        fatias: [...bloco.fatias, {
+          label: "",
+          valor: 0
+        }]
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "plus",
+      tamanho: 13
+    }), " Adicionar fatia"));
+  }
+  if (t === "slider") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Pergunta"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.pergunta,
+      onChange: e => atualizar({
+        pergunta: e.target.value
+      }),
+      placeholder: "Ex: Como voc\xEA est\xE1 se sentindo hoje?",
+      style: {
+        marginBottom: 10
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("label", null, "M\xEDnimo"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      value: bloco.min,
+      onChange: e => atualizar({
+        min: Number(e.target.value)
+      })
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("label", null, "M\xE1ximo"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      value: bloco.max,
+      onChange: e => atualizar({
+        max: Number(e.target.value)
+      })
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 2
+      }
+    }, /*#__PURE__*/React.createElement("label", null, "R\xF3tulo m\xEDn"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.labelMin,
+      onChange: e => atualizar({
+        labelMin: e.target.value
+      }),
+      placeholder: "Nada"
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 2
+      }
+    }, /*#__PURE__*/React.createElement("label", null, "R\xF3tulo m\xE1x"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.labelMax,
+      onChange: e => atualizar({
+        labelMax: e.target.value
+      }),
+      placeholder: "Muito"
+    }))));
+  }
+  if (t === "pergunta") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Pergunta"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.pergunta,
+      onChange: e => atualizar({
+        pergunta: e.target.value
+      }),
+      placeholder: "O que voc\xEA gostaria de compartilhar?",
+      style: {
+        marginBottom: 8
+      }
+    }), /*#__PURE__*/React.createElement("label", null, "Placeholder ", /*#__PURE__*/React.createElement("span", {
+      className: "opcional"
+    }, "(sugest\xE3o para a paciente)")), /*#__PURE__*/React.createElement("input", {
+      value: bloco.placeholder,
+      onChange: e => atualizar({
+        placeholder: e.target.value
+      }),
+      placeholder: "Escreva aqui..."
+    }));
+  }
+  if (t === "audio") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "URL do \xE1udio ou v\xEDdeo"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.url,
+      onChange: e => atualizar({
+        url: e.target.value
+      }),
+      placeholder: "YouTube, Spotify, SoundCloud, Google Drive...",
+      style: {
+        marginBottom: 8
+      }
+    }), /*#__PURE__*/React.createElement("label", null, "Legenda ", /*#__PURE__*/React.createElement("span", {
+      className: "opcional"
+    }, "(opcional)")), /*#__PURE__*/React.createElement("input", {
+      value: bloco.legenda,
+      onChange: e => atualizar({
+        legenda: e.target.value
+      }),
+      placeholder: "Ex: M\xFAsica para relaxamento"
+    }));
+  }
+  if (t === "estrelas") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Pergunta"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.pergunta,
+      onChange: e => atualizar({
+        pergunta: e.target.value
+      }),
+      placeholder: "Ex: Como voc\xEA avalia seu dia?",
+      style: {
+        marginBottom: 8
+      }
+    }), /*#__PURE__*/React.createElement("label", null, "M\xE1ximo de estrelas"), /*#__PURE__*/React.createElement("select", {
+      style: {
+        width: 110
+      },
+      value: bloco.max,
+      onChange: e => atualizar({
+        max: Number(e.target.value)
+      })
+    }, [3, 5, 7, 10].map(n => /*#__PURE__*/React.createElement("option", {
+      key: n,
+      value: n
+    }, n))));
+  }
+  if (t === "selecao") {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Pergunta"), /*#__PURE__*/React.createElement("input", {
+      value: bloco.pergunta,
+      onChange: e => atualizar({
+        pergunta: e.target.value
+      }),
+      placeholder: "Ex: Como voc\xEA se sente agora?",
+      style: {
+        marginBottom: 8
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 10
+      }
+    }, ["unica", "multipla"].map(v => /*#__PURE__*/React.createElement("button", {
+      key: v,
+      type: "button",
+      onClick: () => atualizar({
+        tipo_sel: v
+      }),
+      className: "pill-status" + (bloco.tipo_sel === v ? " pill-status-ativa" : ""),
+      style: {
+        "--cor-pill": "var(--cor-marca)"
+      }
+    }, v === "unica" ? "Escolha única" : "Múltipla escolha"))), bloco.opcoes.map((op, ii) => /*#__PURE__*/React.createElement("div", {
+      key: ii,
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--cor-marca)",
+        fontSize: 13,
+        width: 18
+      }
+    }, ii + 1, "."), /*#__PURE__*/React.createElement("input", {
+      style: {
+        flex: 1
+      },
+      value: op,
+      onChange: e => atualizar({
+        opcoes: bloco.opcoes.map((v, i) => i === ii ? e.target.value : v)
+      }),
+      placeholder: `Opção ${ii + 1}...`
+    }), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-icone",
+      onClick: () => atualizar({
+        opcoes: bloco.opcoes.filter((_, i) => i !== ii)
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "x",
+      tamanho: 14
+    })))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-secundario",
+      style: {
+        fontSize: 12
+      },
+      onClick: () => atualizar({
+        opcoes: [...bloco.opcoes, ""]
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "plus",
+      tamanho: 13
+    }), " Adicionar op\xE7\xE3o"));
+  }
+  return null;
+}
+function resumoBloco(bloco) {
+  switch (bloco.tipo) {
+    case "texto":
+      return bloco.conteudo?.slice(0, 60) || "—";
+    case "banner":
+    case "card":
+      return bloco.titulo || "—";
+    case "lista":
+    case "checklist":
+      return `${bloco.itens.filter(i => i).length} item(ns)`;
+    case "imagem":
+      return bloco.url ? "URL definida" : "—";
+    case "grafico_barras":
+      return `${bloco.itens?.length || 0} item(ns)`;
+    case "grafico_pizza":
+      return `${bloco.fatias?.length || 0} item(ns)`;
+    case "grafico_radar":
+      return `${bloco.eixos?.length || 0} eixo(s)`;
+    case "slider":
+      return `${bloco.min} → ${bloco.max}`;
+    case "pergunta":
+      return bloco.pergunta?.slice(0, 60) || "—";
+    case "audio":
+      return bloco.url ? "URL definida" : "—";
+    case "estrelas":
+      return `Até ${bloco.max} estrelas`;
+    case "selecao":
+      return `${bloco.opcoes.filter(o => o).length} opção(ões)`;
+    default:
+      return "—";
+  }
+}
+
+// ─── Wizard "Nova Ferramenta" / "Nova Psicoeducação" (3 passos) ──
+// Passo 1: Identidade e Categoria · Passo 2: Blocos de Conteúdo ·
+// Passo 3: Revisão e Salvar. Porta fiel de admin/psico_ui.js
+// (RecursosTerapeuticos e AbaPsicoeducacao usam o mesmo desenho).
+// A ferramenta continua podendo usar um componente interativo já
+// pronto (formularioKey) em vez de/além dos blocos — os blocos são
+// opcionais, pra quem quiser montar um conteúdo novo do zero.
+function WizardNovaFerramenta({
   colecao,
   item,
   aoFechar
 }) {
-  const [form, setForm] = useState(item || {
+  const ehFerramenta = colecao === "recursos_terapeuticos";
+  const [passo, setPasso] = useState(1);
+  const [form, setForm] = useState(item ? {
+    titulo: item.titulo || "",
+    descricao: item.descricao || "",
+    categoria: item.categoria || "macro_ansiedade",
+    formularioKey: item.formularioKey || "",
+    icone: item.icone || ""
+  } : {
     titulo: "",
-    categoria: "",
     descricao: "",
-    formularioKey: ""
+    categoria: "macro_ansiedade",
+    formularioKey: "",
+    icone: ""
   });
+  const [blocos, setBlocos] = useState(Array.isArray(item?.blocos) ? item.blocos : []);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
-  async function salvar(evento) {
-    evento.preventDefault();
-    if (!(form.titulo || "").trim()) {
+  function atualizarBloco(idx, patch) {
+    setBlocos(b => b.map((bl, i) => i === idx ? {
+      ...bl,
+      ...patch
+    } : bl));
+  }
+  function moverBloco(idx, dir) {
+    setBlocos(b => {
+      const arr = [...b];
+      const alvo = idx + dir;
+      if (alvo < 0 || alvo >= arr.length) return arr;
+      [arr[idx], arr[alvo]] = [arr[alvo], arr[idx]];
+      return arr;
+    });
+  }
+  async function salvar() {
+    if (!form.titulo.trim()) {
       setErro("Título é obrigatório.");
+      setPasso(1);
       return;
     }
     setErro("");
@@ -344,12 +1678,12 @@ function FormRecurso({
     try {
       const dados = {
         titulo: form.titulo.trim(),
-        categoria: form.categoria || "outros",
-        descricao: form.descricao || ""
+        descricao: form.descricao || "",
+        categoria: form.categoria || "outro",
+        tipo: blocos.length > 0 ? "builder" : "interativa",
+        blocos
       };
-      if (colecao === "recursos_terapeuticos") {
-        dados.formularioKey = form.formularioKey || "";
-      }
+      if (ehFerramenta) dados.formularioKey = form.formularioKey || "";else dados.icone = form.icone || "";
       if (item) {
         await db.collection(colecao).doc(item.id).update(dados);
       } else {
@@ -365,40 +1699,73 @@ function FormRecurso({
       setSalvando(false);
     }
   }
+  const categoriaResolvida = TODAS_SUBCATEGORIAS.find(s => s.id === form.categoria) || MACROCATEGORIAS.find(m => m.id === form.categoria) || CATEGORIAS_LEGADO.find(c => c.id === form.categoria);
   return /*#__PURE__*/React.createElement("div", {
     className: "sobreposicao",
     onClick: aoFechar
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal",
+    className: "modal modal-largo",
     onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("h3", null, item ? "Editar" : "Novo", " Item"), /*#__PURE__*/React.createElement("form", {
-    onSubmit: salvar
-  }, /*#__PURE__*/React.createElement("label", null, "T\xEDtulo *"), /*#__PURE__*/React.createElement("input", {
-    value: form.titulo || "",
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-wizard-recurso"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "titulo-wizard-recurso"
+  }, item ? "Editar" : ehFerramenta ? "Nova Ferramenta" : "Nova Psicoeducação"), /*#__PURE__*/React.createElement("div", {
+    className: "subtitulo-wizard-recurso"
+  }, passo === 1 ? "Passo 1 — Identidade e Categoria" : passo === 2 ? "Passo 2 — Blocos de Conteúdo" : "Passo 3 — Revisão e Salvar")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, [1, 2, 3].map(s => /*#__PURE__*/React.createElement("div", {
+    key: s,
+    className: "circulo-passo-wizard" + (passo === s ? " circulo-passo-ativo" : passo > s ? " circulo-passo-feito" : "")
+  }, passo > s ? /*#__PURE__*/React.createElement(Icone, {
+    nome: "check",
+    tamanho: 13
+  }) : s)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-fechar-wizard",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "x",
+    tamanho: 18
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "corpo-wizard-recurso"
+  }, passo === 1 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "T\xEDtulo ", ehFerramenta ? "da Ferramenta" : "do Material", " *"), /*#__PURE__*/React.createElement("input", {
+    value: form.titulo,
     onChange: e => setForm({
       ...form,
       titulo: e.target.value
     }),
-    required: true
-  }), /*#__PURE__*/React.createElement("label", null, "Categoria ", /*#__PURE__*/React.createElement("span", {
+    placeholder: ehFerramenta ? "Ex: Mapa das Emoções" : "Ex: O que é ansiedade?"
+  }), !ehFerramenta && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "\xCDcone ", /*#__PURE__*/React.createElement("span", {
     className: "opcional"
-  }, "(ex.: tcc, relaxamento, ansiedade)")), /*#__PURE__*/React.createElement("input", {
-    value: form.categoria || "",
+  }, "(nome de um \xEDcone Lucide, opcional)")), /*#__PURE__*/React.createElement("input", {
+    value: form.icone,
     onChange: e => setForm({
       ...form,
-      categoria: e.target.value
-    })
-  }), /*#__PURE__*/React.createElement("label", null, "Descri\xE7\xE3o ", /*#__PURE__*/React.createElement("span", {
-    className: "opcional"
-  }, "(opcional \u2014 uma frase curta, o passo a passo j\xE1 fica dentro da ferramenta)")), /*#__PURE__*/React.createElement(TextAreaVoz, {
+      icone: e.target.value
+    }),
+    placeholder: "ex: brain"
+  })), /*#__PURE__*/React.createElement("label", null, "Descri\xE7\xE3o curta"), /*#__PURE__*/React.createElement(TextAreaVoz, {
     className: "campo-descricao",
-    rows: 3,
-    value: form.descricao || "",
+    rows: 2,
+    value: form.descricao,
     onChange: e => setForm({
       ...form,
       descricao: e.target.value
-    })
-  }), colecao === "recursos_terapeuticos" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Tipo de ferramenta interativa ", /*#__PURE__*/React.createElement("span", {
+    }),
+    placeholder: "O que este conte\xFAdo ajuda a paciente a fazer?"
+  }), /*#__PURE__*/React.createElement(GradeCategoria, {
+    categoria: form.categoria,
+    setCategoria: c => setForm({
+      ...form,
+      categoria: c
+    }),
+    comEspecializadas: ehFerramenta
+  }), ehFerramenta && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Tipo de ferramenta interativa ", /*#__PURE__*/React.createElement("span", {
     className: "opcional"
   }, "(se ela j\xE1 tem uma tela pronta)")), /*#__PURE__*/React.createElement("select", {
     value: form.formularioKey || "",
@@ -418,10 +1785,730 @@ function FormRecurso({
     className: "botao-secundario",
     onClick: aoFechar
   }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
-    type: "submit",
+    type: "button",
     className: "botao-primario",
+    onClick: () => {
+      if (!form.titulo.trim()) {
+        setErro("Título é obrigatório.");
+        return;
+      }
+      setErro("");
+      setPasso(2);
+    }
+  }, "Pr\xF3ximo \u2014 Blocos de Conte\xFAdo ", /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-right",
+    tamanho: 15
+  })))), passo === 2 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rotulo-mini"
+  }, "Adicionar Bloco"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8
+    }
+  }, TIPOS_BLOCO.map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.id,
+    type: "button",
+    className: "botao-secundario",
+    style: {
+      fontSize: 12
+    },
+    title: t.desc,
+    onClick: () => setBlocos(b => [...b, novoBloco(t.id)])
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: t.icone,
+    tamanho: 13
+  }), " ", t.label)))), blocos.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio",
+    style: {
+      textAlign: "center",
+      padding: "26px 16px",
+      border: "1.5px dashed #E5E7EB",
+      borderRadius: 12
+    }
+  }, "Clique nos tipos acima para adicionar blocos ao conte\xFAdo (opcional \u2014 sem blocos, fica s\xF3 t\xEDtulo e descri\xE7\xE3o)."), blocos.map((bloco, idx) => {
+    const t = TIPOS_BLOCO.find(x => x.id === bloco.tipo);
+    return /*#__PURE__*/React.createElement("div", {
+      key: bloco.id,
+      className: "cartao-bloco-wizard"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "cabecalho-bloco-wizard"
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: t?.icone,
+      tamanho: 15
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600,
+        fontSize: 13,
+        color: "var(--cor-marca)",
+        flex: 1
+      }
+    }, t?.label), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-icone",
+      disabled: idx === 0,
+      onClick: () => moverBloco(idx, -1)
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "chevron-up",
+      tamanho: 14
+    })), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-icone",
+      disabled: idx === blocos.length - 1,
+      onClick: () => moverBloco(idx, 1)
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "chevron-down",
+      tamanho: 14
+    })), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-icone botao-icone-perigo",
+      onClick: () => setBlocos(b => b.filter((_, i) => i !== idx))
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "trash-2",
+      tamanho: 14
+    }))), /*#__PURE__*/React.createElement("div", {
+      className: "corpo-bloco-wizard"
+    }, /*#__PURE__*/React.createElement(EditorBloco, {
+      bloco: bloco,
+      atualizar: patch => atualizarBloco(idx, patch)
+    })));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal",
+    style: {
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setPasso(1)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 15
+  }), " Voltar"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    onClick: () => setPasso(3)
+  }, "Pr\xF3ximo \u2014 Revisar ", /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-right",
+    tamanho: 15
+  })))), passo === 3 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "cartao-resumo-wizard"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15,
+      marginBottom: 4
+    }
+  }, form.titulo), form.descricao && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "var(--texto-suave)",
+      marginBottom: 8
+    }
+  }, form.descricao), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--cor-marca)",
+      fontWeight: 600,
+      display: "flex",
+      alignItems: "center",
+      gap: 5
+    }
+  }, categoriaResolvida && /*#__PURE__*/React.createElement(Icone, {
+    nome: categoriaResolvida.macroIcone || categoriaResolvida.icone || "tag",
+    tamanho: 13
+  }), categoriaResolvida?.label || form.categoria)), /*#__PURE__*/React.createElement("div", {
+    className: "rotulo-mini"
+  }, blocos.length, " bloco", blocos.length !== 1 ? "s" : "", " de conte\xFAdo"), blocos.map((bloco, idx) => {
+    const t = TIPOS_BLOCO.find(x => x.id === bloco.tipo);
+    return /*#__PURE__*/React.createElement("div", {
+      key: bloco.id,
+      className: "linha-resumo-bloco"
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: t?.icone,
+      tamanho: 16
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: 13
+      }
+    }, t?.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--texto-suave)"
+      }
+    }, resumoBloco(bloco))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "botao-secundario",
+      style: {
+        fontSize: 12
+      },
+      onClick: () => setPasso(2)
+    }, "editar"));
+  }), blocos.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhum bloco adicionado \u2014 o conte\xFAdo ter\xE1 apenas t\xEDtulo e descri\xE7\xE3o."), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal",
+    style: {
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setPasso(2)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 15
+  }), " Voltar"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    onClick: salvar,
     disabled: salvando
-  }, salvando ? "Salvando..." : "Salvar")))));
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "save",
+    tamanho: 15
+  }), " ", salvando ? "Salvando..." : ehFerramenta ? "Salvar Ferramenta" : "Salvar Psicoeducação"))))));
+}
+
+// ─── Wizard "Nova Fábula" (4 passos) ─────────────────────────────
+// Identidade → Categoria → Páginas → Reflexões. Porta fiel de
+// admin/psifabulas.compiled.js (WizardNovaFabula) — cada página é um
+// bloco de texto solto (array `paginas`), lido uma de cada vez pelo
+// paciente (ver LeitorFabula no app.js do paciente, que já sabia ler
+// esse formato — só faltava um jeito de cadastrar). Diferente de
+// Ferramenta/Psicoeducação, aqui `categoria` guarda a MACROcategoria
+// direto (não desce a subcategoria), igual ao modelo.
+function WizardNovaFabula({
+  item,
+  aoFechar
+}) {
+  const [passo, setPasso] = useState(1);
+  const [form, setForm] = useState(item ? {
+    titulo: item.titulo || "",
+    icone: item.icone || "book-open",
+    moral: item.moral || "",
+    categoria: item.categoria || "macro_ansiedade"
+  } : {
+    titulo: "",
+    icone: "book-open",
+    moral: "",
+    categoria: "macro_ansiedade"
+  });
+  const [paginas, setPaginas] = useState(Array.isArray(item?.paginas) && item.paginas.length > 0 ? item.paginas : [""]);
+  const [perguntas, setPerguntas] = useState(Array.isArray(item?.perguntas) && item.perguntas.length > 0 ? [...item.perguntas, "", "", ""].slice(0, Math.max(3, item.perguntas.length)) : ["", "", ""]);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const macro = MACROCATEGORIAS.find(m => m.id === form.categoria) || MACROCATEGORIAS[0];
+  const PASSOS = ["Identidade", "Categoria", "Conteúdo", "Reflexões"];
+  function setPagina(i, v) {
+    setPaginas(p => p.map((x, j) => j === i ? v : x));
+  }
+  function remPagina(i) {
+    setPaginas(p => p.filter((_, j) => j !== i));
+  }
+  function setPergunta(i, v) {
+    setPerguntas(p => p.map((x, j) => j === i ? v : x));
+  }
+  async function salvar() {
+    if (!form.titulo.trim() || paginas.every(p => !p.trim())) {
+      setErro("Título e ao menos uma página são obrigatórios.");
+      setPasso(!form.titulo.trim() ? 1 : 3);
+      return;
+    }
+    setErro("");
+    setSalvando(true);
+    try {
+      const dados = {
+        titulo: form.titulo.trim(),
+        icone: form.icone || "book-open",
+        moral: form.moral.trim(),
+        categoria: form.categoria,
+        paginas: paginas.filter(p => p.trim()),
+        perguntas: perguntas.filter(p => p.trim())
+      };
+      if (item) {
+        await db.collection("fabulas_terapeuticas").doc(item.id).update(dados);
+      } else {
+        await db.collection("fabulas_terapeuticas").add({
+          ...dados,
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      aoFechar();
+    } catch (e) {
+      setErro(e.message || "Não foi possível salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sobreposicao",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal modal-largo",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-wizard-recurso",
+    style: {
+      background: macro.cor
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "titulo-wizard-recurso",
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: form.icone || "book-open",
+    tamanho: 18
+  }), " ", form.titulo || (item ? "Editar Fábula" : "Nova Fábula"))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-fechar-wizard",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "x",
+    tamanho: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 20
+    }
+  }, PASSOS.map((p, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 4,
+      borderRadius: 4,
+      background: i < passo ? "var(--cor-marca)" : "#E5E7EB",
+      marginBottom: 4
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "var(--texto-suave)",
+      fontWeight: i === passo - 1 ? 700 : 400
+    }
+  }, p)))), /*#__PURE__*/React.createElement("div", {
+    className: "corpo-wizard-recurso"
+  }, passo === 1 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 110
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "\xCDcone"), /*#__PURE__*/React.createElement("input", {
+    value: form.icone,
+    onChange: e => setForm({
+      ...form,
+      icone: e.target.value
+    }),
+    placeholder: "ex: book-open"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "T\xEDtulo da F\xE1bula *"), /*#__PURE__*/React.createElement("input", {
+    value: form.titulo,
+    onChange: e => setForm({
+      ...form,
+      titulo: e.target.value
+    }),
+    placeholder: "Ex: A Borboleta e a Tempestade"
+  }))), /*#__PURE__*/React.createElement("label", null, "Moral / Mensagem central"), /*#__PURE__*/React.createElement("input", {
+    value: form.moral,
+    onChange: e => setForm({
+      ...form,
+      moral: e.target.value
+    }),
+    placeholder: "Ex: \"A crise que parece fim pode ser come\xE7o.\""
+  }), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: aoFechar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    style: {
+      background: macro.cor
+    },
+    disabled: !form.titulo.trim(),
+    onClick: () => setPasso(2)
+  }, "Pr\xF3ximo ", /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-right",
+    tamanho: 14
+  })))), passo === 2 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Categoria terap\xEAutica"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      marginTop: 8
+    }
+  }, MACROCATEGORIAS.map(m => /*#__PURE__*/React.createElement("div", {
+    key: m.id,
+    onClick: () => setForm({
+      ...form,
+      categoria: m.id
+    }),
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 16px",
+      borderRadius: 12,
+      border: "2px solid",
+      cursor: "pointer",
+      borderColor: form.categoria === m.id ? m.cor : "#E5E7EB",
+      background: form.categoria === m.id ? m.bg : "white"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      background: m.cor,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "white",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: m.icone,
+    tamanho: 17
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 14,
+      color: form.categoria === m.id ? m.cor : "#374151"
+    }
+  }, m.label), form.categoria === m.id && /*#__PURE__*/React.createElement(Icone, {
+    nome: "check-circle-2",
+    tamanho: 18,
+    style: {
+      color: m.cor,
+      marginLeft: "auto"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal",
+    style: {
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setPasso(1)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 14
+  }), " Anterior"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    style: {
+      background: macro.cor
+    },
+    onClick: () => setPasso(3)
+  }, "Pr\xF3ximo ", /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-right",
+    tamanho: 14
+  })))), passo === 3 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "P\xE1ginas da f\xE1bula"), /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio",
+    style: {
+      marginTop: 0
+    }
+  }, "Cada p\xE1gina \xE9 um bloco de texto. O paciente avan\xE7a p\xE1gina por p\xE1gina."), paginas.map((p, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      margin: 0
+    }
+  }, "P\xE1gina ", i + 1), paginas.length > 1 && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-icone botao-icone-perigo",
+    onClick: () => remPagina(i)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "x",
+    tamanho: 14
+  }))), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 4,
+    value: p,
+    onChange: e => setPagina(i, e.target.value),
+    placeholder: `Texto da página ${i + 1}...`
+  }))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    style: {
+      width: "100%",
+      justifyContent: "center"
+    },
+    onClick: () => setPaginas(p => [...p, ""])
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "plus",
+    tamanho: 14
+  }), " Adicionar p\xE1gina"), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal",
+    style: {
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setPasso(2)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 14
+  }), " Anterior"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    style: {
+      background: macro.cor
+    },
+    onClick: () => setPasso(4)
+  }, "Pr\xF3ximo ", /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-right",
+    tamanho: 14
+  })))), passo === 4 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Perguntas de reflex\xE3o"), /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio",
+    style: {
+      marginTop: 0
+    }
+  }, "Deixe em branco as que n\xE3o quiser usar. A paciente responde depois de ler a f\xE1bula."), perguntas.map((p, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Pergunta ", i + 1), /*#__PURE__*/React.createElement("input", {
+    value: p,
+    onChange: e => setPergunta(i, e.target.value),
+    placeholder: i === 0 ? "O que mais te tocou nessa história?" : i === 1 ? "Você se identificou com algum personagem?" : "Que mensagem você leva desta fábula?"
+  }))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setPerguntas(p => [...p, ""])
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "plus",
+    tamanho: 13
+  }), " Adicionar pergunta"), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal",
+    style: {
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setPasso(3)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 14
+  }), " Anterior"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    style: {
+      background: macro.cor
+    },
+    disabled: salvando,
+    onClick: salvar
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "save",
+    tamanho: 14
+  }), " ", salvando ? "Salvando..." : "Salvar Fábula"))))));
+}
+
+// ─── Busca por sintoma (IA) ──────────────────────────────────────
+// A chamada de verdade pra IA vive na Cloud Function buscarPorSintoma
+// (functions/index.js) — a chave da Anthropic nunca fica no
+// navegador. Aqui só manda a queixa + a lista de itens já cadastrados
+// e cruza a resposta com os itens reais pelo título (protege contra
+// a IA inventar um título que não existe na biblioteca).
+function BuscaPorSintoma({
+  itens,
+  aoFechar,
+  aoEnviar,
+  aoVisualizar
+}) {
+  const [sintoma, setSintoma] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [erro, setErro] = useState("");
+  async function buscar() {
+    if (!sintoma.trim()) return;
+    setBuscando(true);
+    setErro("");
+    setResultado(null);
+    try {
+      const chamar = functions.httpsCallable("buscarPorSintoma");
+      const itensSimplificados = itens.map(it => ({
+        titulo: it.titulo || it.nome,
+        categoria: it.categoria,
+        descricao: it.descricao
+      }));
+      const resposta = await chamar({
+        sintoma,
+        itens: itensSimplificados
+      });
+      const recomendados = (resposta.data?.recomendacoes || []).map(r => ({
+        ...r,
+        item: itens.find(x => (x.titulo || x.nome || "").toLowerCase() === (r.titulo || "").toLowerCase())
+      })).filter(r => r.item).sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+      setResultado(recomendados);
+    } catch (e) {
+      setErro(e.message || "Erro ao consultar a IA. Tente novamente.");
+    } finally {
+      setBuscando(false);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sobreposicao",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "sparkles",
+    tamanho: 18
+  }), " Busca por sintoma"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      marginTop: 0
+    }
+  }, "Descreva a queixa da paciente \u2014 a IA sugere as op\xE7\xF5es mais indicadas dentro do que j\xE1 est\xE1 cadastrado nesta biblioteca."), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 2,
+    value: sintoma,
+    onChange: e => setSintoma(e.target.value),
+    placeholder: "Ex: crises de ansiedade antes de dormir, rumina\xE7\xE3o de pensamentos..."
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      marginTop: 10
+    },
+    onClick: buscar,
+    disabled: buscando || !sintoma.trim()
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "search",
+    tamanho: 14
+  }), " ", buscando ? "Buscando..." : "Buscar"), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), resultado && resultado.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhuma correspond\xEAncia encontrada nessa biblioteca."), resultado && resultado.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, resultado.map((r, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      gap: 10,
+      alignItems: "flex-start",
+      border: "1px solid #E5E7EB",
+      borderRadius: 10,
+      padding: "12px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: "var(--cor-marca)",
+      color: "white",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 700,
+      flexShrink: 0
+    }
+  }, r.ordem || i + 1), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13.5
+    }
+  }, r.item.titulo || r.item.nome), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: "var(--texto-suave)",
+      fontStyle: "italic",
+      margin: "4px 0 8px"
+    }
+  }, r.motivo), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      fontSize: 12
+    },
+    onClick: () => aoVisualizar(r.item)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "eye",
+    tamanho: 13
+  }), " Visualizar"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      fontSize: 12
+    },
+    onClick: () => aoEnviar(r.item)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "send",
+    tamanho: 13
+  }), " Enviar")))))), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: aoFechar
+  }, "Fechar"))));
 }
 function EnviarRecursoModal({
   usuario,
@@ -2475,6 +4562,10 @@ function PreviewFabula({
 // texto, card, lista, pergunta, checklist, gráficos...). Aqui cobrimos
 // os tipos mais comuns; um tipo ainda não coberto aparece identificado
 // em vez de simplesmente sumir, pra ficar claro o que falta portar.
+// Pré-visualização dos blocos pro admin — mesmos 14 tipos que o
+// paciente vê (ver VisualizadorBlocos no app.js do paciente), só que
+// aqui é sempre somente leitura (não existe paciente real nessa tela
+// pra gravar resposta).
 function PreviewBlocosPsicoeducacao({
   item
 }) {
@@ -2493,15 +4584,14 @@ function PreviewBlocosPsicoeducacao({
             color: "white",
             textAlign: "center"
           }
-        }, b.emoji && /*#__PURE__*/React.createElement("div", {
-          style: {
-            fontSize: 32,
-            marginBottom: 6
-          }
-        }, b.emoji), /*#__PURE__*/React.createElement("div", {
+        }, /*#__PURE__*/React.createElement(Icone, {
+          nome: b.icone || "sparkles",
+          tamanho: 26
+        }), /*#__PURE__*/React.createElement("div", {
           style: {
             fontWeight: 700,
-            fontSize: 16
+            fontSize: 16,
+            marginTop: 6
           }
         }, b.titulo));
       case "texto":
@@ -2509,7 +4599,8 @@ function PreviewBlocosPsicoeducacao({
           key: i,
           className: "texto-visualizar-recurso",
           style: {
-            marginBottom: 14
+            marginBottom: 14,
+            whiteSpace: "pre-wrap"
           }
         }, b.conteudo);
       case "card":
@@ -2519,12 +4610,17 @@ function PreviewBlocosPsicoeducacao({
           style: {
             marginBottom: 12
           }
-        }, b.icone && /*#__PURE__*/React.createElement("div", {
+        }, /*#__PURE__*/React.createElement("div", {
           style: {
-            fontSize: 22,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
             marginBottom: 4
           }
-        }, b.icone), /*#__PURE__*/React.createElement("strong", null, b.titulo), /*#__PURE__*/React.createElement("p", {
+        }, /*#__PURE__*/React.createElement(Icone, {
+          nome: b.icone || "lightbulb",
+          tamanho: 18
+        }), /*#__PURE__*/React.createElement("strong", null, b.titulo)), /*#__PURE__*/React.createElement("p", {
           className: "texto-visualizar-recurso"
         }, b.texto));
       case "lista":
@@ -2538,6 +4634,146 @@ function PreviewBlocosPsicoeducacao({
           key: j,
           className: "texto-visualizar-recurso"
         }, it)));
+      case "imagem":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14
+          }
+        }, b.url && /*#__PURE__*/React.createElement("img", {
+          src: b.url,
+          alt: b.legenda || "",
+          style: {
+            maxWidth: "100%",
+            borderRadius: 10
+          }
+        }), b.legenda && /*#__PURE__*/React.createElement("p", {
+          className: "texto-vazio",
+          style: {
+            textAlign: "center"
+          }
+        }, b.legenda));
+      case "audio":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14,
+            display: "flex",
+            alignItems: "center",
+            gap: 8
+          }
+        }, /*#__PURE__*/React.createElement(Icone, {
+          nome: "music",
+          tamanho: 16
+        }), " ", b.legenda || b.url || "Áudio/vídeo");
+      case "grafico_barras":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14
+          }
+        }, b.titulo && /*#__PURE__*/React.createElement("strong", {
+          style: {
+            display: "block",
+            marginBottom: 8
+          }
+        }, b.titulo), (b.itens || []).map((it, j) => /*#__PURE__*/React.createElement("div", {
+          key: j,
+          style: {
+            fontSize: 12,
+            marginBottom: 4
+          }
+        }, it.label, ": ", /*#__PURE__*/React.createElement("strong", null, it.valor))));
+      case "grafico_radar":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14
+          }
+        }, b.titulo && /*#__PURE__*/React.createElement("strong", {
+          style: {
+            display: "block",
+            marginBottom: 8
+          }
+        }, b.titulo), (b.eixos || []).map((it, j) => /*#__PURE__*/React.createElement("div", {
+          key: j,
+          style: {
+            fontSize: 12,
+            marginBottom: 4
+          }
+        }, it.label, ": ", /*#__PURE__*/React.createElement("strong", null, it.valor))));
+      case "grafico_pizza":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14
+          }
+        }, b.titulo && /*#__PURE__*/React.createElement("strong", {
+          style: {
+            display: "block",
+            marginBottom: 8
+          }
+        }, b.titulo), (b.fatias || []).map((it, j) => /*#__PURE__*/React.createElement("div", {
+          key: j,
+          style: {
+            fontSize: 12,
+            marginBottom: 4
+          }
+        }, it.label, ": ", /*#__PURE__*/React.createElement("strong", null, it.valor, "%"))));
+      case "slider":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14
+          }
+        }, /*#__PURE__*/React.createElement("label", {
+          style: {
+            fontSize: 13,
+            fontWeight: 600,
+            display: "block",
+            marginBottom: 6
+          }
+        }, b.pergunta), /*#__PURE__*/React.createElement("input", {
+          type: "range",
+          min: b.min,
+          max: b.max,
+          disabled: true,
+          style: {
+            width: "100%"
+          }
+        }), /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 11,
+            color: "var(--texto-suave)"
+          }
+        }, /*#__PURE__*/React.createElement("span", null, b.labelMin), /*#__PURE__*/React.createElement("span", null, b.labelMax)));
+      case "estrelas":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14
+          }
+        }, /*#__PURE__*/React.createElement("label", {
+          style: {
+            fontSize: 13,
+            fontWeight: 600,
+            display: "block",
+            marginBottom: 6
+          }
+        }, b.pergunta), /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            gap: 4
+          }
+        }, Array.from({
+          length: b.max || 5
+        }).map((_, n) => /*#__PURE__*/React.createElement(Icone, {
+          key: n,
+          nome: "star",
+          tamanho: 18
+        }))));
       case "checklist":
         return /*#__PURE__*/React.createElement("div", {
           key: i,
@@ -2557,12 +4793,39 @@ function PreviewBlocosPsicoeducacao({
             gap: 8,
             marginBottom: 6
           }
-        }, /*#__PURE__*/React.createElement("input", {
-          type: "checkbox",
-          disabled: true
+        }, /*#__PURE__*/React.createElement(Icone, {
+          nome: "square",
+          tamanho: 15
         }), " ", /*#__PURE__*/React.createElement("span", {
           className: "texto-visualizar-recurso"
         }, it))));
+      case "selecao":
+        return /*#__PURE__*/React.createElement("div", {
+          key: i,
+          style: {
+            marginBottom: 14
+          }
+        }, /*#__PURE__*/React.createElement("label", {
+          style: {
+            fontSize: 13,
+            fontWeight: 600,
+            display: "block",
+            marginBottom: 6
+          }
+        }, b.pergunta), (b.opcoes || []).map((op, j) => /*#__PURE__*/React.createElement("div", {
+          key: j,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 6
+          }
+        }, /*#__PURE__*/React.createElement(Icone, {
+          nome: b.tipo_sel === "multipla" ? "square" : "circle",
+          tamanho: 15
+        }), " ", /*#__PURE__*/React.createElement("span", {
+          className: "texto-visualizar-recurso"
+        }, op))));
       case "pergunta":
         return /*#__PURE__*/React.createElement("div", {
           key: i,
@@ -2583,13 +4846,7 @@ function PreviewBlocosPsicoeducacao({
           readOnly: true
         }));
       default:
-        return /*#__PURE__*/React.createElement("p", {
-          key: i,
-          className: "texto-vazio",
-          style: {
-            marginBottom: 14
-          }
-        }, "[bloco do tipo \"", b.tipo, "\" ainda n\xE3o tem pr\xE9-visualiza\xE7\xE3o pr\xF3pria]");
+        return null;
     }
   }));
 }

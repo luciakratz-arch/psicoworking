@@ -1086,7 +1086,7 @@ function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
           <LeitorFabula usuario={usuario} paciente={paciente} recurso={item} />
         )}
         {!ComponenteFerramenta && paginas.length === 0 && blocos.length > 0 && (
-          <VisualizadorBlocos blocos={blocos} />
+          <VisualizadorBlocos blocos={blocos} usuario={usuario} paciente={paciente} recurso={item} />
         )}
         {!ComponenteFerramenta && paginas.length === 0 && blocos.length === 0 && (
           <LeitorConteudo item={item} />
@@ -2484,64 +2484,278 @@ function LeitorFabula({ usuario, paciente, recurso }) {
 }
 
 // ─── Psicoeducação (blocos, leitura) ─────────────────────────────
-function VisualizadorBlocos({ blocos }) {
+// Renderiza o conteúdo montado no assistente "Nova Ferramenta"/"Nova
+// Psicoeducação" do admin (blocos heterogêneos — ver TIPOS_BLOCO em
+// psi/admin/app_recursos.js). Blocos de conteúdo (banner, texto,
+// card, lista, imagem, gráficos, áudio) são só leitura; blocos de
+// resposta (pergunta, slider, estrelas, checklist, seleção) guardam a
+// resposta da paciente localmente e um botão no fim salva tudo junto
+// em clinica_reflexoes — mesmo padrão já usado pra fábulas.
+function VisualizadorBlocos({ blocos, usuario, paciente, recurso }) {
+  const [respostas, setRespostas] = useState({});
+  const [msg, setMsg] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const TIPOS_RESPOSTA = ["pergunta", "slider", "estrelas", "checklist", "selecao"];
+  const temInterativo = blocos.some((b) => TIPOS_RESPOSTA.includes(b.tipo));
+
+  function setResposta(id, valor) {
+    setRespostas((r) => ({ ...r, [id]: valor }));
+  }
+
+  function formatarResposta(b) {
+    const valor = respostas[b.id];
+    if (b.tipo === "checklist" || b.tipo === "selecao") return Array.isArray(valor) ? valor.join(", ") : "";
+    if (valor === undefined || valor === null || valor === "") return "";
+    return String(valor);
+  }
+
+  async function salvarRespostas() {
+    const registros = blocos
+      .filter((b) => TIPOS_RESPOSTA.includes(b.tipo))
+      .map((b) => ({ pergunta: b.pergunta || b.titulo || "Resposta", resposta: formatarResposta(b) }))
+      .filter((r) => r.resposta);
+    if (registros.length === 0) { setMsg("Responda pelo menos um item antes de salvar."); return; }
+    setSalvando(true);
+    try {
+      await db.collection("clinica_reflexoes").add({
+        psi_id: usuario.psiId, pacienteId: usuario.uid, pacienteNome: paciente?.nome || "",
+        origem: "psicoeducacao", origemId: recurso?.id || "", origemTitulo: recurso?.titulo || recurso?.nome || "",
+        registros,
+        data: new Date().toLocaleDateString("pt-BR"),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setMsg("Respostas salvas!");
+      setTimeout(() => setMsg(""), 2500);
+    } catch (e) {
+      setMsg("Erro ao salvar: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   return (
     <div>
       {blocos.map((b, i) => {
+        const key = b.id || i;
         switch (b.tipo) {
           case "banner":
             return (
-              <div key={i} style={{ background: b.cor || "var(--cor-marca)", borderRadius: 12, padding: 20, marginBottom: 14, color: "white", textAlign: "center" }}>
-                {b.emoji && <div style={{ fontSize: 32, marginBottom: 6 }}>{b.emoji}</div>}
-                <div style={{ fontWeight: 700, fontSize: 16 }}>{b.titulo}</div>
+              <div key={key} style={{ background: b.cor || "var(--cor-marca)", borderRadius: 12, padding: 20, marginBottom: 14, color: "white", textAlign: "center" }}>
+                <Icone nome={b.icone || "sparkles"} tamanho={28} />
+                <div style={{ fontWeight: 700, fontSize: 16, marginTop: 6 }}>{b.titulo}</div>
               </div>
             );
           case "texto":
-            return <p key={i} style={{ marginBottom: 14, lineHeight: 1.7, fontSize: 14 }}>{b.conteudo}</p>;
+            return <p key={key} style={{ marginBottom: 14, lineHeight: 1.7, fontSize: 14, whiteSpace: "pre-wrap" }}>{b.conteudo}</p>;
           case "card":
             return (
-              <div key={i} className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB", marginBottom: 12 }}>
-                {b.icone && <div style={{ fontSize: 22, marginBottom: 4 }}>{b.icone}</div>}
-                <strong>{b.titulo}</strong>
-                <p style={{ fontSize: 13.5, color: "#6B7280", marginTop: 6 }}>{b.texto}</p>
+              <div key={key} className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB", marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <Icone nome={b.icone || "lightbulb"} tamanho={20} />
+                  <strong>{b.titulo}</strong>
+                </div>
+                <p style={{ fontSize: 13.5, color: "#6B7280", marginTop: 4 }}>{b.texto}</p>
               </div>
             );
           case "lista":
             return (
-              <ul key={i} style={{ marginBottom: 14, paddingLeft: 20 }}>
+              <ul key={key} style={{ marginBottom: 14, paddingLeft: 20 }}>
                 {(b.itens || []).map((it, j) => <li key={j} style={{ fontSize: 13.5, color: "#374151", marginBottom: 4 }}>{it}</li>)}
               </ul>
             );
-          case "checklist":
+          case "imagem":
             return (
-              <div key={i} style={{ marginBottom: 14 }}>
-                {b.titulo && <strong style={{ display: "block", marginBottom: 8 }}>{b.titulo}</strong>}
-                {(b.itens || []).map((it, j) => (
-                  <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                    <input type="checkbox" style={{ width: "auto" }} /> <span style={{ fontSize: 13.5 }}>{it}</span>
-                  </div>
-                ))}
+              <div key={key} style={{ marginBottom: 14 }}>
+                {b.url && <img src={b.url} alt={b.legenda || ""} style={{ maxWidth: "100%", borderRadius: 10 }} />}
+                {b.legenda && <p style={{ fontSize: 12, color: "#9CA3AF", textAlign: "center", marginTop: 6 }}>{b.legenda}</p>}
               </div>
             );
+          case "grafico_barras":
+            return <BarrasBloco key={key} titulo={b.titulo} itens={b.itens || []} />;
+          case "grafico_radar":
+            return <RadarBloco key={key} titulo={b.titulo} eixos={b.eixos || []} />;
+          case "grafico_pizza":
+            return <PizzaBloco key={key} titulo={b.titulo} fatias={b.fatias || []} />;
+          case "audio":
+            return (
+              <div key={key} style={{ marginBottom: 14 }}>
+                {b.legenda && <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{b.legenda}</p>}
+                {b.url && (
+                  <a href={b.url} target="_blank" rel="noreferrer" className="botao-secundario-p" style={{ display: "inline-flex", textDecoration: "none" }}>
+                    <Icone nome="play" tamanho={14} /> Abrir áudio/vídeo
+                  </a>
+                )}
+              </div>
+            );
+          case "slider":
+            return (
+              <div key={key} style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 6 }}>{b.pergunta}</label>
+                <input type="range" min={b.min} max={b.max} value={respostas[b.id] ?? b.min} onChange={(e) => setResposta(b.id, +e.target.value)} style={{ width: "100%", accentColor: "var(--cor-marca)" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9CA3AF" }}>
+                  <span>{b.labelMin}</span>
+                  <span style={{ fontWeight: 700, color: "var(--cor-marca)" }}>{respostas[b.id] ?? b.min}</span>
+                  <span>{b.labelMax}</span>
+                </div>
+              </div>
+            );
+          case "pergunta":
+            return (
+              <div key={key} style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 6 }}>{b.pergunta}</label>
+                <TextAreaVoz rows={2} value={respostas[b.id] || ""} onChange={(e) => setResposta(b.id, e.target.value)} placeholder={b.placeholder || "Escreva aqui..."} />
+              </div>
+            );
+          case "estrelas":
+            return (
+              <div key={key} style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 8 }}>{b.pergunta}</label>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {Array.from({ length: b.max || 5 }).map((_, n) => (
+                    <button key={n} type="button" onClick={() => setResposta(b.id, n + 1)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                      <Icone nome="star" tamanho={24} style={{ color: (respostas[b.id] || 0) > n ? "#F59E0B" : "#D1D5DB" }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          case "checklist":
+            return (
+              <div key={key} style={{ marginBottom: 16 }}>
+                {b.titulo && <strong style={{ display: "block", marginBottom: 8 }}>{b.titulo}</strong>}
+                {(b.itens || []).map((it, j) => {
+                  const marcados = respostas[b.id] || [];
+                  const ativo = marcados.includes(it);
+                  return (
+                    <div key={j} onClick={() => setResposta(b.id, ativo ? marcados.filter((x) => x !== it) : [...marcados, it])} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, cursor: "pointer" }}>
+                      <Icone nome={ativo ? "check-square" : "square"} tamanho={17} style={{ color: ativo ? "var(--cor-marca)" : "#9CA3AF" }} />
+                      <span style={{ fontSize: 13.5 }}>{it}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          case "selecao": {
+            const selecionadas = respostas[b.id] || [];
+            const multipla = b.tipo_sel === "multipla";
+            return (
+              <div key={key} style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 8 }}>{b.pergunta}</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {(b.opcoes || []).map((op, j) => {
+                    const ativo = selecionadas.includes(op);
+                    return (
+                      <div
+                        key={j}
+                        onClick={() => {
+                          if (multipla) setResposta(b.id, ativo ? selecionadas.filter((x) => x !== op) : [...selecionadas, op]);
+                          else setResposta(b.id, [op]);
+                        }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 10, border: "1.5px solid", borderColor: ativo ? "var(--cor-marca)" : "#E5E7EB", background: ativo ? "#EADDFC" : "white", cursor: "pointer" }}
+                      >
+                        <Icone nome={ativo ? "check-circle-2" : "circle"} tamanho={16} style={{ color: ativo ? "var(--cor-marca)" : "#9CA3AF" }} />
+                        <span style={{ fontSize: 13.5 }}>{op}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
           default:
             return null;
         }
       })}
+
+      {temInterativo && (
+        <button className="botao-primario-p" onClick={salvarRespostas} disabled={salvando}>
+          {msg || (salvando ? "Salvando..." : "Salvar minhas respostas")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function BarrasBloco({ titulo, itens }) {
+  const max = Math.max(1, ...itens.map((i) => i.valor || 0));
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {titulo && <strong style={{ display: "block", marginBottom: 10 }}>{titulo}</strong>}
+      {itens.map((it, i) => (
+        <div key={i} style={{ marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+            <span>{it.label}</span><span style={{ fontWeight: 600 }}>{it.valor}</span>
+          </div>
+          <div style={{ height: 8, background: "#F3F4F6", borderRadius: 20 }}>
+            <div style={{ width: (it.valor / max) * 100 + "%", height: "100%", background: "var(--cor-marca)", borderRadius: 20 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RadarBloco({ titulo, eixos }) {
+  const n = eixos.length;
+  if (n < 3) return null;
+  const cx = 100, cy = 100, r = 80;
+  const maxValor = Math.max(1, ...eixos.map((e) => e.valor || 0), 10);
+  const pontos = eixos.map((e, i) => {
+    const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+    const v = (e.valor || 0) / maxValor;
+    return [cx + r * v * Math.cos(ang), cy + r * v * Math.sin(ang)];
+  });
+  const eixosLinhas = eixos.map((_, i) => {
+    const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+    return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
+  });
+  return (
+    <div style={{ marginBottom: 16, textAlign: "center" }}>
+      {titulo && <strong style={{ display: "block", marginBottom: 10 }}>{titulo}</strong>}
+      <svg width="200" height="200" viewBox="0 0 200 200">
+        {eixosLinhas.map((p, i) => <line key={i} x1={cx} y1={cy} x2={p[0]} y2={p[1]} stroke="#E5E7EB" strokeWidth="1" />)}
+        <polygon points={pontos.map((p) => p.join(",")).join(" ")} fill="rgba(123,0,196,0.15)" stroke="var(--cor-marca)" strokeWidth="2" />
+        {eixos.map((e, i) => {
+          const ang = (i / n) * 2 * Math.PI - Math.PI / 2;
+          const lx = cx + (r + 18) * Math.cos(ang);
+          const ly = cy + (r + 18) * Math.sin(ang);
+          return <text key={i} x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize="8" fill="#6B7280">{e.label}</text>;
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function PizzaBloco({ titulo, fatias }) {
+  const total = fatias.reduce((s, f) => s + (f.valor || 0), 0) || 1;
+  const cores = ["#7B00C4", "#0891b2", "#059669", "#d97706", "#dc2626", "#db2777", "#6366f1", "#374151"];
+  let acumulado = 0;
+  const cx = 60, cy = 60, r = 55;
+  return (
+    <div style={{ marginBottom: 16, textAlign: "center" }}>
+      {titulo && <strong style={{ display: "block", marginBottom: 10 }}>{titulo}</strong>}
+      <svg width="120" height="120" viewBox="0 0 120 120" style={{ marginBottom: 10 }}>
+        {fatias.map((f, i) => {
+          const frac = (f.valor || 0) / total;
+          const inicioAng = acumulado * 2 * Math.PI - Math.PI / 2;
+          acumulado += frac;
+          const fimAng = acumulado * 2 * Math.PI - Math.PI / 2;
+          const x1 = cx + r * Math.cos(inicioAng), y1 = cy + r * Math.sin(inicioAng);
+          const x2 = cx + r * Math.cos(fimAng), y2 = cy + r * Math.sin(fimAng);
+          const grandeArco = frac > 0.5 ? 1 : 0;
+          return <path key={i} d={`M ${cx},${cy} L ${x1},${y1} A ${r},${r} 0 ${grandeArco} 1 ${x2},${y2} Z`} fill={cores[i % cores.length]} />;
+        })}
+      </svg>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+        {fatias.map((f, i) => (
+          <span key={i} style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: cores[i % cores.length], display: "inline-block" }} /> {f.label} ({f.valor}%)
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-
-// ═══════════════════════════════════════════════════════════════
-//  PENDÊNCIAS (ver [[projeto-psicoworking]] na memória):
-//  - Só Gestão da Ansiedade e Fábulas gravam de verdade. As outras
-//    ferramentas (Respiração 4-7-8, Árvore da Decisão, Registro ABC
-//    etc.) ainda não têm implementação própria aqui.
-//  - Perguntas do tipo "pergunta" dentro de blocos de Psicoeducação
-//    ainda são só leitura (não salvam resposta).
-//  - Check-in Diário, Minhas Metas, Diário Terapêutico e Avaliar
-//    (do CLAUDE.md) ainda não têm tela.
-//  - Formulário público de Anamnese/Questionários ainda não existe
-//    (a aba Questionários do admin depende disso).
-// ═══════════════════════════════════════════════════════════════

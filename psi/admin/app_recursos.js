@@ -24,40 +24,208 @@ const ABAS_RECURSOS = [
   { id: "psicoeducacao", rotulo: "Psicoeducação", icone: "brain", colecao: "psicoeducacao_conteudos", tipo: "psicoeducacao" },
 ];
 
-// Cores por categoria, no espírito das macrocategorias do sistema
-// real (cada uma com uma cor de destaque + fundo claro). Categorias
-// que não estão no mapa caem numa paleta de reserva, sempre a mesma
-// cor pra mesma categoria (hash do nome), pra nunca ficar tudo cinza.
-const PALETA_CATEGORIAS = {
-  tcc: { cor: "#7B00C4", bg: "#f3e6ff" },
-  ansiedade: { cor: "#7B00C4", bg: "#f3e6ff" },
-  relaxamento: { cor: "#0891b2", bg: "#e0f2fe" },
-  avaliacao: { cor: "#6366f1", bg: "#e0e7ff" },
-  musicoterapia: { cor: "#7B00C4", bg: "#f3e6ff" },
-  depressao: { cor: "#db2777", bg: "#fce7f3" },
-  humor: { cor: "#db2777", bg: "#fce7f3" },
-  habitos: { cor: "#16a34a", bg: "#dcfce7" },
-  autocuidado: { cor: "#16a34a", bg: "#dcfce7" },
-  relacionamentos: { cor: "#0891b2", bg: "#e0f2fe" },
-  familia: { cor: "#d97706", bg: "#fef3c7" },
-  outros: { cor: "#6b7280", bg: "#f3f4f6" },
-};
-const PALETA_RESERVA = [
-  { cor: "#7B00C4", bg: "#f3e6ff" },
-  { cor: "#0891b2", bg: "#e0f2fe" },
-  { cor: "#db2777", bg: "#fce7f3" },
-  { cor: "#16a34a", bg: "#dcfce7" },
-  { cor: "#d97706", bg: "#fef3c7" },
-  { cor: "#6366f1", bg: "#e0e7ff" },
-  { cor: "#0d9488", bg: "#ccfbf1" },
+// ─── Taxonomia clínica (macrocategorias + subcategorias) ────────
+// Porta fiel do app de referência (admin/psico_ui.js e
+// admin/psifabulas.compiled.js: MACROCATEGORIAS, CATEGORIAS_LEGADO,
+// LEGADO_PARA_MACRO) — cada macrocategoria tem cor/ícone próprios e
+// uma lista de subcategorias específicas. Ferramentas e Psicoeducação
+// guardam o id da SUBcategoria em `categoria`; Fábulas guardam o id
+// da MACROcategoria direto (mesma assimetria do sistema original).
+// Trocamos emoji por nome de ícone Lucide (regra de nunca usar emoji).
+const MACROCATEGORIAS = [
+  {
+    id: "macro_ansiedade", icone: "brain", label: "Ansiedade e Controle dos Pensamentos",
+    cor: "#7B00C4", bg: "#f3e6ff",
+    subs: [
+      { id: "ansiedade_diaria", label: "Ansiedade Diária e Crises" },
+      { id: "distorcoes", label: "Distorções Cognitivas e Ruminação" },
+      { id: "crencas_esquemas", label: "Crenças e Esquemas Disfuncionais" },
+      { id: "autocritica", label: "Autocrítica e Culpa" },
+      { id: "procrastinacao", label: "Procrastinação e Foco" },
+    ],
+  },
+  {
+    id: "macro_humor", icone: "heart", label: "Humor e Regulação Emocional",
+    cor: "#db2777", bg: "#fce7f3",
+    subs: [
+      { id: "depressao", label: "Depressão e Desânimo" },
+      { id: "desamor", label: "Desamor, Desamparo e Desvalor" },
+      { id: "regulacao_emocional", label: "Inteligência e Regulação Emocional" },
+      { id: "burnout", label: "Burnout, Estresse e Frustração" },
+      { id: "vergonha", label: "Vergonha e Insegurança" },
+    ],
+  },
+  {
+    id: "macro_habitos", icone: "leaf", label: "Corpo, Saúde e Autocuidado",
+    cor: "#16a34a", bg: "#dcfce7",
+    subs: [
+      { id: "rotina", label: "Rotina e Organização Diária" },
+      { id: "sono", label: "Sono e Descanso" },
+      { id: "motivacao", label: "Motivação e Zona de Conforto" },
+      { id: "neuroplasticidade", label: "Neuroplasticidade e Novos Hábitos" },
+      { id: "praticas_autocuidado", label: "Práticas de Autocuidado" },
+      { id: "alimentacao", label: "Alimentação Emocional e Compulsão" },
+      { id: "autoimagem", label: "Autoimagem e Aceitação Corporal" },
+      { id: "nervovago", label: "Regulação do Sistema Nervoso (Nervo Vago)" },
+      { id: "sintomas_fisicos", label: "Sintomas Físicos da Ansiedade" },
+      { id: "saude_mental", label: "Integração Saúde Física e Mental" },
+    ],
+  },
+  {
+    id: "macro_relacionamentos", icone: "handshake", label: "Conflitos Interpessoais e Relacionamentos",
+    cor: "#0891b2", bg: "#e0f2fe",
+    subs: [
+      { id: "comunicacao", label: "Comunicação Assertiva" },
+      { id: "dependencia", label: "Dependência Emocional e Apego" },
+      { id: "limites", label: "Limites e Autoestima" },
+      { id: "ciumes", label: "Ciúmes e Insegurança na Relação" },
+      { id: "toxicos", label: "Relacionamentos Tóxicos e Abusivos" },
+    ],
+  },
+  {
+    id: "macro_casais", icone: "users", label: "Casais, Família e Parentalidade",
+    cor: "#d97706", bg: "#fef3c7",
+    subs: [
+      { id: "conflitos_casal", label: "Conflitos e Alinhamento de Casal" },
+      { id: "sexualidade", label: "Sexualidade e Intimidade" },
+      { id: "parentalidade", label: "Parentalidade e Educação de Filhos" },
+      { id: "conflitos_familia", label: "Conflitos Familiares e Enteados" },
+      { id: "traicao", label: "Traição e Reconexão Conjugal" },
+    ],
+  },
+  {
+    id: "macro_compulsao", icone: "lock", label: "Compulsão Sexual",
+    cor: "#7c3aed", bg: "#ede9fe",
+    subs: [
+      { id: "compulsao_ciclo", label: "Ciclo do Gatilho e Fissura" },
+      { id: "compulsao_habitos", label: "Substituição de Hábitos" },
+      { id: "compulsao_emocional", label: "Regulação Emocional" },
+      { id: "compulsao_vinculos", label: "Impacto nos Vínculos" },
+      { id: "compulsao_aval", label: "Rastreamento e Avaliação" },
+    ],
+  },
 ];
 
+const CATEGORIAS_LEGADO = [
+  { id: "tcc", label: "TCC", cor: "#7B00C4", bg: "#f3e6ff" },
+  { id: "ansiedade", label: "Ansiedade", cor: "#7B00C4", bg: "#f3e6ff" },
+  { id: "emocoes", label: "Emoções", cor: "#7B00C4", bg: "#f3e6ff" },
+  { id: "autocuidado", label: "Autocuidado", cor: "#7B00C4", bg: "#f3e6ff" },
+  { id: "relacionamentos", label: "Relacionamentos", cor: "#7B00C4", bg: "#f3e6ff" },
+  { id: "corpo", label: "Corpo e Alimentação", cor: "#7B00C4", bg: "#f3e6ff" },
+  { id: "esquema", label: "Terapia do Esquema", cor: "#7B00C4", bg: "#f3e6ff" },
+  { id: "musicoterapia", label: "Musicoterapia", cor: "#7B00C4", bg: "#f3e6ff" },
+  { id: "avaliacao", label: "Avaliação e Anamnese", cor: "#6366f1", bg: "#e0e7ff" },
+  { id: "outro", label: "Outros", cor: "#6b7280", bg: "#f3f4f6" },
+];
+
+const TODAS_SUBCATEGORIAS = MACROCATEGORIAS.flatMap((m) =>
+  m.subs.map((s) => ({ ...s, macroId: m.id, macroLabel: m.label, macroIcone: m.icone, cor: m.cor, bg: m.bg }))
+);
+
+// Mapa de categorias/formularioKey antigos → macrocategoria nova, pra
+// itens migrados do sistema anterior continuarem se agrupando/
+// colorindo certo mesmo sem terem sido recadastrados.
+const LEGADO_PARA_MACRO = {
+  tcc: "macro_ansiedade", ansiedade: "macro_ansiedade", esquema: "macro_ansiedade",
+  emocoes: "macro_humor", humor: "macro_humor",
+  autocuidado: "macro_habitos", habitos: "macro_habitos", relaxamento: "macro_habitos", corpo: "macro_habitos", alimentacao: "macro_habitos",
+  relacionamentos: "macro_relacionamentos", comunicacao: "macro_relacionamentos",
+  casal: "macro_casais",
+  musicoterapia: "macro_musico", avaliacao: "macro_aval",
+  compulsao_sexual: "macro_compulsao", compulsao: "macro_compulsao",
+  "breathing-478": "macro_habitos", "muscle-relaxation": "macro_habitos", "anxiety-management": "macro_ansiedade",
+  "decision-tree": "macro_ansiedade", "abc-record": "macro_ansiedade", "emotional-eating": "macro_habitos",
+  "roda-vida-integral": "macro_habitos", "treino-neuro-auditivo": "macro_habitos",
+};
+
+function pertenceAMacro(item, macro) {
+  if (item.categoria === macro.id) return true;
+  if (macro.subs.some((s) => s.id === item.categoria)) return true;
+  const macroInferido = LEGADO_PARA_MACRO[item.categoria] || LEGADO_PARA_MACRO[item.formularioKey];
+  return macroInferido === macro.id;
+}
+
 function corDaCategoria(categoria) {
+  const sub = TODAS_SUBCATEGORIAS.find((s) => s.id === categoria);
+  if (sub) return { cor: sub.cor, bg: sub.bg };
+  const macroDireto = MACROCATEGORIAS.find((m) => m.id === categoria);
+  if (macroDireto) return { cor: macroDireto.cor, bg: macroDireto.bg };
+  const macroLegado = MACROCATEGORIAS.find((m) => m.id === LEGADO_PARA_MACRO[categoria]);
+  if (macroLegado) return { cor: macroLegado.cor, bg: macroLegado.bg };
+  const legado = CATEGORIAS_LEGADO.find((c) => c.id === categoria);
+  if (legado) return { cor: legado.cor, bg: legado.bg };
+  const PALETA_RESERVA = [
+    { cor: "#7B00C4", bg: "#f3e6ff" }, { cor: "#0891b2", bg: "#e0f2fe" }, { cor: "#db2777", bg: "#fce7f3" },
+    { cor: "#16a34a", bg: "#dcfce7" }, { cor: "#d97706", bg: "#fef3c7" }, { cor: "#6366f1", bg: "#e0e7ff" }, { cor: "#0d9488", bg: "#ccfbf1" },
+  ];
   const chave = (categoria || "outros").toLowerCase();
-  if (PALETA_CATEGORIAS[chave]) return PALETA_CATEGORIAS[chave];
   let hash = 0;
   for (let i = 0; i < chave.length; i++) hash = (hash * 31 + chave.charCodeAt(i)) >>> 0;
   return PALETA_RESERVA[hash % PALETA_RESERVA.length];
+}
+
+// Barra de pills de filtro por macrocategoria — reaproveitada nas 3
+// abas (Ferramentas, Fábulas, Psicoeducação). "todos" mostra tudo;
+// clicar de novo na pill ativa volta pra "todos".
+function BarraFiltroCategoria({ itens, filtro, setFiltro }) {
+  return (
+    <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+      <button
+        type="button"
+        onClick={() => setFiltro("todos")}
+        style={{
+          display: "flex", alignItems: "center", gap: 6, padding: "6px 13px", borderRadius: 20, border: "2px solid var(--cor-marca)",
+          cursor: "pointer", fontSize: 12, fontWeight: 600,
+          background: filtro === "todos" ? "var(--cor-marca)" : "white",
+          color: filtro === "todos" ? "white" : "var(--cor-marca)",
+        }}
+      >
+        Todas {itens.length}
+      </button>
+      {MACROCATEGORIAS.map((m) => {
+        const n = itens.filter((it) => pertenceAMacro(it, m)).length;
+        const ativo = filtro === m.id;
+        return (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => setFiltro(ativo ? "todos" : m.id)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "6px 13px", borderRadius: 20, border: "2px solid",
+              cursor: "pointer", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+              borderColor: ativo ? m.cor : m.cor + "50",
+              background: ativo ? m.cor : m.bg,
+              color: ativo ? "white" : m.cor,
+            }}
+          >
+            <Icone nome={m.icone} tamanho={13} /> {m.label} {n > 0 ? "(" + n + ")" : ""}
+          </button>
+        );
+      })}
+      {["musicoterapia", "avaliacao"].map((cid) => {
+        const cat = CATEGORIAS_LEGADO.find((c) => c.id === cid);
+        const n = itens.filter((it) => it.categoria === cid).length;
+        if (!cat || n === 0) return null;
+        const ativo = filtro === cid;
+        return (
+          <button
+            key={cid}
+            type="button"
+            onClick={() => setFiltro(ativo ? "todos" : cid)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "6px 13px", borderRadius: 20, border: "2px solid var(--cor-marca)",
+              cursor: "pointer", fontSize: 12, fontWeight: 600,
+              background: ativo ? "var(--cor-marca)" : "#F3E6FF",
+              color: ativo ? "white" : "var(--cor-marca)",
+            }}
+          >
+            <Icone nome={cid === "musicoterapia" ? "music" : "clipboard-list"} tamanho={13} /> {cat.label} {n > 0 ? "(" + n + ")" : ""}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 const ICONE_POR_TIPO = { ferramenta: "wrench", fabula: "book-open", psicoeducacao: "brain" };
@@ -71,10 +239,12 @@ function TelaRecursos({ usuario }) {
   });
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
+  const [filtroCateg, setFiltroCateg] = useState("todos");
   const [mostrarForm, setMostrarForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
   const [enviarItem, setEnviarItem] = useState(null);
   const [visualizando, setVisualizando] = useState(null);
+  const [buscaIA, setBuscaIA] = useState(false);
 
   const abaAtual = ABAS_RECURSOS.find((a) => a.id === aba);
   const itens = itensPorColecao[abaAtual.colecao] || [];
@@ -92,13 +262,26 @@ function TelaRecursos({ usuario }) {
     return () => cancelamentos.forEach((c) => c());
   }, []);
 
-  const filtrados = itens.filter((it) => {
+  function trocarAba(id) {
+    setAba(id);
+    setFiltroCateg("todos");
+    setBusca("");
+  }
+
+  const itensDaAba = itens.filter((it) => {
     // "avaliacao" (Anamnese, Entrevista Clínica, Rastreamentos DSM-5...)
     // não é ferramenta de biblioteca compartilhada — é questionário
     // individual do paciente, mora na aba Questionários do perfil dele.
-    if (aba === "ferramentas" && it.categoria === "avaliacao") return false;
+    return !(aba === "ferramentas" && it.categoria === "avaliacao");
+  });
+
+  const filtrados = itensDaAba.filter((it) => {
     const titulo = it.titulo || it.nome || "";
-    return !busca || titulo.toLowerCase().includes(busca.toLowerCase());
+    const okBusca = !busca || titulo.toLowerCase().includes(busca.toLowerCase());
+    if (!okBusca) return false;
+    if (filtroCateg === "todos") return true;
+    const macro = MACROCATEGORIAS.find((m) => m.id === filtroCateg);
+    return macro ? pertenceAMacro(it, macro) : it.categoria === filtroCateg;
   });
 
   const porCategoria = {};
@@ -113,6 +296,11 @@ function TelaRecursos({ usuario }) {
     await db.collection(abaAtual.colecao).doc(item.id).delete();
   }
 
+  function abrirNovoItem() {
+    setItemEditando(null);
+    setMostrarForm(true);
+  }
+
   return (
     <div className="conteudo conteudo-larga">
       <div className="cabecalho-secao">
@@ -120,9 +308,14 @@ function TelaRecursos({ usuario }) {
           <h2>Recursos Terapêuticos</h2>
           <p className="subtitulo-pagina">Catálogo de ferramentas, fábulas e psicoeducação — compartilhado com toda a plataforma</p>
         </div>
-        <button className="botao-primario" onClick={() => { setItemEditando(null); setMostrarForm(true); }}>
-          <Icone nome="plus" tamanho={16} /> Novo Item
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="botao-secundario" onClick={() => setBuscaIA(true)}>
+            <Icone nome="sparkles" tamanho={16} /> Busca por sintoma
+          </button>
+          <button className="botao-primario" onClick={abrirNovoItem}>
+            <Icone nome="plus" tamanho={16} /> {abaAtual.id === "ferramentas" ? "Nova Ferramenta" : abaAtual.id === "fabulas" ? "Nova Fábula" : "Nova Psicoeducação"}
+          </button>
+        </div>
       </div>
 
       <div className="abas-financeiro">
@@ -130,7 +323,7 @@ function TelaRecursos({ usuario }) {
           <button
             key={a.id}
             className={"aba-financeiro" + (aba === a.id ? " aba-financeiro-ativa" : "")}
-            onClick={() => setAba(a.id)}
+            onClick={() => trocarAba(a.id)}
           >
             <Icone nome={a.icone} tamanho={15} /> {a.rotulo}
           </button>
@@ -144,11 +337,13 @@ function TelaRecursos({ usuario }) {
         onChange={(e) => setBusca(e.target.value)}
       />
 
+      <BarraFiltroCategoria itens={itensDaAba} filtro={filtroCateg} setFiltro={setFiltroCateg} />
+
       {carregando && <p>Carregando...</p>}
       {!carregando && categorias.length === 0 && (
         <p className="texto-vazio">
-          Nenhum item cadastrado ainda nesta aba. Use a ferramenta de migração de dados (Passo 5) pra trazer o
-          catálogo do sistema anterior, ou clique em "Novo Item" pra cadastrar direto.
+          Nenhum item cadastrado ainda nesta aba/categoria. Use a ferramenta de migração de dados (Passo 5) pra
+          trazer o catálogo do sistema anterior, ou clique em "Nova {abaAtual.id === "ferramentas" ? "Ferramenta" : abaAtual.id === "fabulas" ? "Fábula" : "Psicoeducação"}" pra cadastrar direto.
         </p>
       )}
 
@@ -167,11 +362,17 @@ function TelaRecursos({ usuario }) {
                 <div key={item.id} className="cartao-recurso" style={{ "--cor-cat": cores.cor, "--bg-cat": cores.bg }}>
                   <div className="cabecalho-cartao-recurso">
                     <div className="icone-cartao-recurso">
-                      <Icone nome={ICONE_POR_TIPO[abaAtual.tipo]} tamanho={20} />
+                      <Icone nome={item.icone || ICONE_POR_TIPO[abaAtual.tipo]} tamanho={20} />
                     </div>
                     <div className="titulo-cartao-recurso">{item.titulo || item.nome}</div>
                   </div>
-                  {item.descricao && <p className="descricao-cartao-recurso">{item.descricao}</p>}
+                  {abaAtual.id === "fabulas" && item.moral && <p className="descricao-cartao-recurso" style={{ fontStyle: "italic" }}>"{item.moral}"</p>}
+                  {abaAtual.id !== "fabulas" && item.descricao && <p className="descricao-cartao-recurso">{item.descricao}</p>}
+                  {abaAtual.id === "fabulas" && (
+                    <p className="texto-vazio" style={{ margin: 0 }}>
+                      {(item.paginas || []).length} pág. · {(item.perguntas || []).length} reflexões
+                    </p>
+                  )}
                   <div className="acoes-cartao-recurso">
                     <button className="botao-secundario" onClick={() => setVisualizando(item)} title="Visualizar">
                       <Icone nome="eye" tamanho={14} /> Visualizar
@@ -193,8 +394,14 @@ function TelaRecursos({ usuario }) {
         );
       })}
 
-      {mostrarForm && (
-        <FormRecurso
+      {mostrarForm && abaAtual.id === "fabulas" && (
+        <WizardNovaFabula
+          item={itemEditando}
+          aoFechar={() => { setMostrarForm(false); setItemEditando(null); }}
+        />
+      )}
+      {mostrarForm && abaAtual.id !== "fabulas" && (
+        <WizardNovaFerramenta
           colecao={abaAtual.colecao}
           item={itemEditando}
           aoFechar={() => { setMostrarForm(false); setItemEditando(null); }}
@@ -212,6 +419,10 @@ function TelaRecursos({ usuario }) {
 
       {visualizando && (
         <VisualizarRecursoModal item={visualizando} aoFechar={() => setVisualizando(null)} />
+      )}
+
+      {buscaIA && (
+        <BuscaPorSintoma itens={itensDaAba} tipo={abaAtual.tipo} aoFechar={() => setBuscaIA(false)} aoEnviar={(item) => { setBuscaIA(false); setEnviarItem(item); }} aoVisualizar={(item) => { setBuscaIA(false); setVisualizando(item); }} />
       )}
     </div>
   );
@@ -232,28 +443,384 @@ const FERRAMENTAS_INTERATIVAS_DISPONIVEIS = [
   { valor: "treino-neuro-auditivo", rotulo: "Treino Neuro-Auditivo" },
 ];
 
-function FormRecurso({ colecao, item, aoFechar }) {
-  const [form, setForm] = useState(item || { titulo: "", categoria: "", descricao: "", formularioKey: "" });
+// Cada tipo de bloco tem seu formato de dados default — porta fiel de
+// admin/psico_ui.js (novoBloco). Emoji trocado por nome de ícone
+// Lucide nos rótulos do seletor (regra de nunca usar emoji).
+const TIPOS_BLOCO = [
+  { id: "banner", label: "Banner", icone: "flag", desc: "Cabeçalho colorido com título e ícone" },
+  { id: "texto", label: "Texto", icone: "file-text", desc: "Parágrafo de texto livre" },
+  { id: "card", label: "Card", icone: "square", desc: "Card com ícone, título e texto" },
+  { id: "lista", label: "Lista", icone: "list", desc: "Lista de itens" },
+  { id: "imagem", label: "Imagem", icone: "image", desc: "Imagem via URL" },
+  { id: "grafico_barras", label: "Gráfico Barras", icone: "bar-chart-3", desc: "Gráfico de barras comparativo" },
+  { id: "grafico_radar", label: "Gráfico Teia", icone: "hexagon", desc: "Gráfico radar/teia" },
+  { id: "grafico_pizza", label: "Gráfico Pizza", icone: "pie-chart", desc: "Gráfico circular/pizza" },
+  { id: "slider", label: "Slider", icone: "sliders-horizontal", desc: "Escala de intensidade (0 a 10)" },
+  { id: "pergunta", label: "Pergunta Aberta", icone: "help-circle", desc: "Campo para a paciente responder" },
+  { id: "audio", label: "Áudio/Vídeo", icone: "music", desc: "Link de áudio ou vídeo" },
+  { id: "estrelas", label: "Avaliação", icone: "star", desc: "Avaliação de 1 a 5 estrelas" },
+  { id: "checklist", label: "Checklist", icone: "check-square", desc: "Lista de itens para marcar" },
+  { id: "selecao", label: "Seleção", icone: "list-checks", desc: "Múltipla escolha ou escolha única" },
+];
+
+function novoBloco(tipo) {
+  const defaults = {
+    banner: { cor: "#7B00C4", icone: "sparkles", titulo: "" },
+    texto: { conteudo: "" },
+    card: { icone: "lightbulb", titulo: "", texto: "" },
+    lista: { itens: [""] },
+    imagem: { url: "", legenda: "" },
+    grafico_barras: { titulo: "", itens: [{ label: "", valor: 0 }, { label: "", valor: 0 }] },
+    grafico_radar: { titulo: "", eixos: [{ label: "", valor: 0 }, { label: "", valor: 0 }, { label: "", valor: 0 }] },
+    grafico_pizza: { titulo: "", fatias: [{ label: "", valor: 50 }, { label: "", valor: 50 }] },
+    slider: { pergunta: "", min: 0, max: 10, labelMin: "Nada", labelMax: "Muito" },
+    pergunta: { pergunta: "", placeholder: "Escreva aqui..." },
+    audio: { url: "", legenda: "" },
+    estrelas: { pergunta: "", max: 5 },
+    checklist: { titulo: "", itens: [""] },
+    selecao: { pergunta: "", tipo_sel: "unica", opcoes: ["", ""] },
+  };
+  return { id: Date.now() + "_" + Math.random().toString(36).slice(2), tipo, ...defaults[tipo] };
+}
+
+// Grid de categoria em duas camadas: cada macrocategoria como
+// cabeçalho colorido, com pills de subcategoria dentro — porta fiel
+// de admin/psico_ui.js (Passo 1 do wizard). `comEspecializadas` add
+// a linha extra Musicoterapia/Avaliação/Outros (só nas Ferramentas).
+function GradeCategoria({ categoria, setCategoria, comEspecializadas }) {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <label>Categoria</label>
+      {MACROCATEGORIAS.map((m) => (
+        <div key={m.id} style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: m.cor, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+            <Icone nome={m.icone} tamanho={13} /> {m.label}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {m.subs.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setCategoria(s.id)}
+                style={{
+                  padding: "6px 12px", borderRadius: 20, border: "1.5px solid", cursor: "pointer", fontSize: 12,
+                  borderColor: categoria === s.id ? m.cor : "#E5E7EB",
+                  background: categoria === s.id ? m.bg : "white",
+                  color: categoria === s.id ? m.cor : "#6B7280",
+                  fontWeight: categoria === s.id ? 600 : 400,
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      {comEspecializadas && (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>Especializadas</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {[{ id: "musicoterapia", label: "Musicoterapia", icone: "music" }, { id: "avaliacao", label: "Avaliação e Anamnese", icone: "clipboard-list" }, { id: "outro", label: "Outros", icone: "wrench" }].map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCategoria(c.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 20, border: "1.5px solid", cursor: "pointer", fontSize: 12,
+                  borderColor: categoria === c.id ? "var(--cor-marca)" : "#E5E7EB",
+                  background: categoria === c.id ? "#F3E6FF" : "white",
+                  color: categoria === c.id ? "var(--cor-marca)" : "#6B7280",
+                  fontWeight: categoria === c.id ? 600 : 400,
+                }}
+              >
+                <Icone nome={c.icone} tamanho={12} /> {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Editor de um bloco de conteúdo — um switch por tipo, porta fiel de
+// admin/psico_ui.js (Passo 2 do wizard). `bloco`/`atualizar` isolam
+// cada bloco da lista maior.
+function EditorBloco({ bloco, atualizar }) {
+  const t = bloco.tipo;
+  if (t === "banner") {
+    return (
+      <>
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <div style={{ flex: 1 }}>
+            <label>Título do banner</label>
+            <input value={bloco.titulo} onChange={(e) => atualizar({ titulo: e.target.value })} placeholder="Título..." />
+          </div>
+          <div style={{ width: 110 }}>
+            <label>Ícone</label>
+            <input value={bloco.icone} onChange={(e) => atualizar({ icone: e.target.value })} placeholder="ex: sparkles" />
+          </div>
+        </div>
+        <label>Cor de fundo</label>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {["#7B00C4", "#0891b2", "#059669", "#d97706", "#dc2626", "#db2777", "#6366f1", "#374151"].map((cor) => (
+            <button key={cor} type="button" onClick={() => atualizar({ cor })} style={{ width: 26, height: 26, borderRadius: "50%", background: cor, border: bloco.cor === cor ? "3px solid white" : "2px solid transparent", outline: bloco.cor === cor ? "2px solid " + cor : "none", cursor: "pointer" }} />
+          ))}
+          <input type="color" value={bloco.cor} onChange={(e) => atualizar({ cor: e.target.value })} style={{ width: 26, height: 26, border: "none", cursor: "pointer", padding: 0 }} />
+        </div>
+        <div style={{ marginTop: 10, borderRadius: 10, padding: "12px 16px", background: bloco.cor, color: "white", display: "flex", alignItems: "center", gap: 10 }}>
+          <Icone nome={bloco.icone || "sparkles"} tamanho={20} />
+          <span style={{ fontWeight: 700, fontSize: 14 }}>{bloco.titulo || "Prévia do banner"}</span>
+        </div>
+      </>
+    );
+  }
+  if (t === "texto") {
+    return <TextAreaVoz className="campo-descricao" rows={4} value={bloco.conteudo} onChange={(e) => atualizar({ conteudo: e.target.value })} placeholder="Escreva o texto aqui..." />;
+  }
+  if (t === "card") {
+    return (
+      <>
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <div style={{ width: 110 }}>
+            <label>Ícone</label>
+            <input value={bloco.icone} onChange={(e) => atualizar({ icone: e.target.value })} placeholder="ex: lightbulb" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label>Título</label>
+            <input value={bloco.titulo} onChange={(e) => atualizar({ titulo: e.target.value })} placeholder="Título do card..." />
+          </div>
+        </div>
+        <TextAreaVoz className="campo-descricao" rows={3} value={bloco.texto} onChange={(e) => atualizar({ texto: e.target.value })} placeholder="Texto do card..." />
+      </>
+    );
+  }
+  if (t === "lista" || t === "checklist") {
+    return (
+      <>
+        {t === "checklist" && (
+          <>
+            <label>Título</label>
+            <input value={bloco.titulo} onChange={(e) => atualizar({ titulo: e.target.value })} placeholder="Ex: Minha lista de autocuidado" style={{ marginBottom: 10 }} />
+          </>
+        )}
+        {bloco.itens.map((val, ii) => (
+          <div key={ii} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+            <Icone nome={t === "checklist" ? "square" : "circle"} tamanho={14} />
+            <input style={{ flex: 1 }} value={val} onChange={(e) => atualizar({ itens: bloco.itens.map((v, i) => (i === ii ? e.target.value : v)) })} placeholder={`Item ${ii + 1}...`} />
+            <button type="button" className="botao-icone" onClick={() => atualizar({ itens: bloco.itens.filter((_, i) => i !== ii) })}><Icone nome="x" tamanho={14} /></button>
+          </div>
+        ))}
+        <button type="button" className="botao-secundario" style={{ fontSize: 12 }} onClick={() => atualizar({ itens: [...bloco.itens, ""] })}>
+          <Icone nome="plus" tamanho={13} /> Adicionar item
+        </button>
+      </>
+    );
+  }
+  if (t === "imagem") {
+    return (
+      <>
+        <label>URL da imagem</label>
+        <input value={bloco.url} onChange={(e) => atualizar({ url: e.target.value })} placeholder="https://..." style={{ marginBottom: 8 }} />
+        <label>Legenda <span className="opcional">(opcional)</span></label>
+        <input value={bloco.legenda} onChange={(e) => atualizar({ legenda: e.target.value })} placeholder="Legenda da imagem..." />
+        {bloco.url && <img src={bloco.url} alt="" style={{ marginTop: 10, maxWidth: "100%", borderRadius: 8, maxHeight: 160, objectFit: "cover" }} onError={(e) => { e.target.style.display = "none"; }} />}
+      </>
+    );
+  }
+  if (t === "grafico_barras") {
+    return (
+      <>
+        <label>Título do gráfico</label>
+        <input value={bloco.titulo} onChange={(e) => atualizar({ titulo: e.target.value })} placeholder="Ex: Áreas da minha vida" style={{ marginBottom: 10 }} />
+        {bloco.itens.map((item, ii) => (
+          <div key={ii} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+            <input style={{ flex: 2 }} value={item.label} onChange={(e) => atualizar({ itens: bloco.itens.map((v, i) => (i === ii ? { ...v, label: e.target.value } : v)) })} placeholder={`Rótulo ${ii + 1}`} />
+            <input type="number" style={{ width: 80 }} min={0} max={100} value={item.valor} onChange={(e) => atualizar({ itens: bloco.itens.map((v, i) => (i === ii ? { ...v, valor: Number(e.target.value) } : v)) })} />
+            <button type="button" className="botao-icone" onClick={() => atualizar({ itens: bloco.itens.filter((_, i) => i !== ii) })}><Icone nome="x" tamanho={14} /></button>
+          </div>
+        ))}
+        <button type="button" className="botao-secundario" style={{ fontSize: 12 }} onClick={() => atualizar({ itens: [...bloco.itens, { label: "", valor: 0 }] })}>
+          <Icone nome="plus" tamanho={13} /> Adicionar barra
+        </button>
+      </>
+    );
+  }
+  if (t === "grafico_radar") {
+    return (
+      <>
+        <label>Título do gráfico</label>
+        <input value={bloco.titulo} onChange={(e) => atualizar({ titulo: e.target.value })} placeholder="Ex: Roda da Vida" style={{ marginBottom: 10 }} />
+        {bloco.eixos.map((eixo, ii) => (
+          <div key={ii} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+            <input style={{ flex: 2 }} value={eixo.label} onChange={(e) => atualizar({ eixos: bloco.eixos.map((v, i) => (i === ii ? { ...v, label: e.target.value } : v)) })} placeholder={`Eixo ${ii + 1}`} />
+            <input type="number" style={{ width: 80 }} min={0} max={10} value={eixo.valor} onChange={(e) => atualizar({ eixos: bloco.eixos.map((v, i) => (i === ii ? { ...v, valor: Number(e.target.value) } : v)) })} />
+            <button type="button" className="botao-icone" onClick={() => atualizar({ eixos: bloco.eixos.filter((_, i) => i !== ii) })}><Icone nome="x" tamanho={14} /></button>
+          </div>
+        ))}
+        <button type="button" className="botao-secundario" style={{ fontSize: 12 }} onClick={() => atualizar({ eixos: [...bloco.eixos, { label: "", valor: 0 }] })}>
+          <Icone nome="plus" tamanho={13} /> Adicionar eixo
+        </button>
+      </>
+    );
+  }
+  if (t === "grafico_pizza") {
+    return (
+      <>
+        <label>Título do gráfico</label>
+        <input value={bloco.titulo} onChange={(e) => atualizar({ titulo: e.target.value })} placeholder="Ex: Como uso meu tempo" style={{ marginBottom: 10 }} />
+        {bloco.fatias.map((fatia, ii) => (
+          <div key={ii} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+            <input style={{ flex: 2 }} value={fatia.label} onChange={(e) => atualizar({ fatias: bloco.fatias.map((v, i) => (i === ii ? { ...v, label: e.target.value } : v)) })} placeholder={`Fatia ${ii + 1}`} />
+            <input type="number" style={{ width: 80 }} min={0} max={100} value={fatia.valor} onChange={(e) => atualizar({ fatias: bloco.fatias.map((v, i) => (i === ii ? { ...v, valor: Number(e.target.value) } : v)) })} />
+            <span style={{ fontSize: 11, color: "var(--texto-suave)" }}>%</span>
+            <button type="button" className="botao-icone" onClick={() => atualizar({ fatias: bloco.fatias.filter((_, i) => i !== ii) })}><Icone nome="x" tamanho={14} /></button>
+          </div>
+        ))}
+        <button type="button" className="botao-secundario" style={{ fontSize: 12 }} onClick={() => atualizar({ fatias: [...bloco.fatias, { label: "", valor: 0 }] })}>
+          <Icone nome="plus" tamanho={13} /> Adicionar fatia
+        </button>
+      </>
+    );
+  }
+  if (t === "slider") {
+    return (
+      <>
+        <label>Pergunta</label>
+        <input value={bloco.pergunta} onChange={(e) => atualizar({ pergunta: e.target.value })} placeholder="Ex: Como você está se sentindo hoje?" style={{ marginBottom: 10 }} />
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ flex: 1 }}><label>Mínimo</label><input type="number" value={bloco.min} onChange={(e) => atualizar({ min: Number(e.target.value) })} /></div>
+          <div style={{ flex: 1 }}><label>Máximo</label><input type="number" value={bloco.max} onChange={(e) => atualizar({ max: Number(e.target.value) })} /></div>
+          <div style={{ flex: 2 }}><label>Rótulo mín</label><input value={bloco.labelMin} onChange={(e) => atualizar({ labelMin: e.target.value })} placeholder="Nada" /></div>
+          <div style={{ flex: 2 }}><label>Rótulo máx</label><input value={bloco.labelMax} onChange={(e) => atualizar({ labelMax: e.target.value })} placeholder="Muito" /></div>
+        </div>
+      </>
+    );
+  }
+  if (t === "pergunta") {
+    return (
+      <>
+        <label>Pergunta</label>
+        <input value={bloco.pergunta} onChange={(e) => atualizar({ pergunta: e.target.value })} placeholder="O que você gostaria de compartilhar?" style={{ marginBottom: 8 }} />
+        <label>Placeholder <span className="opcional">(sugestão para a paciente)</span></label>
+        <input value={bloco.placeholder} onChange={(e) => atualizar({ placeholder: e.target.value })} placeholder="Escreva aqui..." />
+      </>
+    );
+  }
+  if (t === "audio") {
+    return (
+      <>
+        <label>URL do áudio ou vídeo</label>
+        <input value={bloco.url} onChange={(e) => atualizar({ url: e.target.value })} placeholder="YouTube, Spotify, SoundCloud, Google Drive..." style={{ marginBottom: 8 }} />
+        <label>Legenda <span className="opcional">(opcional)</span></label>
+        <input value={bloco.legenda} onChange={(e) => atualizar({ legenda: e.target.value })} placeholder="Ex: Música para relaxamento" />
+      </>
+    );
+  }
+  if (t === "estrelas") {
+    return (
+      <>
+        <label>Pergunta</label>
+        <input value={bloco.pergunta} onChange={(e) => atualizar({ pergunta: e.target.value })} placeholder="Ex: Como você avalia seu dia?" style={{ marginBottom: 8 }} />
+        <label>Máximo de estrelas</label>
+        <select style={{ width: 110 }} value={bloco.max} onChange={(e) => atualizar({ max: Number(e.target.value) })}>
+          {[3, 5, 7, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </>
+    );
+  }
+  if (t === "selecao") {
+    return (
+      <>
+        <label>Pergunta</label>
+        <input value={bloco.pergunta} onChange={(e) => atualizar({ pergunta: e.target.value })} placeholder="Ex: Como você se sente agora?" style={{ marginBottom: 8 }} />
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          {["unica", "multipla"].map((v) => (
+            <button key={v} type="button" onClick={() => atualizar({ tipo_sel: v })} className={"pill-status" + (bloco.tipo_sel === v ? " pill-status-ativa" : "")} style={{ "--cor-pill": "var(--cor-marca)" }}>
+              {v === "unica" ? "Escolha única" : "Múltipla escolha"}
+            </button>
+          ))}
+        </div>
+        {bloco.opcoes.map((op, ii) => (
+          <div key={ii} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+            <span style={{ color: "var(--cor-marca)", fontSize: 13, width: 18 }}>{ii + 1}.</span>
+            <input style={{ flex: 1 }} value={op} onChange={(e) => atualizar({ opcoes: bloco.opcoes.map((v, i) => (i === ii ? e.target.value : v)) })} placeholder={`Opção ${ii + 1}...`} />
+            <button type="button" className="botao-icone" onClick={() => atualizar({ opcoes: bloco.opcoes.filter((_, i) => i !== ii) })}><Icone nome="x" tamanho={14} /></button>
+          </div>
+        ))}
+        <button type="button" className="botao-secundario" style={{ fontSize: 12 }} onClick={() => atualizar({ opcoes: [...bloco.opcoes, ""] })}>
+          <Icone nome="plus" tamanho={13} /> Adicionar opção
+        </button>
+      </>
+    );
+  }
+  return null;
+}
+
+function resumoBloco(bloco) {
+  switch (bloco.tipo) {
+    case "texto": return bloco.conteudo?.slice(0, 60) || "—";
+    case "banner": case "card": return bloco.titulo || "—";
+    case "lista": case "checklist": return `${bloco.itens.filter((i) => i).length} item(ns)`;
+    case "imagem": return bloco.url ? "URL definida" : "—";
+    case "grafico_barras": return `${bloco.itens?.length || 0} item(ns)`;
+    case "grafico_pizza": return `${bloco.fatias?.length || 0} item(ns)`;
+    case "grafico_radar": return `${bloco.eixos?.length || 0} eixo(s)`;
+    case "slider": return `${bloco.min} → ${bloco.max}`;
+    case "pergunta": return bloco.pergunta?.slice(0, 60) || "—";
+    case "audio": return bloco.url ? "URL definida" : "—";
+    case "estrelas": return `Até ${bloco.max} estrelas`;
+    case "selecao": return `${bloco.opcoes.filter((o) => o).length} opção(ões)`;
+    default: return "—";
+  }
+}
+
+// ─── Wizard "Nova Ferramenta" / "Nova Psicoeducação" (3 passos) ──
+// Passo 1: Identidade e Categoria · Passo 2: Blocos de Conteúdo ·
+// Passo 3: Revisão e Salvar. Porta fiel de admin/psico_ui.js
+// (RecursosTerapeuticos e AbaPsicoeducacao usam o mesmo desenho).
+// A ferramenta continua podendo usar um componente interativo já
+// pronto (formularioKey) em vez de/além dos blocos — os blocos são
+// opcionais, pra quem quiser montar um conteúdo novo do zero.
+function WizardNovaFerramenta({ colecao, item, aoFechar }) {
+  const ehFerramenta = colecao === "recursos_terapeuticos";
+  const [passo, setPasso] = useState(1);
+  const [form, setForm] = useState(
+    item
+      ? { titulo: item.titulo || "", descricao: item.descricao || "", categoria: item.categoria || "macro_ansiedade", formularioKey: item.formularioKey || "", icone: item.icone || "" }
+      : { titulo: "", descricao: "", categoria: "macro_ansiedade", formularioKey: "", icone: "" }
+  );
+  const [blocos, setBlocos] = useState(Array.isArray(item?.blocos) ? item.blocos : []);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
-  async function salvar(evento) {
-    evento.preventDefault();
-    if (!(form.titulo || "").trim()) {
-      setErro("Título é obrigatório.");
-      return;
-    }
+  function atualizarBloco(idx, patch) {
+    setBlocos((b) => b.map((bl, i) => (i === idx ? { ...bl, ...patch } : bl)));
+  }
+  function moverBloco(idx, dir) {
+    setBlocos((b) => {
+      const arr = [...b];
+      const alvo = idx + dir;
+      if (alvo < 0 || alvo >= arr.length) return arr;
+      [arr[idx], arr[alvo]] = [arr[alvo], arr[idx]];
+      return arr;
+    });
+  }
+
+  async function salvar() {
+    if (!form.titulo.trim()) { setErro("Título é obrigatório."); setPasso(1); return; }
     setErro("");
     setSalvando(true);
     try {
       const dados = {
         titulo: form.titulo.trim(),
-        categoria: form.categoria || "outros",
         descricao: form.descricao || "",
+        categoria: form.categoria || "outro",
+        tipo: blocos.length > 0 ? "builder" : "interativa",
+        blocos,
       };
-      if (colecao === "recursos_terapeuticos") {
-        dados.formularioKey = form.formularioKey || "";
-      }
+      if (ehFerramenta) dados.formularioKey = form.formularioKey || "";
+      else dados.icone = form.icone || "";
       if (item) {
         await db.collection(colecao).doc(item.id).update(dados);
       } else {
@@ -267,38 +834,410 @@ function FormRecurso({ colecao, item, aoFechar }) {
     }
   }
 
+  const categoriaResolvida = TODAS_SUBCATEGORIAS.find((s) => s.id === form.categoria)
+    || MACROCATEGORIAS.find((m) => m.id === form.categoria)
+    || CATEGORIAS_LEGADO.find((c) => c.id === form.categoria);
+
   return (
     <div className="sobreposicao" onClick={aoFechar}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{item ? "Editar" : "Novo"} Item</h3>
-        <form onSubmit={salvar}>
-          <label>Título *</label>
-          <input value={form.titulo || ""} onChange={(e) => setForm({ ...form, titulo: e.target.value })} required />
+      <div className="modal modal-largo" onClick={(e) => e.stopPropagation()}>
+        <div className="cabecalho-wizard-recurso">
+          <div>
+            <div className="titulo-wizard-recurso">{item ? "Editar" : ehFerramenta ? "Nova Ferramenta" : "Nova Psicoeducação"}</div>
+            <div className="subtitulo-wizard-recurso">
+              {passo === 1 ? "Passo 1 — Identidade e Categoria" : passo === 2 ? "Passo 2 — Blocos de Conteúdo" : "Passo 3 — Revisão e Salvar"}
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {[1, 2, 3].map((s) => (
+              <div key={s} className={"circulo-passo-wizard" + (passo === s ? " circulo-passo-ativo" : passo > s ? " circulo-passo-feito" : "")}>
+                {passo > s ? <Icone nome="check" tamanho={13} /> : s}
+              </div>
+            ))}
+            <button type="button" className="botao-fechar-wizard" onClick={aoFechar}><Icone nome="x" tamanho={18} /></button>
+          </div>
+        </div>
 
-          <label>Categoria <span className="opcional">(ex.: tcc, relaxamento, ansiedade)</span></label>
-          <input value={form.categoria || ""} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
-
-          <label>Descrição <span className="opcional">(opcional — uma frase curta, o passo a passo já fica dentro da ferramenta)</span></label>
-          <TextAreaVoz className="campo-descricao" rows={3} value={form.descricao || ""} onChange={(e) => setForm({ ...form, descricao: e.target.value })} />
-
-          {colecao === "recursos_terapeuticos" && (
+        <div className="corpo-wizard-recurso">
+          {passo === 1 && (
             <>
-              <label>Tipo de ferramenta interativa <span className="opcional">(se ela já tem uma tela pronta)</span></label>
-              <select value={form.formularioKey || ""} onChange={(e) => setForm({ ...form, formularioKey: e.target.value })}>
-                {FERRAMENTAS_INTERATIVAS_DISPONIVEIS.map((f) => (
-                  <option key={f.valor} value={f.valor}>{f.rotulo}</option>
-                ))}
-              </select>
+              <label>Título {ehFerramenta ? "da Ferramenta" : "do Material"} *</label>
+              <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder={ehFerramenta ? "Ex: Mapa das Emoções" : "Ex: O que é ansiedade?"} />
+
+              {!ehFerramenta && (
+                <>
+                  <label>Ícone <span className="opcional">(nome de um ícone Lucide, opcional)</span></label>
+                  <input value={form.icone} onChange={(e) => setForm({ ...form, icone: e.target.value })} placeholder="ex: brain" />
+                </>
+              )}
+
+              <label>Descrição curta</label>
+              <TextAreaVoz className="campo-descricao" rows={2} value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} placeholder="O que este conteúdo ajuda a paciente a fazer?" />
+
+              <GradeCategoria categoria={form.categoria} setCategoria={(c) => setForm({ ...form, categoria: c })} comEspecializadas={ehFerramenta} />
+
+              {ehFerramenta && (
+                <>
+                  <label>Tipo de ferramenta interativa <span className="opcional">(se ela já tem uma tela pronta)</span></label>
+                  <select value={form.formularioKey || ""} onChange={(e) => setForm({ ...form, formularioKey: e.target.value })}>
+                    {FERRAMENTAS_INTERATIVAS_DISPONIVEIS.map((f) => <option key={f.valor} value={f.valor}>{f.rotulo}</option>)}
+                  </select>
+                </>
+              )}
+
+              {erro && <p className="mensagem-erro">{erro}</p>}
+              <div className="acoes-modal">
+                <button type="button" className="botao-secundario" onClick={aoFechar}>Cancelar</button>
+                <button type="button" className="botao-primario" onClick={() => { if (!form.titulo.trim()) { setErro("Título é obrigatório."); return; } setErro(""); setPasso(2); }}>
+                  Próximo — Blocos de Conteúdo <Icone nome="arrow-right" tamanho={15} />
+                </button>
+              </div>
             </>
           )}
 
-          {erro && <p className="mensagem-erro">{erro}</p>}
+          {passo === 2 && (
+            <>
+              <div style={{ marginBottom: 18 }}>
+                <div className="rotulo-mini">Adicionar Bloco</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {TIPOS_BLOCO.map((t) => (
+                    <button key={t.id} type="button" className="botao-secundario" style={{ fontSize: 12 }} title={t.desc} onClick={() => setBlocos((b) => [...b, novoBloco(t.id)])}>
+                      <Icone nome={t.icone} tamanho={13} /> {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          <div className="acoes-modal">
-            <button type="button" className="botao-secundario" onClick={aoFechar}>Cancelar</button>
-            <button type="submit" className="botao-primario" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</button>
+              {blocos.length === 0 && (
+                <p className="texto-vazio" style={{ textAlign: "center", padding: "26px 16px", border: "1.5px dashed #E5E7EB", borderRadius: 12 }}>
+                  Clique nos tipos acima para adicionar blocos ao conteúdo (opcional — sem blocos, fica só título e descrição).
+                </p>
+              )}
+              {blocos.map((bloco, idx) => {
+                const t = TIPOS_BLOCO.find((x) => x.id === bloco.tipo);
+                return (
+                  <div key={bloco.id} className="cartao-bloco-wizard">
+                    <div className="cabecalho-bloco-wizard">
+                      <Icone nome={t?.icone} tamanho={15} />
+                      <span style={{ fontWeight: 600, fontSize: 13, color: "var(--cor-marca)", flex: 1 }}>{t?.label}</span>
+                      <button type="button" className="botao-icone" disabled={idx === 0} onClick={() => moverBloco(idx, -1)}><Icone nome="chevron-up" tamanho={14} /></button>
+                      <button type="button" className="botao-icone" disabled={idx === blocos.length - 1} onClick={() => moverBloco(idx, 1)}><Icone nome="chevron-down" tamanho={14} /></button>
+                      <button type="button" className="botao-icone botao-icone-perigo" onClick={() => setBlocos((b) => b.filter((_, i) => i !== idx))}><Icone nome="trash-2" tamanho={14} /></button>
+                    </div>
+                    <div className="corpo-bloco-wizard">
+                      <EditorBloco bloco={bloco} atualizar={(patch) => atualizarBloco(idx, patch)} />
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="acoes-modal" style={{ justifyContent: "space-between" }}>
+                <button type="button" className="botao-secundario" onClick={() => setPasso(1)}><Icone nome="arrow-left" tamanho={15} /> Voltar</button>
+                <button type="button" className="botao-primario" onClick={() => setPasso(3)}>Próximo — Revisar <Icone nome="arrow-right" tamanho={15} /></button>
+              </div>
+            </>
+          )}
+
+          {passo === 3 && (
+            <>
+              <div className="cartao-resumo-wizard">
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{form.titulo}</div>
+                {form.descricao && <div style={{ fontSize: 13, color: "var(--texto-suave)", marginBottom: 8 }}>{form.descricao}</div>}
+                <div style={{ fontSize: 12, color: "var(--cor-marca)", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                  {categoriaResolvida && <Icone nome={categoriaResolvida.macroIcone || categoriaResolvida.icone || "tag"} tamanho={13} />}
+                  {categoriaResolvida?.label || form.categoria}
+                </div>
+              </div>
+              <div className="rotulo-mini">{blocos.length} bloco{blocos.length !== 1 ? "s" : ""} de conteúdo</div>
+              {blocos.map((bloco, idx) => {
+                const t = TIPOS_BLOCO.find((x) => x.id === bloco.tipo);
+                return (
+                  <div key={bloco.id} className="linha-resumo-bloco">
+                    <Icone nome={t?.icone} tamanho={16} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{t?.label}</div>
+                      <div style={{ fontSize: 11, color: "var(--texto-suave)" }}>{resumoBloco(bloco)}</div>
+                    </div>
+                    <button type="button" className="botao-secundario" style={{ fontSize: 12 }} onClick={() => setPasso(2)}>editar</button>
+                  </div>
+                );
+              })}
+              {blocos.length === 0 && <p className="texto-vazio">Nenhum bloco adicionado — o conteúdo terá apenas título e descrição.</p>}
+
+              {erro && <p className="mensagem-erro">{erro}</p>}
+              <div className="acoes-modal" style={{ justifyContent: "space-between" }}>
+                <button type="button" className="botao-secundario" onClick={() => setPasso(2)}><Icone nome="arrow-left" tamanho={15} /> Voltar</button>
+                <button type="button" className="botao-primario" onClick={salvar} disabled={salvando}>
+                  <Icone nome="save" tamanho={15} /> {salvando ? "Salvando..." : ehFerramenta ? "Salvar Ferramenta" : "Salvar Psicoeducação"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Wizard "Nova Fábula" (4 passos) ─────────────────────────────
+// Identidade → Categoria → Páginas → Reflexões. Porta fiel de
+// admin/psifabulas.compiled.js (WizardNovaFabula) — cada página é um
+// bloco de texto solto (array `paginas`), lido uma de cada vez pelo
+// paciente (ver LeitorFabula no app.js do paciente, que já sabia ler
+// esse formato — só faltava um jeito de cadastrar). Diferente de
+// Ferramenta/Psicoeducação, aqui `categoria` guarda a MACROcategoria
+// direto (não desce a subcategoria), igual ao modelo.
+function WizardNovaFabula({ item, aoFechar }) {
+  const [passo, setPasso] = useState(1);
+  const [form, setForm] = useState(
+    item
+      ? { titulo: item.titulo || "", icone: item.icone || "book-open", moral: item.moral || "", categoria: item.categoria || "macro_ansiedade" }
+      : { titulo: "", icone: "book-open", moral: "", categoria: "macro_ansiedade" }
+  );
+  const [paginas, setPaginas] = useState(Array.isArray(item?.paginas) && item.paginas.length > 0 ? item.paginas : [""]);
+  const [perguntas, setPerguntas] = useState(Array.isArray(item?.perguntas) && item.perguntas.length > 0 ? [...item.perguntas, "", "", ""].slice(0, Math.max(3, item.perguntas.length)) : ["", "", ""]);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const macro = MACROCATEGORIAS.find((m) => m.id === form.categoria) || MACROCATEGORIAS[0];
+  const PASSOS = ["Identidade", "Categoria", "Conteúdo", "Reflexões"];
+
+  function setPagina(i, v) { setPaginas((p) => p.map((x, j) => (j === i ? v : x))); }
+  function remPagina(i) { setPaginas((p) => p.filter((_, j) => j !== i)); }
+  function setPergunta(i, v) { setPerguntas((p) => p.map((x, j) => (j === i ? v : x))); }
+
+  async function salvar() {
+    if (!form.titulo.trim() || paginas.every((p) => !p.trim())) {
+      setErro("Título e ao menos uma página são obrigatórios.");
+      setPasso(!form.titulo.trim() ? 1 : 3);
+      return;
+    }
+    setErro("");
+    setSalvando(true);
+    try {
+      const dados = {
+        titulo: form.titulo.trim(),
+        icone: form.icone || "book-open",
+        moral: form.moral.trim(),
+        categoria: form.categoria,
+        paginas: paginas.filter((p) => p.trim()),
+        perguntas: perguntas.filter((p) => p.trim()),
+      };
+      if (item) {
+        await db.collection("fabulas_terapeuticas").doc(item.id).update(dados);
+      } else {
+        await db.collection("fabulas_terapeuticas").add({ ...dados, criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+      aoFechar();
+    } catch (e) {
+      setErro(e.message || "Não foi possível salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="sobreposicao" onClick={aoFechar}>
+      <div className="modal modal-largo" onClick={(e) => e.stopPropagation()}>
+        <div className="cabecalho-wizard-recurso" style={{ background: macro.cor }}>
+          <div>
+            <div className="titulo-wizard-recurso" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icone nome={form.icone || "book-open"} tamanho={18} /> {form.titulo || (item ? "Editar Fábula" : "Nova Fábula")}
+            </div>
           </div>
-        </form>
+          <button type="button" className="botao-fechar-wizard" onClick={aoFechar}><Icone nome="x" tamanho={18} /></button>
+        </div>
+        <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+          {PASSOS.map((p, i) => (
+            <div key={i} style={{ flex: 1 }}>
+              <div style={{ height: 4, borderRadius: 4, background: i < passo ? "var(--cor-marca)" : "#E5E7EB", marginBottom: 4 }} />
+              <div style={{ fontSize: 10, color: "var(--texto-suave)", fontWeight: i === passo - 1 ? 700 : 400 }}>{p}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="corpo-wizard-recurso">
+          {passo === 1 && (
+            <>
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ width: 110 }}>
+                  <label>Ícone</label>
+                  <input value={form.icone} onChange={(e) => setForm({ ...form, icone: e.target.value })} placeholder="ex: book-open" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label>Título da Fábula *</label>
+                  <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} placeholder="Ex: A Borboleta e a Tempestade" />
+                </div>
+              </div>
+              <label>Moral / Mensagem central</label>
+              <input value={form.moral} onChange={(e) => setForm({ ...form, moral: e.target.value })} placeholder='Ex: "A crise que parece fim pode ser começo."' />
+
+              {erro && <p className="mensagem-erro">{erro}</p>}
+              <div className="acoes-modal">
+                <button type="button" className="botao-secundario" onClick={aoFechar}>Cancelar</button>
+                <button type="button" className="botao-primario" style={{ background: macro.cor }} disabled={!form.titulo.trim()} onClick={() => setPasso(2)}>
+                  Próximo <Icone nome="arrow-right" tamanho={14} />
+                </button>
+              </div>
+            </>
+          )}
+
+          {passo === 2 && (
+            <>
+              <label>Categoria terapêutica</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                {MACROCATEGORIAS.map((m) => (
+                  <div
+                    key={m.id}
+                    onClick={() => setForm({ ...form, categoria: m.id })}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 12, border: "2px solid", cursor: "pointer",
+                      borderColor: form.categoria === m.id ? m.cor : "#E5E7EB",
+                      background: form.categoria === m.id ? m.bg : "white",
+                    }}
+                  >
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: m.cor, display: "flex", alignItems: "center", justifyContent: "center", color: "white", flexShrink: 0 }}>
+                      <Icone nome={m.icone} tamanho={17} />
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: form.categoria === m.id ? m.cor : "#374151" }}>{m.label}</div>
+                    {form.categoria === m.id && <Icone nome="check-circle-2" tamanho={18} style={{ color: m.cor, marginLeft: "auto" }} />}
+                  </div>
+                ))}
+              </div>
+              <div className="acoes-modal" style={{ justifyContent: "space-between" }}>
+                <button type="button" className="botao-secundario" onClick={() => setPasso(1)}><Icone nome="arrow-left" tamanho={14} /> Anterior</button>
+                <button type="button" className="botao-primario" style={{ background: macro.cor }} onClick={() => setPasso(3)}>Próximo <Icone nome="arrow-right" tamanho={14} /></button>
+              </div>
+            </>
+          )}
+
+          {passo === 3 && (
+            <>
+              <label>Páginas da fábula</label>
+              <p className="texto-vazio" style={{ marginTop: 0 }}>Cada página é um bloco de texto. O paciente avança página por página.</p>
+              {paginas.map((p, i) => (
+                <div key={i} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label style={{ margin: 0 }}>Página {i + 1}</label>
+                    {paginas.length > 1 && (
+                      <button type="button" className="botao-icone botao-icone-perigo" onClick={() => remPagina(i)}><Icone nome="x" tamanho={14} /></button>
+                    )}
+                  </div>
+                  <TextAreaVoz className="campo-descricao" rows={4} value={p} onChange={(e) => setPagina(i, e.target.value)} placeholder={`Texto da página ${i + 1}...`} />
+                </div>
+              ))}
+              <button type="button" className="botao-secundario" style={{ width: "100%", justifyContent: "center" }} onClick={() => setPaginas((p) => [...p, ""])}>
+                <Icone nome="plus" tamanho={14} /> Adicionar página
+              </button>
+
+              {erro && <p className="mensagem-erro">{erro}</p>}
+              <div className="acoes-modal" style={{ justifyContent: "space-between" }}>
+                <button type="button" className="botao-secundario" onClick={() => setPasso(2)}><Icone nome="arrow-left" tamanho={14} /> Anterior</button>
+                <button type="button" className="botao-primario" style={{ background: macro.cor }} onClick={() => setPasso(4)}>Próximo <Icone nome="arrow-right" tamanho={14} /></button>
+              </div>
+            </>
+          )}
+
+          {passo === 4 && (
+            <>
+              <label>Perguntas de reflexão</label>
+              <p className="texto-vazio" style={{ marginTop: 0 }}>Deixe em branco as que não quiser usar. A paciente responde depois de ler a fábula.</p>
+              {perguntas.map((p, i) => (
+                <div key={i} style={{ marginBottom: 12 }}>
+                  <label>Pergunta {i + 1}</label>
+                  <input
+                    value={p}
+                    onChange={(e) => setPergunta(i, e.target.value)}
+                    placeholder={i === 0 ? "O que mais te tocou nessa história?" : i === 1 ? "Você se identificou com algum personagem?" : "Que mensagem você leva desta fábula?"}
+                  />
+                </div>
+              ))}
+              <button type="button" className="botao-secundario" onClick={() => setPerguntas((p) => [...p, ""])}>
+                <Icone nome="plus" tamanho={13} /> Adicionar pergunta
+              </button>
+
+              {erro && <p className="mensagem-erro">{erro}</p>}
+              <div className="acoes-modal" style={{ justifyContent: "space-between" }}>
+                <button type="button" className="botao-secundario" onClick={() => setPasso(3)}><Icone nome="arrow-left" tamanho={14} /> Anterior</button>
+                <button type="button" className="botao-primario" style={{ background: macro.cor }} disabled={salvando} onClick={salvar}>
+                  <Icone nome="save" tamanho={14} /> {salvando ? "Salvando..." : "Salvar Fábula"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Busca por sintoma (IA) ──────────────────────────────────────
+// A chamada de verdade pra IA vive na Cloud Function buscarPorSintoma
+// (functions/index.js) — a chave da Anthropic nunca fica no
+// navegador. Aqui só manda a queixa + a lista de itens já cadastrados
+// e cruza a resposta com os itens reais pelo título (protege contra
+// a IA inventar um título que não existe na biblioteca).
+function BuscaPorSintoma({ itens, aoFechar, aoEnviar, aoVisualizar }) {
+  const [sintoma, setSintoma] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [erro, setErro] = useState("");
+
+  async function buscar() {
+    if (!sintoma.trim()) return;
+    setBuscando(true);
+    setErro("");
+    setResultado(null);
+    try {
+      const chamar = functions.httpsCallable("buscarPorSintoma");
+      const itensSimplificados = itens.map((it) => ({ titulo: it.titulo || it.nome, categoria: it.categoria, descricao: it.descricao }));
+      const resposta = await chamar({ sintoma, itens: itensSimplificados });
+      const recomendados = (resposta.data?.recomendacoes || [])
+        .map((r) => ({ ...r, item: itens.find((x) => (x.titulo || x.nome || "").toLowerCase() === (r.titulo || "").toLowerCase()) }))
+        .filter((r) => r.item)
+        .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+      setResultado(recomendados);
+    } catch (e) {
+      setErro(e.message || "Erro ao consultar a IA. Tente novamente.");
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  return (
+    <div className="sobreposicao" onClick={aoFechar}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Icone nome="sparkles" tamanho={18} /> Busca por sintoma</h3>
+        <p style={{ marginTop: 0 }}>Descreva a queixa da paciente — a IA sugere as opções mais indicadas dentro do que já está cadastrado nesta biblioteca.</p>
+        <TextAreaVoz className="campo-descricao" rows={2} value={sintoma} onChange={(e) => setSintoma(e.target.value)} placeholder="Ex: crises de ansiedade antes de dormir, ruminação de pensamentos..." />
+        <button className="botao-primario" style={{ width: "100%", justifyContent: "center", marginTop: 10 }} onClick={buscar} disabled={buscando || !sintoma.trim()}>
+          <Icone nome="search" tamanho={14} /> {buscando ? "Buscando..." : "Buscar"}
+        </button>
+
+        {erro && <p className="mensagem-erro">{erro}</p>}
+
+        {resultado && resultado.length === 0 && <p className="texto-vazio">Nenhuma correspondência encontrada nessa biblioteca.</p>}
+        {resultado && resultado.length > 0 && (
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+            {resultado.map((r, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", border: "1px solid #E5E7EB", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--cor-marca)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{r.ordem || i + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{r.item.titulo || r.item.nome}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--texto-suave)", fontStyle: "italic", margin: "4px 0 8px" }}>{r.motivo}</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="botao-secundario" style={{ fontSize: 12 }} onClick={() => aoVisualizar(r.item)}><Icone nome="eye" tamanho={13} /> Visualizar</button>
+                    <button className="botao-secundario" style={{ fontSize: 12 }} onClick={() => aoEnviar(r.item)}><Icone nome="send" tamanho={13} /> Enviar</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="acoes-modal">
+          <button className="botao-secundario" onClick={aoFechar}>Fechar</button>
+        </div>
       </div>
     </div>
   );
@@ -1381,6 +2320,10 @@ function PreviewFabula({ item }) {
 // texto, card, lista, pergunta, checklist, gráficos...). Aqui cobrimos
 // os tipos mais comuns; um tipo ainda não coberto aparece identificado
 // em vez de simplesmente sumir, pra ficar claro o que falta portar.
+// Pré-visualização dos blocos pro admin — mesmos 14 tipos que o
+// paciente vê (ver VisualizadorBlocos no app.js do paciente), só que
+// aqui é sempre somente leitura (não existe paciente real nessa tela
+// pra gravar resposta).
 function PreviewBlocosPsicoeducacao({ item }) {
   const blocos = Array.isArray(item.blocos) ? item.blocos : [];
   if (blocos.length === 0) return null;
@@ -1392,17 +2335,19 @@ function PreviewBlocosPsicoeducacao({ item }) {
           case "banner":
             return (
               <div key={i} style={{ background: b.cor || "var(--cor-marca)", borderRadius: 12, padding: 20, marginBottom: 14, color: "white", textAlign: "center" }}>
-                {b.emoji && <div style={{ fontSize: 32, marginBottom: 6 }}>{b.emoji}</div>}
-                <div style={{ fontWeight: 700, fontSize: 16 }}>{b.titulo}</div>
+                <Icone nome={b.icone || "sparkles"} tamanho={26} />
+                <div style={{ fontWeight: 700, fontSize: 16, marginTop: 6 }}>{b.titulo}</div>
               </div>
             );
           case "texto":
-            return <p key={i} className="texto-visualizar-recurso" style={{ marginBottom: 14 }}>{b.conteudo}</p>;
+            return <p key={i} className="texto-visualizar-recurso" style={{ marginBottom: 14, whiteSpace: "pre-wrap" }}>{b.conteudo}</p>;
           case "card":
             return (
               <div key={i} className="cartao-secao" style={{ marginBottom: 12 }}>
-                {b.icone && <div style={{ fontSize: 22, marginBottom: 4 }}>{b.icone}</div>}
-                <strong>{b.titulo}</strong>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <Icone nome={b.icone || "lightbulb"} tamanho={18} />
+                  <strong>{b.titulo}</strong>
+                </div>
                 <p className="texto-visualizar-recurso">{b.texto}</p>
               </div>
             );
@@ -1412,13 +2357,83 @@ function PreviewBlocosPsicoeducacao({ item }) {
                 {(b.itens || []).map((it, j) => <li key={j} className="texto-visualizar-recurso">{it}</li>)}
               </ul>
             );
+          case "imagem":
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                {b.url && <img src={b.url} alt={b.legenda || ""} style={{ maxWidth: "100%", borderRadius: 10 }} />}
+                {b.legenda && <p className="texto-vazio" style={{ textAlign: "center" }}>{b.legenda}</p>}
+              </div>
+            );
+          case "audio":
+            return (
+              <div key={i} style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                <Icone nome="music" tamanho={16} /> {b.legenda || b.url || "Áudio/vídeo"}
+              </div>
+            );
+          case "grafico_barras":
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                {b.titulo && <strong style={{ display: "block", marginBottom: 8 }}>{b.titulo}</strong>}
+                {(b.itens || []).map((it, j) => (
+                  <div key={j} style={{ fontSize: 12, marginBottom: 4 }}>{it.label}: <strong>{it.valor}</strong></div>
+                ))}
+              </div>
+            );
+          case "grafico_radar":
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                {b.titulo && <strong style={{ display: "block", marginBottom: 8 }}>{b.titulo}</strong>}
+                {(b.eixos || []).map((it, j) => (
+                  <div key={j} style={{ fontSize: 12, marginBottom: 4 }}>{it.label}: <strong>{it.valor}</strong></div>
+                ))}
+              </div>
+            );
+          case "grafico_pizza":
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                {b.titulo && <strong style={{ display: "block", marginBottom: 8 }}>{b.titulo}</strong>}
+                {(b.fatias || []).map((it, j) => (
+                  <div key={j} style={{ fontSize: 12, marginBottom: 4 }}>{it.label}: <strong>{it.valor}%</strong></div>
+                ))}
+              </div>
+            );
+          case "slider":
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{b.pergunta}</label>
+                <input type="range" min={b.min} max={b.max} disabled style={{ width: "100%" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--texto-suave)" }}>
+                  <span>{b.labelMin}</span><span>{b.labelMax}</span>
+                </div>
+              </div>
+            );
+          case "estrelas":
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{b.pergunta}</label>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {Array.from({ length: b.max || 5 }).map((_, n) => <Icone key={n} nome="star" tamanho={18} />)}
+                </div>
+              </div>
+            );
           case "checklist":
             return (
               <div key={i} style={{ marginBottom: 14 }}>
                 {b.titulo && <strong style={{ display: "block", marginBottom: 8 }}>{b.titulo}</strong>}
                 {(b.itens || []).map((it, j) => (
                   <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                    <input type="checkbox" disabled /> <span className="texto-visualizar-recurso">{it}</span>
+                    <Icone nome="square" tamanho={15} /> <span className="texto-visualizar-recurso">{it}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          case "selecao":
+            return (
+              <div key={i} style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{b.pergunta}</label>
+                {(b.opcoes || []).map((op, j) => (
+                  <div key={j} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <Icone nome={b.tipo_sel === "multipla" ? "square" : "circle"} tamanho={15} /> <span className="texto-visualizar-recurso">{op}</span>
                   </div>
                 ))}
               </div>
@@ -1431,11 +2446,7 @@ function PreviewBlocosPsicoeducacao({ item }) {
               </div>
             );
           default:
-            return (
-              <p key={i} className="texto-vazio" style={{ marginBottom: 14 }}>
-                [bloco do tipo "{b.tipo}" ainda não tem pré-visualização própria]
-              </p>
-            );
+            return null;
         }
       })}
     </div>

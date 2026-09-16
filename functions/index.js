@@ -22,6 +22,7 @@ const auth = admin.auth();
 
 const GOOGLE_CLIENT_ID = defineSecret("GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET = defineSecret("GOOGLE_CLIENT_SECRET");
+const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 
 // ─────────────────────────────────────────────────────────────
 // 1) CARIMBO DE IDENTIDADE (custom claims)
@@ -347,3 +348,72 @@ exports.criarEventoAgenda = onCall(
     return { ok: true, eventoId: resposta.data.id };
   }
 );
+
+// ─────────────────────────────────────────────────────────────
+// 7) BUSCA POR SINTOMA (IA) — Recursos Terapêuticos
+// ─────────────────────────────────────────────────────────────
+// A psicóloga digita a queixa/sintoma da paciente e a IA escolhe, só
+// entre os itens que já existem na biblioteca da clínica, quais fazem
+// mais sentido indicar. A chave da Anthropic fica só aqui (Secret
+// Manager) — nunca é exposta no navegador.
+exports.buscarPorSintoma = onCall({ secrets: [ANTHROPIC_API_KEY] }, async (request) => {
+  const chamador = request.auth;
+  if (!chamador) {
+    throw new HttpsError("unauthenticated", "É preciso estar logado.");
+  }
+
+  const { sintoma, itens } = request.data || {};
+  if (!sintoma || !Array.isArray(itens) || itens.length === 0) {
+    throw new HttpsError("invalid-argument", "Envie o sintoma e a lista de itens da biblioteca.");
+  }
+
+  const lista = itens
+    .slice(0, 200)
+    .map((it) => `- "${it.titulo}" (${it.categoria || "sem categoria"}): ${it.descricao || "sem descrição"}`)
+    .join("\n");
+
+  const prompt = `Você é uma psicóloga clínica experiente em TCC, DBT e recursos terapêuticos digitais.
+
+Estas são as opções disponíveis na biblioteca da clínica:
+${lista}
+
+A queixa/sintoma relatado é: "${sintoma}"
+
+Escolha as 3 a 5 opções mais indicadas, usando SOMENTE títulos que estão exatamente na lista acima (nunca invente um título novo). Responda apenas em JSON válido, sem nenhum texto antes ou depois:
+{"recomendacoes":[{"titulo":"título exato como está na lista","motivo":"justificativa clínica breve","ordem":1}]}`;
+
+  let resposta;
+  try {
+    resposta = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY.value(),
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-5",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+  } catch (e) {
+    throw new HttpsError("internal", "Não foi possível consultar a IA: " + e.message);
+  }
+
+  const dados = await resposta.json();
+  if (!resposta.ok) {
+    throw new HttpsError("internal", dados?.error?.message || "Erro ao consultar a IA.");
+  }
+
+  let recomendacoes = [];
+  try {
+    const texto = dados?.content?.[0]?.text || "{}";
+    const json = JSON.parse(texto);
+    recomendacoes = Array.isArray(json.recomendacoes) ? json.recomendacoes : [];
+  } catch (e) {
+    throw new HttpsError("internal", "A IA respondeu num formato inesperado.");
+  }
+
+  return { recomendacoes };
+});

@@ -491,6 +491,14 @@ function AbaPerfilPaciente({ paciente }) {
 // categoria.
 
 function formatarCategoria(cat) {
+  if (typeof TODAS_SUBCATEGORIAS !== "undefined") {
+    const sub = TODAS_SUBCATEGORIAS.find((s) => s.id === cat);
+    if (sub) return sub.label;
+    const macro = MACROCATEGORIAS.find((m) => m.id === cat);
+    if (macro) return macro.label;
+    const legado = CATEGORIAS_LEGADO.find((c) => c.id === cat);
+    if (legado) return legado.label;
+  }
   return (cat || "outros").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
 
