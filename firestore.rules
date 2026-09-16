@@ -180,6 +180,24 @@ service cloud.firestore {
                            && request.resource.data.psi_id == carimboClinica();
     }
 
+    match /clinica_relaxamento/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, create: if estaLogado() && carimboPapel() == 'paciente'
+                           && request.resource.data.psi_id == carimboClinica();
+    }
+
+    match /clinica_rastreamento_alimentar/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, create: if estaLogado() && carimboPapel() == 'paciente'
+                           && request.resource.data.psi_id == carimboClinica();
+    }
+
+    match /clinica_treino_auditivo/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, create: if estaLogado() && carimboPapel() == 'paciente'
+                           && request.resource.data.psi_id == carimboClinica();
+    }
+
     match /clinica_agenda/{eventoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
