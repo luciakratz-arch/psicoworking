@@ -715,6 +715,14 @@ function FormDespesa({ usuario, lancamento, aoFechar }) {
 const MODALIDADES_PACOTE = ["Online", "Presencial"];
 
 function ListaPacotes({ pacotes, sessoes, pacientes, aoEditar }) {
+  // Cada paciente é um bloco recolhível, sempre fechado por padrão —
+  // evita uma lista gigante quando há muitos pacientes com pacotes.
+  // O estado de expandido/recolhido mora AQUI (no pai), não dentro de
+  // CardPacotesPaciente: toda vez que os pacotes mudam (onSnapshot do
+  // Firestore) o React recria os componentes filhos, e um useState
+  // local ali dentro perderia o valor e o card fecharia sozinho.
+  const [expandidosPac, setExpandidosPac] = useState({});
+
   async function excluirPacote(pacote) {
     if (!confirm("Excluir este pacote e todas as sessões vinculadas a ele?")) return;
     const batch = db.batch();
@@ -738,48 +746,78 @@ function ListaPacotes({ pacotes, sessoes, pacientes, aoEditar }) {
 
   return (
     <div>
-      {Object.entries(porPaciente).map(([pacienteId, lista]) => {
-        const nome = pacientes.find((p) => p.id === pacienteId)?.nome || lista[0].pacienteNome || "Paciente";
-        return (
-          <div key={pacienteId} className="grupo-status">
-            <div className="cabecalho-secao-lanc">
-              <span className="titulo-secao-lanc">{nome}</span>
-            </div>
-            <div className="cartao-lista-pacientes">
-              {lista.map((pac) => {
-                const sessoesPac = sessoes.filter((s) => s.pacoteId === pac.id);
-                const realizadas = sessoesPac.filter((s) => s.status === "realizada" || s.pagamento === "pago").length;
-                const total = pac.totalSessoes || sessoesPac.length || 1;
-                const pct = Math.min(100, Math.round((realizadas / total) * 100));
-                return (
-                  <div key={pac.id} className="cartao-pacote">
-                    <div className="info-pacote">
-                      <div className="descricao-lancamento">
-                        Pacote de {pac.totalSessoes} sessões — {pac.recorrencia}
-                      </div>
-                      <div className="detalhe-lancamento">
-                        Início {pac.dataInicio?.split("-").reverse().join("/")}
-                        {" · "}{TIPOS_ATENDIMENTO.find((t) => t.valor === pac.tipoAtendimento)?.rotulo || "Particular"}
-                        {pac.horario ? " · " + pac.horario : ""}
-                      </div>
-                      <div className="barra-progresso">
-                        <div className="barra-progresso-preenchimento" style={{ width: pct + "%" }} />
-                      </div>
-                      <div className="detalhe-lancamento">{realizadas} de {total} sessões realizadas</div>
-                    </div>
-                    <span className={"etiqueta-status-lanc etiqueta-" + (pac.statusPag || "pendente")}>
-                      {pac.statusPag === "recebido" ? "✓ Recebido" : "Pendente"}
-                    </span>
-                    <span className="valor-lancamento valor-receita">{fmtMoeda(pac.valorTotal)}</span>
-                    <button className="botao-icone" onClick={() => aoEditar(pac)} title="Editar"><Icone nome="pencil" tamanho={15} /></button>
-                    <button className="botao-icone botao-icone-perigo" onClick={() => excluirPacote(pac)} title="Excluir"><Icone nome="trash-2" tamanho={15} /></button>
-                  </div>
-                );
-              })}
-            </div>
+      {Object.entries(porPaciente).map(([pacienteId, lista]) => (
+        <CardPacotesPaciente
+          key={pacienteId}
+          nome={pacientes.find((p) => p.id === pacienteId)?.nome || lista[0].pacienteNome || "Paciente"}
+          lista={lista}
+          sessoes={sessoes}
+          expandido={!!expandidosPac[pacienteId]}
+          aoAlternar={() => setExpandidosPac((prev) => ({ ...prev, [pacienteId]: !prev[pacienteId] }))}
+          aoEditar={aoEditar}
+          aoExcluir={excluirPacote}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CardPacotesPaciente({ nome, lista, sessoes, expandido, aoAlternar, aoEditar, aoExcluir }) {
+  const totalPacotes = lista.length;
+  const recebidos = lista.filter((p) => p.statusPag === "recebido").length;
+  const pendentes = totalPacotes - recebidos;
+  const valorTotal = lista.reduce((s, p) => s + (p.valorTotal || 0), 0);
+
+  return (
+    <div className="grupo-status">
+      <div className="cabecalho-pacote-paciente" onClick={aoAlternar}>
+        <div className="avatar-paciente">{(nome || "?")[0].toUpperCase()}</div>
+        <div className="info-lancamento">
+          <span className="titulo-secao-lanc">{nome}</span>
+          <div className="detalhe-lancamento" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <span>{totalPacotes} pacote(s)</span>
+            {pendentes > 0 && <span style={{ color: "#d97706", fontWeight: 600 }}>{pendentes} pendente(s)</span>}
+            {recebidos > 0 && <span style={{ color: "var(--sucesso)", fontWeight: 600 }}>{recebidos} recebido(s)</span>}
+            <span style={{ color: "var(--cor-marca)", fontWeight: 600 }}>{fmtMoeda(valorTotal)}</span>
           </div>
-        );
-      })}
+        </div>
+        <Icone nome="chevron-down" tamanho={18} style={{ transform: expandido ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s" }} />
+      </div>
+
+      {expandido && (
+        <div className="cartao-lista-pacientes">
+          {lista.map((pac) => {
+            const sessoesPac = sessoes.filter((s) => s.pacoteId === pac.id);
+            const realizadas = sessoesPac.filter((s) => s.status === "realizada" || s.pagamento === "pago").length;
+            const total = pac.totalSessoes || sessoesPac.length || 1;
+            const pct = Math.min(100, Math.round((realizadas / total) * 100));
+            return (
+              <div key={pac.id} className="cartao-pacote">
+                <div className="info-pacote">
+                  <div className="descricao-lancamento">
+                    Pacote de {pac.totalSessoes} sessões — {pac.recorrencia}
+                  </div>
+                  <div className="detalhe-lancamento">
+                    Início {pac.dataInicio?.split("-").reverse().join("/")}
+                    {" · "}{TIPOS_ATENDIMENTO.find((t) => t.valor === pac.tipoAtendimento)?.rotulo || "Particular"}
+                    {pac.horario ? " · " + pac.horario : ""}
+                  </div>
+                  <div className="barra-progresso">
+                    <div className="barra-progresso-preenchimento" style={{ width: pct + "%" }} />
+                  </div>
+                  <div className="detalhe-lancamento">{realizadas} de {total} sessões realizadas</div>
+                </div>
+                <span className={"etiqueta-status-lanc etiqueta-" + (pac.statusPag || "pendente")}>
+                  {pac.statusPag === "recebido" ? "✓ Recebido" : "Pendente"}
+                </span>
+                <span className="valor-lancamento valor-receita">{fmtMoeda(pac.valorTotal)}</span>
+                <button className="botao-icone" onClick={() => aoEditar(pac)} title="Editar"><Icone nome="pencil" tamanho={15} /></button>
+                <button className="botao-icone botao-icone-perigo" onClick={() => aoExcluir(pac)} title="Excluir"><Icone nome="trash-2" tamanho={15} /></button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

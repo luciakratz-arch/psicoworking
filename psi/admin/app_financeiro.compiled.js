@@ -916,6 +916,13 @@ function ListaPacotes({
   pacientes,
   aoEditar
 }) {
+  // Cada paciente é um bloco recolhível, sempre fechado por padrão —
+  // evita uma lista gigante quando há muitos pacientes com pacotes.
+  // O estado de expandido/recolhido mora AQUI (no pai), não dentro de
+  // CardPacotesPaciente: toda vez que os pacotes mudam (onSnapshot do
+  // Firestore) o React recria os componentes filhos, e um useState
+  // local ali dentro perderia o valor e o card fecharia sozinho.
+  const [expandidosPac, setExpandidosPac] = useState({});
   async function excluirPacote(pacote) {
     if (!confirm("Excluir este pacote e todas as sessões vinculadas a ele?")) return;
     const batch = db.batch();
@@ -936,61 +943,118 @@ function ListaPacotes({
     if (!porPaciente[chave]) porPaciente[chave] = [];
     porPaciente[chave].push(p);
   });
-  return /*#__PURE__*/React.createElement("div", null, Object.entries(porPaciente).map(([pacienteId, lista]) => {
-    const nome = pacientes.find(p => p.id === pacienteId)?.nome || lista[0].pacienteNome || "Paciente";
+  return /*#__PURE__*/React.createElement("div", null, Object.entries(porPaciente).map(([pacienteId, lista]) => /*#__PURE__*/React.createElement(CardPacotesPaciente, {
+    key: pacienteId,
+    nome: pacientes.find(p => p.id === pacienteId)?.nome || lista[0].pacienteNome || "Paciente",
+    lista: lista,
+    sessoes: sessoes,
+    expandido: !!expandidosPac[pacienteId],
+    aoAlternar: () => setExpandidosPac(prev => ({
+      ...prev,
+      [pacienteId]: !prev[pacienteId]
+    })),
+    aoEditar: aoEditar,
+    aoExcluir: excluirPacote
+  })));
+}
+function CardPacotesPaciente({
+  nome,
+  lista,
+  sessoes,
+  expandido,
+  aoAlternar,
+  aoEditar,
+  aoExcluir
+}) {
+  const totalPacotes = lista.length;
+  const recebidos = lista.filter(p => p.statusPag === "recebido").length;
+  const pendentes = totalPacotes - recebidos;
+  const valorTotal = lista.reduce((s, p) => s + (p.valorTotal || 0), 0);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "grupo-status"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-pacote-paciente",
+    onClick: aoAlternar
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "avatar-paciente"
+  }, (nome || "?")[0].toUpperCase()), /*#__PURE__*/React.createElement("div", {
+    className: "info-lancamento"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "titulo-secao-lanc"
+  }, nome), /*#__PURE__*/React.createElement("div", {
+    className: "detalhe-lancamento",
+    style: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, totalPacotes, " pacote(s)"), pendentes > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#d97706",
+      fontWeight: 600
+    }
+  }, pendentes, " pendente(s)"), recebidos > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--sucesso)",
+      fontWeight: 600
+    }
+  }, recebidos, " recebido(s)"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--cor-marca)",
+      fontWeight: 600
+    }
+  }, fmtMoeda(valorTotal)))), /*#__PURE__*/React.createElement(Icone, {
+    nome: "chevron-down",
+    tamanho: 18,
+    style: {
+      transform: expandido ? "rotate(180deg)" : "rotate(0deg)",
+      transition: "transform .2s"
+    }
+  })), expandido && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-lista-pacientes"
+  }, lista.map(pac => {
+    const sessoesPac = sessoes.filter(s => s.pacoteId === pac.id);
+    const realizadas = sessoesPac.filter(s => s.status === "realizada" || s.pagamento === "pago").length;
+    const total = pac.totalSessoes || sessoesPac.length || 1;
+    const pct = Math.min(100, Math.round(realizadas / total * 100));
     return /*#__PURE__*/React.createElement("div", {
-      key: pacienteId,
-      className: "grupo-status"
+      key: pac.id,
+      className: "cartao-pacote"
     }, /*#__PURE__*/React.createElement("div", {
-      className: "cabecalho-secao-lanc"
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "titulo-secao-lanc"
-    }, nome)), /*#__PURE__*/React.createElement("div", {
-      className: "cartao-lista-pacientes"
-    }, lista.map(pac => {
-      const sessoesPac = sessoes.filter(s => s.pacoteId === pac.id);
-      const realizadas = sessoesPac.filter(s => s.status === "realizada" || s.pagamento === "pago").length;
-      const total = pac.totalSessoes || sessoesPac.length || 1;
-      const pct = Math.min(100, Math.round(realizadas / total * 100));
-      return /*#__PURE__*/React.createElement("div", {
-        key: pac.id,
-        className: "cartao-pacote"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "info-pacote"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "descricao-lancamento"
-      }, "Pacote de ", pac.totalSessoes, " sess\xF5es \u2014 ", pac.recorrencia), /*#__PURE__*/React.createElement("div", {
-        className: "detalhe-lancamento"
-      }, "In\xEDcio ", pac.dataInicio?.split("-").reverse().join("/"), " · ", TIPOS_ATENDIMENTO.find(t => t.valor === pac.tipoAtendimento)?.rotulo || "Particular", pac.horario ? " · " + pac.horario : ""), /*#__PURE__*/React.createElement("div", {
-        className: "barra-progresso"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "barra-progresso-preenchimento",
-        style: {
-          width: pct + "%"
-        }
-      })), /*#__PURE__*/React.createElement("div", {
-        className: "detalhe-lancamento"
-      }, realizadas, " de ", total, " sess\xF5es realizadas")), /*#__PURE__*/React.createElement("span", {
-        className: "etiqueta-status-lanc etiqueta-" + (pac.statusPag || "pendente")
-      }, pac.statusPag === "recebido" ? "✓ Recebido" : "Pendente"), /*#__PURE__*/React.createElement("span", {
-        className: "valor-lancamento valor-receita"
-      }, fmtMoeda(pac.valorTotal)), /*#__PURE__*/React.createElement("button", {
-        className: "botao-icone",
-        onClick: () => aoEditar(pac),
-        title: "Editar"
-      }, /*#__PURE__*/React.createElement(Icone, {
-        nome: "pencil",
-        tamanho: 15
-      })), /*#__PURE__*/React.createElement("button", {
-        className: "botao-icone botao-icone-perigo",
-        onClick: () => excluirPacote(pac),
-        title: "Excluir"
-      }, /*#__PURE__*/React.createElement(Icone, {
-        nome: "trash-2",
-        tamanho: 15
-      })));
+      className: "info-pacote"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "descricao-lancamento"
+    }, "Pacote de ", pac.totalSessoes, " sess\xF5es \u2014 ", pac.recorrencia), /*#__PURE__*/React.createElement("div", {
+      className: "detalhe-lancamento"
+    }, "In\xEDcio ", pac.dataInicio?.split("-").reverse().join("/"), " · ", TIPOS_ATENDIMENTO.find(t => t.valor === pac.tipoAtendimento)?.rotulo || "Particular", pac.horario ? " · " + pac.horario : ""), /*#__PURE__*/React.createElement("div", {
+      className: "barra-progresso"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "barra-progresso-preenchimento",
+      style: {
+        width: pct + "%"
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "detalhe-lancamento"
+    }, realizadas, " de ", total, " sess\xF5es realizadas")), /*#__PURE__*/React.createElement("span", {
+      className: "etiqueta-status-lanc etiqueta-" + (pac.statusPag || "pendente")
+    }, pac.statusPag === "recebido" ? "✓ Recebido" : "Pendente"), /*#__PURE__*/React.createElement("span", {
+      className: "valor-lancamento valor-receita"
+    }, fmtMoeda(pac.valorTotal)), /*#__PURE__*/React.createElement("button", {
+      className: "botao-icone",
+      onClick: () => aoEditar(pac),
+      title: "Editar"
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "pencil",
+      tamanho: 15
+    })), /*#__PURE__*/React.createElement("button", {
+      className: "botao-icone botao-icone-perigo",
+      onClick: () => aoExcluir(pac),
+      title: "Excluir"
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "trash-2",
+      tamanho: 15
     })));
-  }));
+  })));
 }
 function PacoteForm({
   usuario,
