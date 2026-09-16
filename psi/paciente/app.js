@@ -1069,7 +1069,6 @@ function resolverFormularioKey(item) {
 function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
   const blocos = Array.isArray(item.blocos) ? item.blocos : [];
-  const conteudoTexto = item.conteudo || item.passos || item.texto || "";
   const ComponenteFerramenta = COMPONENTES_FERRAMENTA[resolverFormularioKey(item)];
 
   return (
@@ -1079,7 +1078,6 @@ function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
       </button>
       <div className="cartao">
         <h2 style={{ margin: "0 0 6px" }}>{item.titulo || item.nome}</h2>
-        {item.descricao && !ComponenteFerramenta && <p style={{ color: "#6B7280", fontSize: 13.5, marginBottom: 18 }}>{item.descricao}</p>}
 
         {ComponenteFerramenta && (
           <ComponenteFerramenta usuario={usuario} paciente={paciente} recurso={item} />
@@ -1090,13 +1088,88 @@ function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
         {!ComponenteFerramenta && paginas.length === 0 && blocos.length > 0 && (
           <VisualizadorBlocos blocos={blocos} />
         )}
-        {!ComponenteFerramenta && paginas.length === 0 && blocos.length === 0 && conteudoTexto && (
-          <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7, fontSize: 14 }}>{conteudoTexto}</p>
+        {!ComponenteFerramenta && paginas.length === 0 && blocos.length === 0 && (
+          <LeitorConteudo item={item} />
         )}
-        {item.formularioKey && !ComponenteFerramenta && paginas.length === 0 && blocos.length === 0 && !conteudoTexto && (
-          <p className="texto-vazio-p">
-            Essa ferramenta ainda está sendo preparada — em breve você vai poder usá-la por aqui.
+      </div>
+    </div>
+  );
+}
+
+// Fallback universal pra qualquer ferramenta sem componente próprio
+// ainda — porta fiel do fallback do app de referência (clinica/app.js,
+// FerramentaPortal): divide o campo conteudo/passos por linha em
+// branco e mostra um "slide" de cada vez, com barra de progresso, em
+// vez de despejar tudo como um parágrafo só. Cobre a maioria das
+// ferramentas do catálogo que ainda não ganharam componente dedicado.
+function LeitorConteudo({ item }) {
+  const conteudo = item.conteudo || item.passos || item.texto || "";
+  const objetivo = item.objetivo || item.descricao || "";
+  const slides = conteudo.split("\n\n").map((p) => p.trim()).filter((p) => p.length > 2);
+  const [idx, setIdx] = useState(0);
+
+  if (slides.length === 0) {
+    if (!objetivo) {
+      return (
+        <div style={{ textAlign: "center", padding: "36px 20px" }}>
+          <Icone nome="wrench" tamanho={40} />
+          <div style={{ fontSize: 17, fontWeight: 700, color: "var(--cor-marca)", margin: "10px 0 8px" }}>Em desenvolvimento</div>
+          <p className="texto-vazio-p" style={{ maxWidth: 280, margin: "0 auto" }}>
+            Esta ferramenta está sendo preparada especialmente para você. Em breve estará disponível nesta área.
           </p>
+        </div>
+      );
+    }
+    return (
+      <div style={{ background: "#F3E6FF", borderRadius: 10, padding: "14px 16px", border: "1px solid #EADDFC" }}>
+        <div style={{ fontWeight: 700, fontSize: 12, color: "var(--cor-marca)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 6 }}>
+          <Icone nome="target" tamanho={13} /> Objetivo
+        </div>
+        <div style={{ fontSize: 13, color: "#3D006A", lineHeight: 1.7 }}>{objetivo}</div>
+      </div>
+    );
+  }
+
+  const atual = slides[idx];
+  const linhas = atual.split("\n");
+  const titulo = linhas[0];
+  const corpo = linhas.slice(1).join("\n").trim();
+  const pct = Math.round(((idx + 1) / slides.length) * 100);
+  const concluido = idx === slides.length - 1;
+
+  return (
+    <div>
+      {objetivo && (
+        <div style={{ background: "#F3E6FF", borderRadius: 10, padding: "14px 16px", marginBottom: 20, border: "1px solid #EADDFC" }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: "var(--cor-marca)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 6 }}>
+            <Icone nome="target" tamanho={13} /> Objetivo
+          </div>
+          <div style={{ fontSize: 13, color: "#3D006A", lineHeight: 1.7 }}>{objetivo}</div>
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span style={{ fontSize: 11, color: "#9CA3AF" }}>{idx + 1} de {slides.length}</span>
+        <span style={{ fontSize: 11, color: "var(--cor-marca)", fontWeight: 700 }}>{pct}%</span>
+      </div>
+      <div style={{ height: 4, background: "#F3E6FF", borderRadius: 20, marginBottom: 20, overflow: "hidden" }}>
+        <div style={{ width: pct + "%", height: "100%", background: "var(--cor-marca)", borderRadius: 20, transition: "width .3s" }} />
+      </div>
+      <div style={{ background: "white", border: "1px solid #EADDFC", borderRadius: 16, padding: "22px 18px", minHeight: 150, marginBottom: 20, borderLeft: "4px solid var(--cor-marca)" }}>
+        {titulo && <div style={{ fontWeight: 700, fontSize: 15, color: "var(--cor-marca)", marginBottom: corpo ? 12 : 0, lineHeight: 1.5 }}>{titulo}</div>}
+        {corpo && <div style={{ fontSize: 14, color: "#374151", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{corpo}</div>}
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button className="botao-secundario-p" style={{ flex: 1 }} disabled={idx === 0} onClick={() => setIdx((i) => Math.max(0, i - 1))}>
+          <Icone nome="arrow-left" tamanho={14} /> Anterior
+        </button>
+        {!concluido ? (
+          <button className="botao-primario-p" style={{ flex: 2 }} onClick={() => setIdx((i) => Math.min(slides.length - 1, i + 1))}>
+            Próximo <Icone nome="arrow-right" tamanho={14} />
+          </button>
+        ) : (
+          <button className="botao-primario-p" style={{ flex: 2, background: "#059669" }} onClick={() => setIdx(0)}>
+            <Icone nome="check-circle-2" tamanho={14} /> Concluído — Recomeçar
+          </button>
         )}
       </div>
     </div>

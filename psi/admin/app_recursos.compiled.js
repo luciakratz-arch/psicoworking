@@ -558,8 +558,6 @@ function VisualizarRecursoModal({
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
   const blocos = Array.isArray(item.blocos) ? item.blocos : [];
   const ComponentePreview = PREVIEWS_INTERATIVOS[resolverFormularioKey(item)];
-  const temConteudoTexto = !!(item.conteudo || item.passos || item.texto);
-  const temAlgumPreview = !!ComponentePreview || paginas.length > 0 || blocos.length > 0 || temConteudoTexto;
   return /*#__PURE__*/React.createElement("div", {
     className: "sobreposicao",
     onClick: aoFechar
@@ -572,9 +570,7 @@ function VisualizarRecursoModal({
       "--cor-cat": cores.cor,
       "--bg-cat": cores.bg
     }
-  }, formatarCategoria(item.categoria)), /*#__PURE__*/React.createElement("h3", null, item.titulo || item.nome), item.descricao && !temConteudoTexto && !ComponentePreview && /*#__PURE__*/React.createElement("p", {
-    className: "texto-visualizar-recurso"
-  }, item.descricao), /*#__PURE__*/React.createElement("div", {
+  }, formatarCategoria(item.categoria)), /*#__PURE__*/React.createElement("h3", null, item.titulo || item.nome), /*#__PURE__*/React.createElement("div", {
     className: "aviso-preview-paciente"
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "eye",
@@ -585,11 +581,9 @@ function VisualizarRecursoModal({
     item: item
   }), !ComponentePreview && paginas.length === 0 && blocos.length > 0 && /*#__PURE__*/React.createElement(PreviewBlocosPsicoeducacao, {
     item: item
-  }), !ComponentePreview && paginas.length === 0 && blocos.length === 0 && temConteudoTexto && /*#__PURE__*/React.createElement(PreviewConteudoTexto, {
+  }), !ComponentePreview && paginas.length === 0 && blocos.length === 0 && /*#__PURE__*/React.createElement(PreviewConteudoTexto, {
     item: item
-  }), !temAlgumPreview && /*#__PURE__*/React.createElement("p", {
-    className: "texto-vazio"
-  }, "Pr\xE9-visualiza\xE7\xE3o interativa completa ainda n\xE3o dispon\xEDvel para esta ferramenta \u2014 s\xF3 os dados cadastrados no cat\xE1logo por enquanto."), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     className: "acoes-modal"
   }, /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
@@ -2604,24 +2598,205 @@ function PreviewBlocosPsicoeducacao({
 // Cobre o formato mais antigo/simples de ferramenta ou psicoeducação:
 // só um texto corrido (campo conteudo/passos/texto), com a descrição
 // como "objetivo" em destaque quando existir.
+// Fallback universal pra qualquer ferramenta sem componente próprio
+// ainda — porta fiel do fallback do app de referência (clinica/app.js,
+// FerramentaPortal): divide o campo conteudo/passos por linha em
+// branco e mostra um "slide" de cada vez, com barra de progresso,
+// em vez de despejar tudo como um parágrafo só. É esse fallback que
+// cobre a grande maioria das ferramentas do catálogo que ainda não
+// ganharam um componente dedicado (Registro ABC, Gestão da Ansiedade
+// etc. têm o próprio; todas as outras caem aqui).
 function PreviewConteudoTexto({
   item
 }) {
   const conteudo = item.conteudo || item.passos || item.texto || "";
-  if (!conteudo) return null;
-  return /*#__PURE__*/React.createElement("div", null, item.descricao && /*#__PURE__*/React.createElement("div", {
-    className: "aviso-preview-paciente",
-    style: {
-      display: "block"
+  const objetivo = item.objetivo || item.descricao || "";
+  const slides = conteudo.split("\n\n").map(p => p.trim()).filter(p => p.length > 2);
+  const [idx, setIdx] = useState(0);
+  if (slides.length === 0) {
+    if (!objetivo) {
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          textAlign: "center",
+          padding: "32px 20px"
+        }
+      }, /*#__PURE__*/React.createElement(Icone, {
+        nome: "wrench",
+        tamanho: 36
+      }), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 16,
+          fontWeight: 700,
+          color: "var(--cor-marca)",
+          margin: "10px 0 6px"
+        }
+      }, "Em desenvolvimento"), /*#__PURE__*/React.createElement("p", {
+        className: "texto-vazio",
+        style: {
+          maxWidth: 280,
+          margin: "0 auto"
+        }
+      }, "Esta ferramenta ainda n\xE3o tem conte\xFAdo cadastrado \u2014 edite o item e preencha o campo Descri\xE7\xE3o."));
     }
-  }, /*#__PURE__*/React.createElement("strong", null, "\uD83C\uDFAF Objetivo"), /*#__PURE__*/React.createElement("p", {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#F3E6FF",
+        borderRadius: 10,
+        padding: "14px 16px",
+        border: "1px solid #EADDFC"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 12,
+        color: "var(--cor-marca)",
+        marginBottom: 6,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "target",
+      tamanho: 13
+    }), " Objetivo"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: "#3D006A",
+        lineHeight: 1.7
+      }
+    }, objetivo));
+  }
+  const atual = slides[idx];
+  const linhas = atual.split("\n");
+  const titulo = linhas[0];
+  const corpo = linhas.slice(1).join("\n").trim();
+  const pct = Math.round((idx + 1) / slides.length * 100);
+  const concluido = idx === slides.length - 1;
+  return /*#__PURE__*/React.createElement("div", null, objetivo && /*#__PURE__*/React.createElement("div", {
     style: {
-      margin: "4px 0 0"
+      background: "#F3E6FF",
+      borderRadius: 10,
+      padding: "14px 16px",
+      marginBottom: 20,
+      border: "1px solid #EADDFC"
     }
-  }, item.descricao)), /*#__PURE__*/React.createElement("p", {
-    className: "texto-visualizar-recurso",
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
+      fontWeight: 700,
+      fontSize: 12,
+      color: "var(--cor-marca)",
+      marginBottom: 6,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "target",
+    tamanho: 13
+  }), " Objetivo"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#3D006A",
+      lineHeight: 1.7
+    }
+  }, objetivo)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--texto-suave)"
+    }
+  }, idx + 1, " de ", slides.length), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--cor-marca)",
+      fontWeight: 700
+    }
+  }, pct, "%")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 4,
+      background: "#F3E6FF",
+      borderRadius: 20,
+      marginBottom: 20,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: pct + "%",
+      height: "100%",
+      background: "var(--cor-marca)",
+      borderRadius: 20,
+      transition: "width .3s"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "white",
+      border: "1px solid #EADDFC",
+      borderRadius: 16,
+      padding: "22px 18px",
+      minHeight: 150,
+      marginBottom: 20,
+      borderLeft: "4px solid var(--cor-marca)"
+    }
+  }, titulo && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15,
+      color: "var(--cor-marca)",
+      marginBottom: corpo ? 12 : 0,
+      lineHeight: 1.5
+    }
+  }, titulo), corpo && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: "#374151",
+      lineHeight: 1.8,
       whiteSpace: "pre-wrap"
     }
-  }, conteudo));
+  }, corpo)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      flex: 1
+    },
+    disabled: idx === 0,
+    onClick: () => setIdx(i => Math.max(0, i - 1))
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 14
+  }), " Anterior"), !concluido ? /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      flex: 2,
+      justifyContent: "center"
+    },
+    onClick: () => setIdx(i => Math.min(slides.length - 1, i + 1))
+  }, "Pr\xF3ximo ", /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-right",
+    tamanho: 14
+  })) : /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      flex: 2,
+      justifyContent: "center",
+      background: "#059669"
+    },
+    onClick: () => setIdx(0)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "check-circle-2",
+    tamanho: 14
+  }), " Conclu\xEDdo \u2014 Recome\xE7ar")));
 }
