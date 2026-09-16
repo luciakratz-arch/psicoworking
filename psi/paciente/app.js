@@ -17,9 +17,15 @@
 const { useState, useEffect, useRef } = React;
 
 function Icone({ nome, tamanho = 16 }) {
+  // Sem array de dependências, isso rodava a cada re-render de CADA
+  // ícone da tela — e window.lucide.createIcons() escaneia o
+  // documento inteiro toda vez que é chamado, deixando qualquer tela
+  // com muitos ícones (Recursos Terapêuticos, blocos interativos)
+  // pesada a cada digitação. Só precisa rodar de novo se o nome do
+  // ícone mudar.
   useEffect(() => {
     if (window.lucide) window.lucide.createIcons();
-  });
+  }, [nome]);
   return <i data-lucide={nome} className="icone-lucide" style={{ width: tamanho, height: tamanho }}></i>;
 }
 

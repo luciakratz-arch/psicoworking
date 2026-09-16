@@ -178,9 +178,15 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
 // desenha um <i data-lucide> e deixa a lib substituir pelo SVG.
 function Icone({ nome, tamanho = 16 }) {
   const ref = useRef(null);
+  // Sem array de dependências, isso rodava a cada re-render de CADA
+  // ícone da tela — e window.lucide.createIcons() escaneia o
+  // documento inteiro toda vez que é chamado. Com dezenas de ícones
+  // numa tela (o assistente de Nova Ferramenta tem muitos), qualquer
+  // digitação virava um monte de varreduras completas do DOM, deixando
+  // tudo pesado. Só precisa rodar de novo se o nome do ícone mudar.
   useEffect(() => {
     if (window.lucide) window.lucide.createIcons();
-  });
+  }, [nome]);
   return <i ref={ref} data-lucide={nome} className="icone-lucide" style={{ width: tamanho, height: tamanho }}></i>;
 }
 
