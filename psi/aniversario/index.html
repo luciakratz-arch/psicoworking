@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data de Nascimento</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+  <script src="https://unpkg.com/lucide@0.383.0/dist/umd/lucide.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: linear-gradient(150deg, #EADDFC 0%, #F3F4F6 60%);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      color: #1F1B2E;
+    }
+    .cartao { background: white; border-radius: 20px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 8px 40px rgba(106,43,217,0.14); text-align: center; }
+    .icone-topo { color: var(--cor-marca, #6A2BD9); margin-bottom: 10px; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .subtitulo { font-size: 13px; color: #6B7280; margin-bottom: 24px; line-height: 1.6; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 5px; text-align: left; }
+    input { width: 100%; padding: 11px 14px; border: 1.5px solid #E5E7EB; border-radius: 10px; font-size: 14px; font-family: inherit; }
+    input:focus { outline: none; border-color: var(--cor-marca, #6A2BD9); }
+    button { width: 100%; margin-top: 22px; padding: 14px; background: var(--cor-marca, #6A2BD9); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: default; }
+    .erro { background: #FEE2E2; color: #DC2626; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-top: 14px; }
+    .sucesso h2 { font-size: 20px; margin-bottom: 10px; color: var(--cor-marca, #3B0D6F); }
+    .sucesso p { font-size: 14px; color: #6B7280; line-height: 1.7; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCJx1RwX5-FM2wcUqzeC_CYAUdkmTKU2u4",
+      authDomain: "psicoworking.firebaseapp.com",
+      projectId: "psicoworking",
+      storageBucket: "psicoworking.firebasestorage.app",
+      messagingSenderId: "176262015536",
+      appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const functions = firebase.functions();
+    const chamarRegistrarNascimento = functions.httpsCallable("registrarNascimento");
+  </script>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect } = React;
+
+    function pegarPsiIdDaUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("psi") || "";
+    }
+
+    function Icone({ nome, tamanho = 16 }) {
+      useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+      }, [nome]);
+      return <i data-lucide={nome} style={{ width: tamanho, height: tamanho, display: "inline-block" }}></i>;
+    }
+
+    function App() {
+      const psiId = pegarPsiIdDaUrl();
+      const [nome, setNome] = useState("");
+      const [dataNasc, setDataNasc] = useState("");
+      const [enviando, setEnviando] = useState(false);
+      const [erro, setErro] = useState("");
+      const [enviado, setEnviado] = useState(false);
+      const [nomeClinica, setNomeClinica] = useState("");
+
+      useEffect(() => {
+        if (!psiId) return;
+        db.collection("psi_config").doc(psiId).get().then((doc) => {
+          if (doc.exists) {
+            const dados = doc.data();
+            setNomeClinica(dados.nome || "");
+            if (dados.corPrimaria) document.documentElement.style.setProperty("--cor-marca", dados.corPrimaria);
+          }
+        }).catch(() => {});
+      }, [psiId]);
+
+      if (!psiId) {
+        return (
+          <div className="cartao">
+            <h1>Link inválido</h1>
+            <p className="subtitulo">Este link está incompleto. Peça um novo link para a sua psicóloga.</p>
+          </div>
+        );
+      }
+
+      async function aoEnviar(evento) {
+        evento.preventDefault();
+        setErro("");
+        if (!nome.trim() || !dataNasc) {
+          setErro("Preencha seu nome completo e a data de nascimento.");
+          return;
+        }
+        setEnviando(true);
+        try {
+          const resultado = await chamarRegistrarNascimento({ psiId, nome: nome.trim(), dataNasc });
+          if (resultado.data?.status === "ambiguo") {
+            setErro("Encontramos mais de um cadastro com esse nome. Fale com sua psicóloga para confirmar.");
+            return;
+          }
+          if (resultado.data?.status === "nao_encontrado") {
+            setErro("Não encontramos seu cadastro com esse nome exato. Confira se digitou igual ao que sua psicóloga tem cadastrado.");
+            return;
+          }
+          setEnviado(true);
+        } catch (e) {
+          setErro(e.message || "Não foi possível salvar. Tente novamente.");
+        } finally {
+          setEnviando(false);
+        }
+      }
+
+      if (enviado) {
+        return (
+          <div className="cartao sucesso">
+            <div className="icone-topo"><Icone nome="check-circle-2" tamanho={40} /></div>
+            <h2>Data salva!</h2>
+            <p>Obrigado, {nome.split(" ")[0]}! Sua data de nascimento foi registrada{nomeClinica ? " para " + nomeClinica : ""}.</p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="cartao">
+          <div className="icone-topo"><Icone nome="cake" tamanho={40} /></div>
+          <h1>Data de Nascimento</h1>
+          <p className="subtitulo">
+            {nomeClinica ? nomeClinica + " pediu" : "Sua psicóloga pediu"} para você confirmar sua data de nascimento — leva 10 segundos.
+          </p>
+          <form onSubmit={aoEnviar}>
+            <label>Nome completo (igual ao seu cadastro)</label>
+            <input value={nome} onChange={(e) => setNome(e.target.value)} required />
+            <label>Data de nascimento</label>
+            <input type="date" value={dataNasc} onChange={(e) => setDataNasc(e.target.value)} required />
+
+            {erro && <p className="erro">{erro}</p>}
+
+            <button type="submit" disabled={enviando}>
+              {enviando ? "Enviando..." : "Salvar"}
+            </button>
+          </form>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

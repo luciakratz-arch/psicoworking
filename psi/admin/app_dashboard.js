@@ -8,9 +8,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 const COLECOES_ATIVIDADE = [
-  { colecao: "clinica_diario", rotulo: "Diário", icone: "📖" },
-  { colecao: "clinica_humor", rotulo: "Humor", icone: "😊" },
-  { colecao: "clinica_arvore_decisao", rotulo: "Árvore Decisão", icone: "🌳" },
+  { colecao: "clinica_diario", rotulo: "Diário", icone: "book-open" },
+  { colecao: "clinica_humor", rotulo: "Humor", icone: "smile" },
+  { colecao: "clinica_arvore_decisao", rotulo: "Árvore Decisão", icone: "trees" },
 ];
 
 function TelaDashboard({ usuario, aoAbrirPaciente }) {
@@ -19,6 +19,7 @@ function TelaDashboard({ usuario, aoAbrirPaciente }) {
   const [sessoesHoje, setSessoesHoje] = useState(null); // null = não sabemos ainda
   const [atividades, setAtividades] = useState([]);
   const [carregandoAtividades, setCarregandoAtividades] = useState(true);
+  const [linkAnivCopiado, setLinkAnivCopiado] = useState(false);
 
   useEffect(() => {
     const cancelar = db
@@ -66,6 +67,47 @@ function TelaDashboard({ usuario, aoAbrirPaciente }) {
   const ativos = pacientes.filter((p) => p.status === "ativo").length;
   const pendentes = pacientes.filter((p) => p.status === "pendente").length;
 
+  // Aniversários — campo clinica_pacientes.dataNasc ("YYYY-MM-DD"),
+  // já coletado no cadastro (admin e autocadastro público), só
+  // opcional. Comparação por mês/dia (não por Date completo, pra não
+  // ter problema de fuso horário virando o dia errado).
+  const pacientesAtivos = pacientes.filter((p) => p.status === "ativo");
+  const hojeD = new Date();
+  const aniversariantesHoje = pacientesAtivos.filter((p) => {
+    if (!p.dataNasc) return false;
+    return parseInt(p.dataNasc.slice(5, 7), 10) === hojeD.getMonth() + 1 && parseInt(p.dataNasc.slice(8, 10), 10) === hojeD.getDate();
+  });
+  const proximosAniv = pacientesAtivos
+    .filter((p) => {
+      if (!p.dataNasc || aniversariantesHoje.some((a) => a.id === p.id)) return false;
+      for (let i = 1; i <= 7; i++) {
+        const prox = new Date(hojeD);
+        prox.setDate(hojeD.getDate() + i);
+        if (parseInt(p.dataNasc.slice(5, 7), 10) === prox.getMonth() + 1 && parseInt(p.dataNasc.slice(8, 10), 10) === prox.getDate()) return true;
+      }
+      return false;
+    })
+    .sort((a, b) => {
+      const proximaOcorrencia = (p) => {
+        const d = new Date(hojeD.getFullYear(), parseInt(p.dataNasc.slice(5, 7), 10) - 1, parseInt(p.dataNasc.slice(8, 10), 10));
+        if (d < hojeD) d.setFullYear(hojeD.getFullYear() + 1);
+        return d.getTime();
+      };
+      return proximaOcorrencia(a) - proximaOcorrencia(b);
+    });
+  const semDataNasc = pacientesAtivos.filter((p) => !p.dataNasc);
+
+  function copiarLinkAniversario() {
+    const url = `${window.location.origin}/psi/aniversario/?psi=${usuario.psiId}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setLinkAnivCopiado(true);
+        setTimeout(() => setLinkAnivCopiado(false), 2500);
+      })
+      .catch(() => prompt("Copie o link:", url));
+  }
+
   // Agrupa atividades por paciente, contando quantas de cada tipo.
   const atividadesPorPaciente = {};
   atividades.forEach((a) => {
@@ -97,6 +139,67 @@ function TelaDashboard({ usuario, aoAbrirPaciente }) {
         />
         <CartaoStat titulo="Cadastros Pendentes" valor={carregandoPacientes ? "..." : pendentes} legenda="via autocadastro" icone="user-plus" />
       </div>
+
+      {!carregandoPacientes && (aniversariantesHoje.length > 0 || proximosAniv.length > 0 || semDataNasc.length > 0) && (
+        <div className="cartao-secao">
+          <div className="titulo-cartao-secao">
+            <Icone nome="cake" tamanho={17} /> Aniversários
+          </div>
+
+          {aniversariantesHoje.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div className="rotulo-mini" style={{ color: "#d97706" }}>Hoje</div>
+              {aniversariantesHoje.map((p) => {
+                const anos = p.dataNasc ? hojeD.getFullYear() - parseInt(p.dataNasc.slice(0, 4), 10) : null;
+                return (
+                  <div key={p.id} className="linha-atividade">
+                    <div className="avatar-paciente">{(p.nome || "?").charAt(0).toUpperCase()}</div>
+                    <div className="info-atividade">
+                      <div className="nome-paciente">{p.nome}</div>
+                      {anos != null && <div className="badges-atividade"><span className="badge-atividade">{anos} anos</span></div>}
+                    </div>
+                    {p.email && (
+                      <a
+                        className="botao-secundario"
+                        href={`mailto:${p.email}?subject=${encodeURIComponent("Feliz Aniversário, " + (p.nome || "").split(" ")[0] + "!")}`}
+                      >
+                        <Icone nome="mail" tamanho={14} /> Enviar e-mail
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {proximosAniv.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div className="rotulo-mini">Próximos 7 dias</div>
+              {proximosAniv.map((p) => (
+                <div key={p.id} className="linha-atividade">
+                  <div className="avatar-paciente">{(p.nome || "?").charAt(0).toUpperCase()}</div>
+                  <div className="info-atividade">
+                    <div className="nome-paciente">{p.nome}</div>
+                    <div className="badges-atividade">
+                      <span className="badge-atividade">{p.dataNasc.slice(8, 10)}/{p.dataNasc.slice(5, 7)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {semDataNasc.length > 0 && (
+            <div className="aviso-modulo-futuro" style={{ alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <Icone nome="alert-triangle" tamanho={16} />
+              <span style={{ flex: 1 }}>{semDataNasc.length} paciente(s) sem data de nascimento cadastrada.</span>
+              <button className="botao-secundario" onClick={copiarLinkAniversario}>
+                <Icone nome={linkAnivCopiado ? "check" : "link"} tamanho={13} /> {linkAnivCopiado ? "Copiado!" : "Copiar link para o paciente preencher"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="cartao-secao">
         <div className="titulo-cartao-secao">

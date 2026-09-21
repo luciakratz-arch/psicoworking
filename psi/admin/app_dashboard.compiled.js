@@ -10,15 +10,15 @@
 const COLECOES_ATIVIDADE = [{
   colecao: "clinica_diario",
   rotulo: "Diário",
-  icone: "📖"
+  icone: "book-open"
 }, {
   colecao: "clinica_humor",
   rotulo: "Humor",
-  icone: "😊"
+  icone: "smile"
 }, {
   colecao: "clinica_arvore_decisao",
   rotulo: "Árvore Decisão",
-  icone: "🌳"
+  icone: "trees"
 }];
 function TelaDashboard({
   usuario,
@@ -29,6 +29,7 @@ function TelaDashboard({
   const [sessoesHoje, setSessoesHoje] = useState(null); // null = não sabemos ainda
   const [atividades, setAtividades] = useState([]);
   const [carregandoAtividades, setCarregandoAtividades] = useState(true);
+  const [linkAnivCopiado, setLinkAnivCopiado] = useState(false);
   useEffect(() => {
     const cancelar = db.collection("clinica_pacientes").where("psi_id", "==", usuario.psiId).onSnapshot(snapshot => {
       setPacientes(snapshot.docs.map(doc => ({
@@ -66,6 +67,41 @@ function TelaDashboard({
   }, [usuario.psiId]);
   const ativos = pacientes.filter(p => p.status === "ativo").length;
   const pendentes = pacientes.filter(p => p.status === "pendente").length;
+
+  // Aniversários — campo clinica_pacientes.dataNasc ("YYYY-MM-DD"),
+  // já coletado no cadastro (admin e autocadastro público), só
+  // opcional. Comparação por mês/dia (não por Date completo, pra não
+  // ter problema de fuso horário virando o dia errado).
+  const pacientesAtivos = pacientes.filter(p => p.status === "ativo");
+  const hojeD = new Date();
+  const aniversariantesHoje = pacientesAtivos.filter(p => {
+    if (!p.dataNasc) return false;
+    return parseInt(p.dataNasc.slice(5, 7), 10) === hojeD.getMonth() + 1 && parseInt(p.dataNasc.slice(8, 10), 10) === hojeD.getDate();
+  });
+  const proximosAniv = pacientesAtivos.filter(p => {
+    if (!p.dataNasc || aniversariantesHoje.some(a => a.id === p.id)) return false;
+    for (let i = 1; i <= 7; i++) {
+      const prox = new Date(hojeD);
+      prox.setDate(hojeD.getDate() + i);
+      if (parseInt(p.dataNasc.slice(5, 7), 10) === prox.getMonth() + 1 && parseInt(p.dataNasc.slice(8, 10), 10) === prox.getDate()) return true;
+    }
+    return false;
+  }).sort((a, b) => {
+    const proximaOcorrencia = p => {
+      const d = new Date(hojeD.getFullYear(), parseInt(p.dataNasc.slice(5, 7), 10) - 1, parseInt(p.dataNasc.slice(8, 10), 10));
+      if (d < hojeD) d.setFullYear(hojeD.getFullYear() + 1);
+      return d.getTime();
+    };
+    return proximaOcorrencia(a) - proximaOcorrencia(b);
+  });
+  const semDataNasc = pacientesAtivos.filter(p => !p.dataNasc);
+  function copiarLinkAniversario() {
+    const url = `${window.location.origin}/psi/aniversario/?psi=${usuario.psiId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkAnivCopiado(true);
+      setTimeout(() => setLinkAnivCopiado(false), 2500);
+    }).catch(() => prompt("Copie o link:", url));
+  }
 
   // Agrupa atividades por paciente, contando quantas de cada tipo.
   const atividadesPorPaciente = {};
@@ -105,7 +141,84 @@ function TelaDashboard({
     valor: carregandoPacientes ? "..." : pendentes,
     legenda: "via autocadastro",
     icone: "user-plus"
-  })), /*#__PURE__*/React.createElement("div", {
+  })), !carregandoPacientes && (aniversariantesHoje.length > 0 || proximosAniv.length > 0 || semDataNasc.length > 0) && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "titulo-cartao-secao"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "cake",
+    tamanho: 17
+  }), " Anivers\xE1rios"), aniversariantesHoje.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rotulo-mini",
+    style: {
+      color: "#d97706"
+    }
+  }, "Hoje"), aniversariantesHoje.map(p => {
+    const anos = p.dataNasc ? hojeD.getFullYear() - parseInt(p.dataNasc.slice(0, 4), 10) : null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      className: "linha-atividade"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "avatar-paciente"
+    }, (p.nome || "?").charAt(0).toUpperCase()), /*#__PURE__*/React.createElement("div", {
+      className: "info-atividade"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "nome-paciente"
+    }, p.nome), anos != null && /*#__PURE__*/React.createElement("div", {
+      className: "badges-atividade"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "badge-atividade"
+    }, anos, " anos"))), p.email && /*#__PURE__*/React.createElement("a", {
+      className: "botao-secundario",
+      href: `mailto:${p.email}?subject=${encodeURIComponent("Feliz Aniversário, " + (p.nome || "").split(" ")[0] + "!")}`
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "mail",
+      tamanho: 14
+    }), " Enviar e-mail"));
+  })), proximosAniv.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rotulo-mini"
+  }, "Pr\xF3ximos 7 dias"), proximosAniv.map(p => /*#__PURE__*/React.createElement("div", {
+    key: p.id,
+    className: "linha-atividade"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "avatar-paciente"
+  }, (p.nome || "?").charAt(0).toUpperCase()), /*#__PURE__*/React.createElement("div", {
+    className: "info-atividade"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "nome-paciente"
+  }, p.nome), /*#__PURE__*/React.createElement("div", {
+    className: "badges-atividade"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "badge-atividade"
+  }, p.dataNasc.slice(8, 10), "/", p.dataNasc.slice(5, 7))))))), semDataNasc.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "aviso-modulo-futuro",
+    style: {
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "alert-triangle",
+    tamanho: 16
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, semDataNasc.length, " paciente(s) sem data de nascimento cadastrada."), /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: copiarLinkAniversario
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: linkAnivCopiado ? "check" : "link",
+    tamanho: 13
+  }), " ", linkAnivCopiado ? "Copiado!" : "Copiar link para o paciente preencher"))), /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("div", {
     className: "titulo-cartao-secao"

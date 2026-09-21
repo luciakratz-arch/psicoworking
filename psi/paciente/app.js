@@ -253,6 +253,95 @@ function usarConfiguracaoClinica(psiId) {
 }
 
 // ─── App principal ──────────────────────────────────────────────
+// ─── Modal de Aniversário ────────────────────────────────────────
+// Aparece uma vez, no primeiro login do dia do aniversário do
+// paciente (campo clinica_pacientes.dataNasc). Confete em CSS puro
+// (sem emoji, regra permanente do projeto) — cada quadradinho cai e
+// gira com uma animação simples.
+function ModalAniversario({ nome, nomeClinica, corMarca, onClose }) {
+  const [visivel, setVisivel] = useState(false);
+  const [confetes, setConfetes] = useState([]);
+
+  useEffect(() => {
+    setTimeout(() => setVisivel(true), 50);
+    const cores = [corMarca || "#7B00C4", "#0891b2", "#059669", "#d97706", "#db2777", "#6366f1"];
+    setConfetes(
+      Array.from({ length: 50 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        atraso: Math.random() * 2,
+        duracao: 2.5 + Math.random() * 2,
+        cor: cores[Math.floor(Math.random() * cores.length)],
+        tamanho: 6 + Math.random() * 8,
+        rotacao: Math.random() * 360,
+      }))
+    );
+  }, [corMarca]);
+
+  const primeiroNome = (nome || "").split(" ")[0];
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        opacity: visivel ? 1 : 0, transition: "opacity .4s",
+      }}
+    >
+      {confetes.map((c) => (
+        <div
+          key={c.id}
+          style={{
+            position: "fixed", left: c.x + "%", top: "-20px", width: c.tamanho, height: c.tamanho, background: c.cor,
+            borderRadius: c.id % 2 === 0 ? "50%" : "2px",
+            animation: `cair-confete ${c.duracao}s ${c.atraso}s ease-in forwards`,
+            transform: `rotate(${c.rotacao}deg)`, pointerEvents: "none", zIndex: 10000,
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes cair-confete { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+        @keyframes pulsar-bolo { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+      `}</style>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white", borderRadius: 24, padding: "40px 32px", maxWidth: 420, width: "100%", textAlign: "center", position: "relative",
+          boxShadow: "0 20px 60px rgba(123,0,196,0.3)",
+          transform: visivel ? "scale(1) translateY(0)" : "scale(.8) translateY(30px)",
+          transition: "transform .4s cubic-bezier(.34,1.56,.64,1)",
+        }}
+      >
+        <div style={{ color: "var(--cor-marca)", animation: "pulsar-bolo 1.5s ease-in-out infinite", marginBottom: 8 }}>
+          <Icone nome="cake" tamanho={64} />
+        </div>
+        <div style={{ fontSize: 26, color: "var(--cor-marca)", fontWeight: 700, marginBottom: 8, lineHeight: 1.3 }}>
+          Feliz Aniversário,<br />{primeiroNome}!
+        </div>
+        <div style={{ fontSize: 15, color: "#555", lineHeight: 1.7, margin: "16px 0 24px" }}>
+          Que este novo ciclo seja repleto de<br />
+          <strong style={{ color: "var(--cor-marca)" }}>saúde, leveza e crescimento</strong>.<br />
+          É uma honra caminhar ao seu lado.
+        </div>
+        {nomeClinica && (
+          <div style={{ fontSize: 13, color: "#888", fontStyle: "italic", marginBottom: 24, borderTop: "1px solid #F3E6FF", paddingTop: 16 }}>
+            Com carinho,<br />
+            <strong style={{ color: "var(--cor-marca)", fontSize: 16 }}>{nomeClinica}</strong>
+          </div>
+        )}
+        <button
+          onClick={onClose}
+          className="botao-primario-p"
+          style={{ padding: "12px 32px", fontSize: 15, borderRadius: 50, justifyContent: "center" }}
+        >
+          <Icone nome="party-popper" tamanho={16} /> Obrigada!
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const { usuario, carregando } = useUsuarioLogado();
   const [tela, setTela] = useState("painel");
@@ -260,6 +349,8 @@ function App() {
   const configPreLogin = usarConfiguracaoPreLogin(!usuario ? pegarPsiIdConhecido() : null);
   const [paciente, setPaciente] = useState(null);
   const [recursoAberto, setRecursoAberto] = useState(null);
+  const [mostrarAniversario, setMostrarAniversario] = useState(false);
+  const aniversarioChecado = useRef(false);
 
   useEffect(() => {
     if (!usuario || usuario.role !== "paciente") return;
@@ -268,6 +359,20 @@ function App() {
     });
     return cancelar;
   }, [usuario]);
+
+  // Mostra o modal de aniversário uma vez por sessão (não a cada
+  // atualização do documento do paciente via onSnapshot).
+  useEffect(() => {
+    if (!paciente || aniversarioChecado.current) return;
+    aniversarioChecado.current = true;
+    if (!paciente.dataNasc) return;
+    const hoje = new Date();
+    const mes = parseInt(paciente.dataNasc.slice(5, 7), 10);
+    const dia = parseInt(paciente.dataNasc.slice(8, 10), 10);
+    if (mes === hoje.getMonth() + 1 && dia === hoje.getDate()) {
+      setMostrarAniversario(true);
+    }
+  }, [paciente]);
 
   // Guarda o psi_id assim que ele fica conhecido de verdade (custom
   // claim, pós-login), pra reconhecer a clínica em visitas futuras
@@ -317,6 +422,9 @@ function App() {
 
   return (
     <div className="layout-paciente">
+      {mostrarAniversario && (
+        <ModalAniversario nome={paciente?.nome} nomeClinica={configClinica?.nome} corMarca={configClinica?.corPrimaria} onClose={() => setMostrarAniversario(false)} />
+      )}
       <aside className="barra-lateral-p">
         <div className="marca-barra-lateral-p">
           {configClinica?.logoUrl ? (

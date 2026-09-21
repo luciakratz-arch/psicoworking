@@ -12,9 +12,21 @@
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
-const { google } = require("googleapis");
+
+// googleapis é um pacote gigante e demora vários segundos pra
+// carregar — se ficar no topo do arquivo, o deploy falha com
+// "Cannot determine backend specification. Timeout after 10000",
+// porque o Firebase carrega este arquivo só pra descobrir quais
+// functions existem. Carregamos sob demanda, só nas functions da
+// Agenda que realmente usam.
+let _google = null;
+function obterGoogle() {
+  if (!_google) _google = require("googleapis").google;
+  return _google;
+}
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -199,7 +211,7 @@ exports.auditarCriacaoPaciente = onDocumentCreated(
 // psicóloga, e persiste de volta se o Google renovar o token.
 // ─────────────────────────────────────────────────────────────
 function montarClienteOAuth(psiId) {
-  const oauth2Client = new google.auth.OAuth2(
+  const oauth2Client = new (obterGoogle()).auth.OAuth2(
     GOOGLE_CLIENT_ID.value(),
     GOOGLE_CLIENT_SECRET.value()
   );
@@ -238,7 +250,7 @@ exports.conectarGoogleCalendar = onCall(
     }
 
     try {
-      const oauth2Client = new google.auth.OAuth2(
+      const oauth2Client = new (obterGoogle()).auth.OAuth2(
         GOOGLE_CLIENT_ID.value(),
         GOOGLE_CLIENT_SECRET.value(),
         redirectUri
@@ -286,7 +298,7 @@ exports.listarEventosAgenda = onCall(
     }
 
     const oauth2Client = await obterClienteAutenticado(chamador.token.psi_id);
-    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+    const calendar = obterGoogle().calendar({ version: "v3", auth: oauth2Client });
 
     const resposta = await calendar.events.list({
       calendarId: "primary",
@@ -326,7 +338,7 @@ exports.criarEventoAgenda = onCall(
     }
 
     const oauth2Client = await obterClienteAutenticado(chamador.token.psi_id);
-    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+    const calendar = obterGoogle().calendar({ version: "v3", auth: oauth2Client });
 
     const resposta = await calendar.events.insert({
       calendarId: "primary",
@@ -367,6 +379,18 @@ exports.buscarPorSintoma = onCall({ secrets: [ANTHROPIC_API_KEY] }, async (reque
     throw new HttpsError("invalid-argument", "Envie o sintoma e a lista de itens da biblioteca.");
   }
 
+  // A chave só existe de verdade depois que a psicóloga criar uma
+  // conta na Anthropic e rodarmos `firebase functions:secrets:set`.
+  // Até lá o segredo guarda um marcador, e a mensagem abaixo explica
+  // a situação em vez de estourar um erro técnico da API.
+  const chaveConfigurada = ANTHROPIC_API_KEY.value();
+  if (!chaveConfigurada || chaveConfigurada === "NAO_CONFIGURADA") {
+    throw new HttpsError(
+      "failed-precondition",
+      "A busca por sintoma ainda não está ativada: falta cadastrar a chave da Anthropic."
+    );
+  }
+
   const lista = itens
     .slice(0, 200)
     .map((it) => `- "${it.titulo}" (${it.categoria || "sem categoria"}): ${it.descricao || "sem descrição"}`)
@@ -388,7 +412,7 @@ Escolha as 3 a 5 opções mais indicadas, usando SOMENTE títulos que estão exa
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY.value(),
+        "x-api-key": chaveConfigurada,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
@@ -417,3 +441,153 @@ Escolha as 3 a 5 opções mais indicadas, usando SOMENTE títulos que estão exa
 
   return { recomendacoes };
 });
+
+// ─────────────────────────────────────────────────────────────
+// 8) ANIVERSÁRIOS
+// ─────────────────────────────────────────────────────────────
+
+// Chamada pela página pública psi/aniversario/ (sem login — o
+// paciente não tem conta ainda ou não lembra a senha). Por segurança
+// só atualiza quando o nome digitado bate com EXATAMENTE UM paciente
+// daquela clínica — em caso de ambiguidade ou "não encontrado" quem
+// decide o que fazer é a psicóloga, não a function.
+exports.registrarNascimento = onCall(async (request) => {
+  const { psiId, nome, dataNasc } = request.data || {};
+  if (!psiId || !nome || !dataNasc) {
+    throw new HttpsError("invalid-argument", "Nome, data de nascimento e clínica são obrigatórios.");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataNasc)) {
+    throw new HttpsError("invalid-argument", "Data de nascimento em formato inválido.");
+  }
+
+  const snap = await db.collection("clinica_pacientes").where("psi_id", "==", psiId).get();
+  const nomeBuscado = nome.trim().toLowerCase();
+  const encontrados = snap.docs.filter((doc) => (doc.data().nome || "").trim().toLowerCase() === nomeBuscado);
+
+  if (encontrados.length === 0) return { status: "nao_encontrado" };
+  if (encontrados.length > 1) return { status: "ambiguo" };
+
+  await encontrados[0].ref.update({ dataNasc });
+
+  await db.collection("clinica_audit_log").add({
+    acao: "registrar_nascimento_publico",
+    psiId,
+    pacienteId: encontrados[0].id,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { status: "ok" };
+});
+
+function montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl }) {
+  return (
+    "<div style='font-family:Arial;background:#f5e8ff;padding:30px'><div style='max-width:500px;margin:0 auto;background:white;border-radius:20px;overflow:hidden'>" +
+    "<div style='background:" + corMarca + ";padding:30px;text-align:center'>" +
+    (logoUrl ? "<img src='" + logoUrl + "' style='width:80px;height:80px;object-fit:contain;border-radius:50%'/>" : "") +
+    "<h1 style='color:white;margin:10px 0'>Feliz Aniversário, " + primeiroNome + "!</h1>" +
+    (anos ? "<p style='color:rgba(255,255,255,0.85)'>" + anos + " anos</p>" : "") +
+    "</div><div style='padding:30px'>" +
+    "<p style='color:#444'>Olá, <strong style='color:" + corMarca + "'>" + primeiroNome + "</strong>! Hoje é o seu dia! Que este novo ciclo seja repleto de saúde, leveza e crescimento.</p>" +
+    "<p style='color:" + corMarca + ";font-size:18px;margin-top:20px'>" + nomeClinica + "</p>" +
+    "</div></div></div>"
+  );
+}
+
+function montarEmailAvisoAniversario({ nomeClinica, corMarca, logoUrl, quantidade, lista }) {
+  return (
+    "<div style='font-family:Arial;background:#f5e8ff;padding:30px'><div style='max-width:500px;margin:0 auto;background:white;border-radius:20px;overflow:hidden'>" +
+    "<div style='background:" + corMarca + ";padding:30px;text-align:center'>" +
+    (logoUrl ? "<img src='" + logoUrl + "' style='width:70px;height:70px;object-fit:contain;border-radius:50%'/>" : "") +
+    "<h1 style='color:white;font-size:20px;margin:10px 0'>Aniversariantes de Hoje</h1></div>" +
+    "<div style='padding:28px'><p style='color:#555'>Hoje é aniversário de <strong style='color:" + corMarca + "'>" + quantidade + " paciente(s)</strong> de " + nomeClinica + ":</p>" +
+    "<ul style='color:#444;line-height:2'>" + lista + "</ul></div></div></div>"
+  );
+}
+
+// Roda todo dia às 08:00 (horário de Brasília). Precisa da extensão
+// "Trigger Email from Firestore" (ext-firestore-send-email) instalada
+// e apontando pra coleção clinica_emails — sem ela, os documentos são
+// criados normalmente mas nenhum e-mail sai de verdade.
+exports.verificarAniversarios = onSchedule(
+  { schedule: "0 8 * * *", timeZone: "America/Sao_Paulo" },
+  async () => {
+    const hoje = new Date();
+    const mes = hoje.getMonth() + 1;
+    const dia = hoje.getDate();
+
+    const snap = await db.collection("clinica_pacientes").where("status", "==", "ativo").get();
+    const aniversariantes = [];
+    snap.forEach((doc) => {
+      const p = doc.data();
+      if (!p.dataNasc) return;
+      if (parseInt(p.dataNasc.slice(5, 7), 10) === mes && parseInt(p.dataNasc.slice(8, 10), 10) === dia) {
+        aniversariantes.push({ id: doc.id, ...p });
+      }
+    });
+
+    if (aniversariantes.length === 0) {
+      console.log("Nenhum aniversariante hoje.");
+      return;
+    }
+
+    // Agrupa por clínica (psi_id) — cada uma tem sua própria cor/logo
+    // e recebe um único e-mail de aviso, mesmo com vários pacientes.
+    const porClinica = {};
+    aniversariantes.forEach((p) => {
+      (porClinica[p.psi_id] = porClinica[p.psi_id] || []).push(p);
+    });
+
+    for (const [psiId, pacientesDaClinica] of Object.entries(porClinica)) {
+      let nomeClinica = "Sua clínica";
+      let corMarca = "#7B00C4";
+      let logoUrl = "";
+      try {
+        const configDoc = await db.collection("psi_config").doc(psiId).get();
+        if (configDoc.exists) {
+          const config = configDoc.data();
+          nomeClinica = config.nome || nomeClinica;
+          corMarca = config.corPrimaria || corMarca;
+          logoUrl = config.logoUrl || "";
+        }
+      } catch (e) {}
+
+      for (const p of pacientesDaClinica) {
+        if (!p.email) continue;
+        const primeiroNome = (p.nome || "").split(" ")[0];
+        const anos = hoje.getFullYear() - parseInt(p.dataNasc.slice(0, 4), 10);
+        await db.collection("clinica_emails").add({
+          to: p.email,
+          message: {
+            subject: "Feliz Aniversário, " + primeiroNome + "!",
+            html: montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl }),
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      try {
+        const psiInfo = await auth.getUser(psiId);
+        if (psiInfo.email) {
+          const lista = pacientesDaClinica
+            .map((p) => {
+              const anosP = hoje.getFullYear() - parseInt(p.dataNasc.slice(0, 4), 10);
+              return "<li><strong>" + p.nome + "</strong> — " + anosP + " anos · " + (p.email || "sem e-mail") + "</li>";
+            })
+            .join("");
+          await db.collection("clinica_emails").add({
+            to: psiInfo.email,
+            message: {
+              subject: pacientesDaClinica.length + " aniversariante(s) hoje — " + dia + "/" + mes,
+              html: montarEmailAvisoAniversario({ nomeClinica, corMarca, logoUrl, quantidade: pacientesDaClinica.length, lista }),
+            },
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        console.error("Erro ao buscar e-mail da psicóloga " + psiId + ":", e.message);
+      }
+    }
+
+    console.log("Aniversariantes de hoje:", aniversariantes.map((p) => p.nome).join(", "));
+  }
+);
