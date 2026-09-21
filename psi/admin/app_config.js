@@ -21,6 +21,17 @@ function TelaConfiguracoes({ usuario }) {
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [statusEmailTeste, setStatusEmailTeste] = useState("");
+
+  async function enviarEmailTeste() {
+    setStatusEmailTeste("Enviando...");
+    try {
+      const resultado = await functions.httpsCallable("enviarEmailTeste")();
+      setStatusEmailTeste("Enviado para " + resultado.data.destino + " — confira sua caixa de entrada (pode levar 1 minuto).");
+    } catch (e) {
+      setStatusEmailTeste("Erro: " + (e.message || "não foi possível enviar."));
+    }
+  }
 
   useEffect(() => {
     db.collection("psi_config")
@@ -163,6 +174,18 @@ function TelaConfiguracoes({ usuario }) {
         <button type="button" className="botao-secundario" onClick={copiarLinkPortal}>
           <Icone nome="link" tamanho={15} /> {linkCopiado ? "Copiado!" : "Copiar Link do Portal"}
         </button>
+      </div>
+
+      <div className="cartao-config" style={{ marginTop: 16 }}>
+        <label>Envio automático de e-mails</label>
+        <p className="dica-campo">
+          Usado nos e-mails de aniversário dos pacientes. Clique abaixo para receber um e-mail de teste no
+          seu próprio endereço e confirmar que está tudo funcionando.
+        </p>
+        <button type="button" className="botao-secundario" onClick={enviarEmailTeste}>
+          <Icone nome="mail" tamanho={15} /> Enviar e-mail de teste
+        </button>
+        {statusEmailTeste && <p className="dica-campo" style={{ marginTop: 10 }}>{statusEmailTeste}</p>}
       </div>
     </div>
   );

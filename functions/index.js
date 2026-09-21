@@ -479,6 +479,38 @@ exports.registrarNascimento = onCall(async (request) => {
   return { status: "ok" };
 });
 
+// Enfileira um e-mail de teste pro endereço da própria psicóloga.
+// Serve pra confirmar que a extensão "Trigger Email from Firestore"
+// está configurada e entregando de verdade — sem depender de
+// esperar o aniversário de alguém chegar.
+exports.enviarEmailTeste = onCall(async (request) => {
+  const chamador = request.auth;
+  if (!chamador || !["psi", "secretaria"].includes(chamador.token.role)) {
+    throw new HttpsError("permission-denied", "Só a equipe da clínica pode enviar e-mail de teste.");
+  }
+
+  const destino = chamador.token.email;
+  if (!destino) {
+    throw new HttpsError("failed-precondition", "Sua conta não tem e-mail cadastrado.");
+  }
+
+  await db.collection("clinica_emails").add({
+    to: destino,
+    message: {
+      subject: "Teste de envio — PsiCoWorking",
+      html:
+        "<div style='font-family:Arial;padding:24px'>" +
+        "<h2 style='color:#7B00C4'>Funcionou!</h2>" +
+        "<p>Se você está lendo isto, o envio automático de e-mails do PsiCoWorking está configurado corretamente.</p>" +
+        "<p>Os e-mails de aniversário dos seus pacientes vão sair normalmente.</p>" +
+        "</div>",
+    },
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { ok: true, destino };
+});
+
 function montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl }) {
   return (
     "<div style='font-family:Arial;background:#f5e8ff;padding:30px'><div style='max-width:500px;margin:0 auto;background:white;border-radius:20px;overflow:hidden'>" +

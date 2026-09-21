@@ -22,6 +22,16 @@ function TelaConfiguracoes({
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [statusEmailTeste, setStatusEmailTeste] = useState("");
+  async function enviarEmailTeste() {
+    setStatusEmailTeste("Enviando...");
+    try {
+      const resultado = await functions.httpsCallable("enviarEmailTeste")();
+      setStatusEmailTeste("Enviado para " + resultado.data.destino + " — confira sua caixa de entrada (pode levar 1 minuto).");
+    } catch (e) {
+      setStatusEmailTeste("Erro: " + (e.message || "não foi possível enviar."));
+    }
+  }
   useEffect(() => {
     db.collection("psi_config").doc(usuario.psiId).get().then(doc => {
       if (doc.exists) {
@@ -158,5 +168,24 @@ function TelaConfiguracoes({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "link",
     tamanho: 15
-  }), " ", linkCopiado ? "Copiado!" : "Copiar Link do Portal")));
+  }), " ", linkCopiado ? "Copiado!" : "Copiar Link do Portal")), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-config",
+    style: {
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Envio autom\xE1tico de e-mails"), /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo"
+  }, "Usado nos e-mails de anivers\xE1rio dos pacientes. Clique abaixo para receber um e-mail de teste no seu pr\xF3prio endere\xE7o e confirmar que est\xE1 tudo funcionando."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: enviarEmailTeste
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "mail",
+    tamanho: 15
+  }), " Enviar e-mail de teste"), statusEmailTeste && /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo",
+    style: {
+      marginTop: 10
+    }
+  }, statusEmailTeste)));
 }

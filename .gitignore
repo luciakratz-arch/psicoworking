@@ -4,6 +4,10 @@ functions/.env.*
 *-service-account*.json
 *serviceAccountKey*.json
 .firebaserc.local
+# Senhas das extensões (ex.: senha de app do Gmail usada pelo envio
+# de e-mail). O arquivo .env da extensão pode ir pro repositório, o
+# .secret.local NUNCA.
+extensions/*.secret.local
 
 # Dependências
 functions/node_modules/

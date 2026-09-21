@@ -1,5 +1,13 @@
 {
   "projects": {
     "default": "psicoworking"
+  },
+  "targets": {},
+  "etags": {
+    "psicoworking": {
+      "extensionInstances": {
+        "firestore-send-email": "cf566d57a2eeaff6cb7a59c85753730b09455b42e1489b1241630c51d5d69072"
+      }
+    }
   }
 }
