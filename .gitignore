@@ -5,9 +5,11 @@ functions/.env.*
 *serviceAccountKey*.json
 .firebaserc.local
 # Senhas das extensões (ex.: senha de app do Gmail usada pelo envio
-# de e-mail). O arquivo .env da extensão pode ir pro repositório, o
-# .secret.local NUNCA.
+# de e-mail). O .env da extensão carrega a senha dentro da URI de
+# conexão SMTP, então ele também fica de fora do repositório.
+# Ver extensions/firestore-send-email.env.exemplo pra estrutura.
 extensions/*.secret.local
+extensions/*.env
 
 # Dependências
 functions/node_modules/
