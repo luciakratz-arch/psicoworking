@@ -111,7 +111,15 @@ service cloud.firestore {
     match /clinica_laudos/{laudoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
-      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
+      // O paciente só lê o que a psicóloga liberou de propósito.
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId)
+                   && resource.data.visivelPaciente == true;
+    }
+
+    // Relatórios e declarações de Saúde Ocupacional (NR-1): só a equipe.
+    match /clinica_documentos_nr1/{docId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
     }
 
     match /clinica_anamneses/{registroId} {

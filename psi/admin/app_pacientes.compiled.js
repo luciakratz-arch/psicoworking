@@ -564,11 +564,22 @@ function PerfilPaciente({
   }), aba === "questionarios" && /*#__PURE__*/React.createElement(AbaQuestionariosPaciente, {
     usuario: usuario,
     paciente: paciente
-  }), aba !== "perfil" && aba !== "modulos" && aba !== "questionarios" && /*#__PURE__*/React.createElement("div", {
-    className: "cartao-secao"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "texto-vazio"
-  }, "Essa aba (", ABAS_PACIENTE.find(a => a.id === aba)?.rotulo, ") ainda n\xE3o foi constru\xEDda \u2014 \xE9 uma das pr\xF3ximas etapas.")));
+  }), aba === "metas" && /*#__PURE__*/React.createElement(AbaMetasPaciente, {
+    usuario: usuario,
+    paciente: paciente
+  }), aba === "laudos" && /*#__PURE__*/React.createElement(AbaLaudosPaciente, {
+    usuario: usuario,
+    paciente: paciente
+  }), aba === "evolucao" && /*#__PURE__*/React.createElement(AbaEvolucaoPaciente, {
+    usuario: usuario,
+    paciente: paciente
+  }), aba === "saude-ocupacional" && /*#__PURE__*/React.createElement(AbaSaudeOcupacionalPaciente, {
+    usuario: usuario,
+    paciente: paciente
+  }), aba === "links" && /*#__PURE__*/React.createElement(AbaLinksPaciente, {
+    usuario: usuario,
+    paciente: paciente
+  }));
 }
 function AbaPerfilPaciente({
   paciente

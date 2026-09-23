@@ -872,16 +872,16 @@ function TelaAvaliar({ usuario }) {
 }
 
 // ─── Meus Laudos ─────────────────────────────────────────────────
-// A psicóloga ainda não tem uma tela pra emitir laudos (é uma das
-// próximas etapas do lado dela) — essa tela já fica pronta pra
-// mostrar assim que existir.
+// Mostra só os documentos que a psicóloga liberou (visivelPaciente).
 function TelaMeusLaudos({ usuario }) {
   const [laudos, setLaudos] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  const [abertoId, setAbertoId] = useState(null);
 
   useEffect(() => {
     db.collection("clinica_laudos")
       .where("pacienteId", "==", usuario.uid)
+      .where("visivelPaciente", "==", true)
       .get()
       .then((snap) => {
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -910,6 +910,31 @@ function TelaMeusLaudos({ usuario }) {
         <div key={l.id} className="cartao">
           <div style={{ fontWeight: 700, fontSize: 15 }}>{l.titulo || "Laudo"}</div>
           <div style={{ fontSize: 11.5, color: "#9CA3AF", marginTop: 4 }}>{l.data}</div>
+          <button
+            type="button"
+            className="botao-secundario-p"
+            style={{ marginTop: 10 }}
+            onClick={() => setAbertoId(abertoId === l.id ? null : l.id)}
+          >
+            {abertoId === l.id ? "Fechar" : "Ler documento"}
+          </button>
+          {abertoId === l.id && (
+            <div style={{ marginTop: 12, fontSize: 13.5, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#374151" }}>
+              {[
+                ["Finalidade", l.finalidade],
+                ["Texto", l.corpo],
+                ["Descrição da demanda", l.demanda],
+                ["Procedimento", l.procedimento],
+                ["Análise", l.analise],
+                ["Conclusão", l.conclusao],
+              ].filter(([, v]) => v).map(([t, v]) => (
+                <div key={t} style={{ marginBottom: 10 }}>
+                  <strong style={{ color: "var(--cor-marca)", fontSize: 12 }}>{t}</strong>
+                  <div>{v}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>

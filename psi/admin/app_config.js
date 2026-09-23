@@ -14,6 +14,9 @@ function TelaConfiguracoes({ usuario }) {
   const [logoUrl, setLogoUrl] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [crp, setCrp] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [tituloProfissional, setTituloProfissional] = useState("");
   const [arquivoLogo, setArquivoLogo] = useState(null);
   const [arquivoFoto, setArquivoFoto] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -45,6 +48,9 @@ function TelaConfiguracoes({ usuario }) {
           setLogoUrl(dados.logoUrl || "");
           setFotoUrl(dados.fotoUrl || "");
           setWhatsapp(dados.whatsapp || "");
+          setCrp(dados.crp || "");
+          setCidade(dados.cidade || "");
+          setTituloProfissional(dados.tituloProfissional || "");
         }
         setCarregando(false);
       })
@@ -83,6 +89,9 @@ function TelaConfiguracoes({ usuario }) {
           logoUrl: urlLogoFinal,
           fotoUrl: urlFotoFinal,
           whatsapp,
+          crp: crp.trim(),
+          cidade: cidade.trim(),
+          tituloProfissional: tituloProfissional.trim(),
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -127,6 +136,15 @@ function TelaConfiguracoes({ usuario }) {
 
         <label>WhatsApp da clínica <span className="opcional">(opcional — usado no botão "Reagendar" do paciente)</span></label>
         <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex.: 62994644950" />
+
+        <label>CRP <span className="opcional">(aparece nos laudos, relatórios e declarações)</span></label>
+        <input value={crp} onChange={(e) => setCrp(e.target.value)} placeholder="Ex.: 09/12345" />
+
+        <label>Cidade <span className="opcional">(aparece na data dos documentos)</span></label>
+        <input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex.: Goiânia, GO" />
+
+        <label>Título profissional <span className="opcional">(opcional — aparece abaixo da assinatura)</span></label>
+        <input value={tituloProfissional} onChange={(e) => setTituloProfissional(e.target.value)} placeholder="Ex.: Psicóloga · TCC · Neuropsicologia" />
 
         <label>Cor principal</label>
         <div className="linha-cor">

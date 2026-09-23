@@ -499,13 +499,11 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
       {aba === "modulos" && <AbaModulosPaciente paciente={paciente} />}
       {aba === "questionarios" && <AbaQuestionariosPaciente usuario={usuario} paciente={paciente} />}
 
-      {aba !== "perfil" && aba !== "modulos" && aba !== "questionarios" && (
-        <div className="cartao-secao">
-          <p className="texto-vazio">
-            Essa aba ({ABAS_PACIENTE.find((a) => a.id === aba)?.rotulo}) ainda não foi construída — é uma das próximas etapas.
-          </p>
-        </div>
-      )}
+      {aba === "metas" && <AbaMetasPaciente usuario={usuario} paciente={paciente} />}
+      {aba === "laudos" && <AbaLaudosPaciente usuario={usuario} paciente={paciente} />}
+      {aba === "evolucao" && <AbaEvolucaoPaciente usuario={usuario} paciente={paciente} />}
+      {aba === "saude-ocupacional" && <AbaSaudeOcupacionalPaciente usuario={usuario} paciente={paciente} />}
+      {aba === "links" && <AbaLinksPaciente usuario={usuario} paciente={paciente} />}
     </div>
   );
 }

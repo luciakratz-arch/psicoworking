@@ -15,6 +15,9 @@ function TelaConfiguracoes({
   const [logoUrl, setLogoUrl] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [crp, setCrp] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [tituloProfissional, setTituloProfissional] = useState("");
   const [arquivoLogo, setArquivoLogo] = useState(null);
   const [arquivoFoto, setArquivoFoto] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -41,6 +44,9 @@ function TelaConfiguracoes({
         setLogoUrl(dados.logoUrl || "");
         setFotoUrl(dados.fotoUrl || "");
         setWhatsapp(dados.whatsapp || "");
+        setCrp(dados.crp || "");
+        setCidade(dados.cidade || "");
+        setTituloProfissional(dados.tituloProfissional || "");
       }
       setCarregando(false);
     }).catch(() => setCarregando(false));
@@ -73,6 +79,9 @@ function TelaConfiguracoes({
         logoUrl: urlLogoFinal,
         fotoUrl: urlFotoFinal,
         whatsapp,
+        crp: crp.trim(),
+        cidade: cidade.trim(),
+        tituloProfissional: tituloProfissional.trim(),
         atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
       }, {
         merge: true
@@ -117,6 +126,24 @@ function TelaConfiguracoes({
     value: whatsapp,
     onChange: e => setWhatsapp(e.target.value),
     placeholder: "Ex.: 62994644950"
+  }), /*#__PURE__*/React.createElement("label", null, "CRP ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(aparece nos laudos, relat\xF3rios e declara\xE7\xF5es)")), /*#__PURE__*/React.createElement("input", {
+    value: crp,
+    onChange: e => setCrp(e.target.value),
+    placeholder: "Ex.: 09/12345"
+  }), /*#__PURE__*/React.createElement("label", null, "Cidade ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(aparece na data dos documentos)")), /*#__PURE__*/React.createElement("input", {
+    value: cidade,
+    onChange: e => setCidade(e.target.value),
+    placeholder: "Ex.: Goi\xE2nia, GO"
+  }), /*#__PURE__*/React.createElement("label", null, "T\xEDtulo profissional ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional \u2014 aparece abaixo da assinatura)")), /*#__PURE__*/React.createElement("input", {
+    value: tituloProfissional,
+    onChange: e => setTituloProfissional(e.target.value),
+    placeholder: "Ex.: Psic\xF3loga \xB7 TCC \xB7 Neuropsicologia"
   }), /*#__PURE__*/React.createElement("label", null, "Cor principal"), /*#__PURE__*/React.createElement("div", {
     className: "linha-cor"
   }, /*#__PURE__*/React.createElement("input", {
