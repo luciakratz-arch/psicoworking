@@ -362,6 +362,24 @@ function FormularioAnamnese({ link, onConcluido }) {
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
 
+  const limparRascunho = useRascunho(
+    "anamnese",
+    tela === "sucesso" ? {} : { tela, perfil, informanteTipo, nomeRespondente, parentescoRespondente, etapaIdx, respostas },
+    (r) => {
+      if (!r.perfil) return;
+      setPerfil(r.perfil);
+      if (r.informanteTipo != null) setInformanteTipo(r.informanteTipo);
+      if (r.nomeRespondente != null) setNomeRespondente(r.nomeRespondente);
+      if (r.parentescoRespondente != null) setParentescoRespondente(r.parentescoRespondente);
+      if (r.respostas) setRespostas(r.respostas);
+      if (r.tela === "formulario") {
+        setEtapas(r.perfil === "infantil" ? etapasAnamneseInfantil() : etapasAnamneseAdulto());
+        setEtapaIdx(r.etapaIdx || 0);
+        setTela("formulario");
+      }
+    }
+  );
+
   function setResposta(id, v) {
     setRespostas((r) => ({ ...r, [id]: v }));
   }
@@ -409,6 +427,7 @@ function FormularioAnamnese({ link, onConcluido }) {
         ...respostas,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
+      limparRascunho();
       setTela("sucesso");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {

@@ -254,6 +254,14 @@ function FerramentaGestaoAnsiedade({ usuario, paciente, recurso }) {
   const [msg, setMsg] = useState("");
   const [historico, setHistorico] = useState([]);
 
+  useRascunho("gestao-ansiedade-" + usuario.uid, { aba, stress, nota, track, resp }, (r) => {
+    if (r.aba != null) setAba(r.aba);
+    if (r.stress != null) setStress(r.stress);
+    if (r.nota != null) setNota(r.nota);
+    if (r.track) setTrack(r.track);
+    if (Array.isArray(r.resp)) setResp(r.resp);
+  });
+
   useEffect(() => {
     db.collection("clinica_gestao_ansiedade")
       .where("pacienteId", "==", usuario.uid)
@@ -424,6 +432,17 @@ function FerramentaABC({ usuario, paciente, recurso }) {
   const [msg, setMsg] = useState("");
   const [salvando, setSalvando] = useState(false);
 
+  useRascunho(
+    "registro-abc-" + usuario.uid,
+    passo === 5
+      ? { passo: 1, draft: { situacao: "", pensamento: "", emocao: "", intensidade: 60, alternativo: "" } }
+      : { passo, draft },
+    (r) => {
+      if (r.passo >= 1 && r.passo <= 4) setPasso(r.passo);
+      if (r.draft) setDraft(r.draft);
+    }
+  );
+
   useEffect(() => {
     db.collection("clinica_registro_abc")
       .where("pacienteId", "==", usuario.uid)
@@ -577,6 +596,17 @@ function FerramentaArvore({ usuario, paciente, recurso }) {
   const [msg, setMsg] = useState("");
   const [salvando, setSalvando] = useState(false);
 
+  useRascunho(
+    "arvore-decisao-" + usuario.uid,
+    step === "conclusao" ? { step: "home", preocupacao: "", acoes: "", plano: "" } : { step, preocupacao, acoes, plano },
+    (r) => {
+      if (r.step) setStep(r.step);
+      if (r.preocupacao != null) setPreocupacao(r.preocupacao);
+      if (r.acoes != null) setAcoes(r.acoes);
+      if (r.plano != null) setPlano(r.plano);
+    }
+  );
+
   useEffect(() => {
     db.collection("clinica_arvore_decisao")
       .where("pacienteId", "==", usuario.uid)
@@ -725,6 +755,10 @@ function FerramentaRodaVida({ usuario, paciente, recurso }) {
   const [msg, setMsg] = useState("");
   const [historico, setHistorico] = useState([]);
   const [salvando, setSalvando] = useState(false);
+
+  useRascunho("roda-da-vida-" + usuario.uid, { vals }, (r) => {
+    if (r.vals) setVals(r.vals);
+  });
 
   useEffect(() => {
     db.collection("clinica_gestao_ansiedade")
@@ -1246,6 +1280,16 @@ function FerramentaRastreamento({ usuario, paciente, recurso }) {
   const [msg, setMsg] = useState("");
   const [salvando, setSalvando] = useState(false);
 
+  useRascunho("rastreamento-alimentacao-" + usuario.uid, { fome, emocoes, pensamento, comeu, alivio, sensacoes, reflexao }, (r) => {
+    if (r.fome != null) setFome(r.fome);
+    if (Array.isArray(r.emocoes)) setEmocoes(r.emocoes);
+    if (r.pensamento != null) setPensamento(r.pensamento);
+    if (r.comeu != null) setComeu(r.comeu);
+    if (r.alivio != null) setAlivio(r.alivio);
+    if (Array.isArray(r.sensacoes)) setSensacoes(r.sensacoes);
+    if (r.reflexao != null) setReflexao(r.reflexao);
+  });
+
   useEffect(() => {
     const cancelar = db.collection("clinica_rastreamento_alimentar")
       .where("pacienteId", "==", usuario.uid)
@@ -1370,6 +1414,14 @@ function FerramentaTreino({ usuario, paciente, recurso }) {
   const [tocando, setTocando] = useState(null);
   const [msg, setMsg] = useState("");
   const [salvando, setSalvando] = useState(false);
+
+  useRascunho("treino-auditivo-" + usuario.uid, { modulo, respostas, feedbacks, score, total }, (r) => {
+    if (r.modulo != null) setModulo(r.modulo);
+    if (r.respostas) setRespostas(r.respostas);
+    if (r.feedbacks) setFeedbacks(r.feedbacks);
+    if (r.score != null) setScore(r.score);
+    if (r.total != null) setTotal(r.total);
+  });
   const ctxRef = useRef(null);
 
   function getCtx() {
@@ -1620,6 +1672,23 @@ function FerramentaBaralhoDistorcoes({ usuario, paciente, recurso }) {
   const [msg, setMsg] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [historico, setHistorico] = useState(null);
+
+  useRascunho(
+    "baralho-distorcoes-" + usuario.uid,
+    tela === "concluido"
+      ? { tela: "intro", categoriaSel: null, frasesSelecionadas: [], ordenadas: [], sessaoIdx: 0, etapaSessao: 0, respostas: {}, reflexaoFinal: "" }
+      : { tela, categoriaSel, frasesSelecionadas, ordenadas, sessaoIdx, etapaSessao, respostas, reflexaoFinal },
+    (r) => {
+      if (r.tela && r.tela !== "concluido") setTela(r.tela);
+      if (r.categoriaSel !== undefined) setCategoriaSel(r.categoriaSel);
+      if (Array.isArray(r.frasesSelecionadas)) setFrasesSelecionadas(r.frasesSelecionadas);
+      if (Array.isArray(r.ordenadas)) setOrdenadas(r.ordenadas);
+      if (r.sessaoIdx != null) setSessaoIdx(r.sessaoIdx);
+      if (r.etapaSessao != null) setEtapaSessao(r.etapaSessao);
+      if (r.respostas) setRespostas(r.respostas);
+      if (r.reflexaoFinal != null) setReflexaoFinal(r.reflexaoFinal);
+    }
+  );
 
   useEffect(() => {
     db.collection("clinica_baralho_distorcoes")
@@ -2019,6 +2088,10 @@ function LeitorFabula({ usuario, paciente, recurso }) {
   const [idx, setIdx] = useState(0);
   const [respostas, setRespostas] = useState({});
   const [msg, setMsg] = useState("");
+  const limparRascunho = useRascunho("fabula-" + usuario.uid + (recurso.id || ""), { idx, respostas }, (r) => {
+    if (r.idx != null) setIdx(r.idx);
+    if (r.respostas) setRespostas(r.respostas);
+  });
 
   if (paginas.length === 0) return null;
   const pagina = paginas[idx];
@@ -2037,6 +2110,7 @@ function LeitorFabula({ usuario, paciente, recurso }) {
         data: new Date().toLocaleDateString("pt-BR"),
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
+      limparRascunho();
       setMsg("Reflexões salvas!");
       setTimeout(() => setMsg(""), 2500);
     } catch (e) {
@@ -2107,6 +2181,9 @@ function VisualizadorBlocos({ blocos, usuario, paciente, recurso }) {
   const [respostas, setRespostas] = useState({});
   const [msg, setMsg] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const limparRascunho = useRascunho("blocos-" + usuario.uid + (recurso?.id || ""), { respostas }, (r) => {
+    if (r.respostas) setRespostas(r.respostas);
+  });
 
   const TIPOS_RESPOSTA = ["pergunta", "slider", "estrelas", "checklist", "selecao"];
   const temInterativo = blocos.some((b) => TIPOS_RESPOSTA.includes(b.tipo));
@@ -2137,6 +2214,7 @@ function VisualizadorBlocos({ blocos, usuario, paciente, recurso }) {
         data: new Date().toLocaleDateString("pt-BR"),
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
+      limparRascunho();
       setMsg("Respostas salvas!");
       setTimeout(() => setMsg(""), 2500);
     } catch (e) {
@@ -2400,8 +2478,43 @@ function aplicarCorMarca(corPrimaria) {
 // script, um `const` aqui em cima pode não ficar visível lá — e a
 // tela quebraria inteira. Pendurar explicitamente no `window` tira
 // essa dúvida: funciona igual em qualquer navegador.
+// Rascunho automático: guarda no aparelho, a cada mudança, o que a
+// pessoa já preencheu, e devolve tudo quando ela reabre o mesmo link.
+// `valores` é um objeto com os campos; `restaurar(obj)` chama os
+// setters. Devolve `limparRascunho()` — chamar depois de enviar/salvar
+// com sucesso, senão o rascunho antigo reaparece.
+function useRascunho(nome, valores, restaurar) {
+  const token = new URLSearchParams(window.location.search).get("t") || "";
+  const chave = "psi_rascunho:" + token + ":" + nome;
+  const pronto = useRef(false);
+
+  useEffect(() => {
+    try {
+      const salvo = localStorage.getItem(chave);
+      if (salvo) restaurar(JSON.parse(salvo));
+    } catch (e) {}
+    setTimeout(() => { pronto.current = true; }, 0);
+  }, [chave]);
+
+  const texto = JSON.stringify(valores);
+  useEffect(() => {
+    if (!pronto.current) return;
+    const t = setTimeout(() => {
+      if (!pronto.current) return;
+      try { localStorage.setItem(chave, texto); } catch (e) {}
+    }, 400);
+    return () => clearTimeout(t);
+  }, [chave, texto]);
+
+  return function limparRascunho() {
+    pronto.current = false;
+    try { localStorage.removeItem(chave); } catch (e) {}
+    setTimeout(() => { pronto.current = true; }, 1000);
+  };
+}
+
 Object.assign(window, {
-  useState, useEffect, useRef,
+  useState, useEffect, useRef, useRascunho,
   Icone, TextAreaVoz,
   COMPONENTES_FERRAMENTA, resolverFormularioKey,
   DetalheRecurso, LeitorConteudo, LeitorFabula, VisualizadorBlocos,

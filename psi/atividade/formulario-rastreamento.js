@@ -726,6 +726,23 @@ function FormularioRastreamento({ link }) {
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
 
+  const limparRascunho = useRascunho(
+    "rastreamento-" + link.tipo,
+    tela === "sucesso" ? {} : { tela, tipoRespondente, nomeRespondente, parentesco, blocoIdx, respostas, obsFinais },
+    (r) => {
+      if (!r.tipoRespondente && !r.respostas) return;
+      if (r.tipoRespondente) setTipoRespondente(r.tipoRespondente);
+      if (r.nomeRespondente != null) setNomeRespondente(r.nomeRespondente);
+      if (r.parentesco != null) setParentesco(r.parentesco);
+      if (r.respostas) setRespostas(r.respostas);
+      if (r.obsFinais != null) setObsFinais(r.obsFinais);
+      if (r.tela === "formulario") {
+        setBlocoIdx(r.blocoIdx || 0);
+        setTela("formulario");
+      }
+    }
+  );
+
   if (!config) {
     return (
       <div className="cartao" style={{ textAlign: "center", padding: "30px 20px" }}>
@@ -780,6 +797,7 @@ function FormularioRastreamento({ link }) {
         obsFinais,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
+      limparRascunho();
       setTela("sucesso");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
