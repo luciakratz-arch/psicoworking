@@ -797,7 +797,6 @@ function AbaModulosPaciente({ paciente }) {
 
 const QUESTIONARIOS_DISPONIVEIS = [
   { id: "anamnese", rotulo: "Anamnese", icone: "clipboard-list", desc: "Marcos do desenvolvimento, histórico clínico e familiar.", pronto: true },
-  { id: "entrevista", rotulo: "Entrevista Clínica Inicial", icone: "brain", desc: "Perfil etário, escalas de observação e hipóteses diagnósticas DSM-5.", pronto: false },
   { id: "rastreamento", rotulo: "Rastreamento Bipolar / Borderline", icone: "bar-chart-2", desc: "Avaliação diferencial DSM-5, com laudo comparativo.", pronto: true },
   { id: "sexual", rotulo: "Rastreamento de Saúde Sexual", icone: "heart", desc: "Rastreamento confidencial, respondido só pelo paciente.", pronto: true },
   { id: "alimentar", rotulo: "Hábitos Alimentares", icone: "utensils", desc: "Rastreamento de padrões e comportamentos alimentares.", pronto: true },
@@ -2622,6 +2621,7 @@ function AbaRastreamentoNeuroView({ usuario, paciente, aoVoltar }) {
 
 function AbaQuestionariosPaciente({ usuario, paciente }) {
   const [aberto, setAberto] = useState(null);
+  const [enviandoId, setEnviandoId] = useState(null);
 
   if (aberto === "anamnese") {
     return <AbaAnamneseView usuario={usuario} paciente={paciente} aoVoltar={() => setAberto(null)} />;
@@ -2642,17 +2642,53 @@ function AbaQuestionariosPaciente({ usuario, paciente }) {
     return <AbaRastreamentoView usuario={usuario} paciente={paciente} tipo={aberto} aoVoltar={() => setAberto(null)} />;
   }
 
+  // Gera o link individual do questionário e abre o WhatsApp com a
+  // mensagem pronta — mesmo fluxo das telas internas, direto do cartão.
+  async function enviarPorWhatsApp(q) {
+    setEnviandoId(q.id);
+    try {
+      const tipo = q.id === "rastreamento" ? "bipolar" : q.id;
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        tipo,
+        titulo: q.rotulo,
+        nomeClinica: cfg.nome || "PsiCoWorking",
+        corMarca: cfg.corPrimaria || "#6A2BD9",
+        logoUrl: cfg.logoUrl || "",
+        status: "enviado",
+        cancelado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      const link = window.location.origin + "/psi/atividade/?t=" + token;
+      const primeiroNome = (paciente.nome || "").split(" ")[0];
+      const mensagem =
+        `Olá, ${primeiroNome}!\n\n` +
+        `Preparei um questionário para você preencher: *${q.rotulo}*.\n\n` +
+        `É só abrir o link abaixo e responder com calma:\n\n${link}\n\n` +
+        `Qualquer dúvida, me chama por aqui.`;
+      const numero = (paciente.telefone || "").replace(/\D/g, "");
+      window.open(
+        (numero ? "https://wa.me/55" + numero : "https://wa.me/") + "?text=" + encodeURIComponent(mensagem),
+        "_blank"
+      );
+    } catch (e) {
+      alert("Não foi possível gerar o link: " + e.message);
+    } finally {
+      setEnviandoId(null);
+    }
+  }
+
   return (
     <div>
-      <p className="subtitulo-pagina" style={{ marginBottom: 16 }}>Selecione um questionário para visualizar.</p>
+      <p className="subtitulo-pagina" style={{ marginBottom: 16 }}>Visualize as respostas ou envie o questionário ao paciente pelo WhatsApp.</p>
       <div className="grade-cartoes-recursos">
         {QUESTIONARIOS_DISPONIVEIS.map((q) => (
-          <div
-            key={q.id}
-            className="cartao-recurso"
-            style={{ cursor: q.pronto ? "pointer" : "default", opacity: q.pronto ? 1 : 0.6 }}
-            onClick={() => q.pronto && setAberto(q.id)}
-          >
+          <div key={q.id} className="cartao-recurso" style={{ opacity: q.pronto ? 1 : 0.6 }}>
             <div className="cabecalho-cartao-recurso">
               <div className="icone-cartao-recurso" style={{ "--cor-cat": "var(--cor-marca)" }}>
                 <Icone nome={q.icone} tamanho={20} />
@@ -2660,7 +2696,18 @@ function AbaQuestionariosPaciente({ usuario, paciente }) {
               <div className="titulo-cartao-recurso">{q.rotulo}</div>
             </div>
             <p className="descricao-cartao-recurso">{q.desc}</p>
-            {!q.pronto && <span className="texto-vazio" style={{ fontSize: 11.5 }}>Em construção</span>}
+            {q.pronto ? (
+              <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                <button className="botao-secundario" onClick={() => setAberto(q.id)}>
+                  <Icone nome="eye" tamanho={14} /> Visualizar
+                </button>
+                <button className="botao-primario" style={{ background: "#25D366" }} disabled={enviandoId === q.id} onClick={() => enviarPorWhatsApp(q)}>
+                  <Icone nome="message-circle" tamanho={14} /> {enviandoId === q.id ? "Gerando..." : "Enviar WhatsApp"}
+                </button>
+              </div>
+            ) : (
+              <span className="texto-vazio" style={{ fontSize: 11.5 }}>Em construção</span>
+            )}
           </div>
         ))}
       </div>

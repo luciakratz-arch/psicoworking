@@ -908,12 +908,6 @@ const QUESTIONARIOS_DISPONIVEIS = [{
   desc: "Marcos do desenvolvimento, histórico clínico e familiar.",
   pronto: true
 }, {
-  id: "entrevista",
-  rotulo: "Entrevista Clínica Inicial",
-  icone: "brain",
-  desc: "Perfil etário, escalas de observação e hipóteses diagnósticas DSM-5.",
-  pronto: false
-}, {
   id: "rastreamento",
   rotulo: "Rastreamento Bipolar / Borderline",
   icone: "bar-chart-2",
@@ -3784,6 +3778,7 @@ function AbaQuestionariosPaciente({
   paciente
 }) {
   const [aberto, setAberto] = useState(null);
+  const [enviandoId, setEnviandoId] = useState(null);
   if (aberto === "anamnese") {
     return /*#__PURE__*/React.createElement(AbaAnamneseView, {
       usuario: usuario,
@@ -3827,21 +3822,53 @@ function AbaQuestionariosPaciente({
       aoVoltar: () => setAberto(null)
     });
   }
+
+  // Gera o link individual do questionário e abre o WhatsApp com a
+  // mensagem pronta — mesmo fluxo das telas internas, direto do cartão.
+  async function enviarPorWhatsApp(q) {
+    setEnviandoId(q.id);
+    try {
+      const tipo = q.id === "rastreamento" ? "bipolar" : q.id;
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        tipo,
+        titulo: q.rotulo,
+        nomeClinica: cfg.nome || "PsiCoWorking",
+        corMarca: cfg.corPrimaria || "#6A2BD9",
+        logoUrl: cfg.logoUrl || "",
+        status: "enviado",
+        cancelado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      const link = window.location.origin + "/psi/atividade/?t=" + token;
+      const primeiroNome = (paciente.nome || "").split(" ")[0];
+      const mensagem = `Olá, ${primeiroNome}!\n\n` + `Preparei um questionário para você preencher: *${q.rotulo}*.\n\n` + `É só abrir o link abaixo e responder com calma:\n\n${link}\n\n` + `Qualquer dúvida, me chama por aqui.`;
+      const numero = (paciente.telefone || "").replace(/\D/g, "");
+      window.open((numero ? "https://wa.me/55" + numero : "https://wa.me/") + "?text=" + encodeURIComponent(mensagem), "_blank");
+    } catch (e) {
+      alert("Não foi possível gerar o link: " + e.message);
+    } finally {
+      setEnviandoId(null);
+    }
+  }
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     className: "subtitulo-pagina",
     style: {
       marginBottom: 16
     }
-  }, "Selecione um question\xE1rio para visualizar."), /*#__PURE__*/React.createElement("div", {
+  }, "Visualize as respostas ou envie o question\xE1rio ao paciente pelo WhatsApp."), /*#__PURE__*/React.createElement("div", {
     className: "grade-cartoes-recursos"
   }, QUESTIONARIOS_DISPONIVEIS.map(q => /*#__PURE__*/React.createElement("div", {
     key: q.id,
     className: "cartao-recurso",
     style: {
-      cursor: q.pronto ? "pointer" : "default",
       opacity: q.pronto ? 1 : 0.6
-    },
-    onClick: () => q.pronto && setAberto(q.id)
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "cabecalho-cartao-recurso"
   }, /*#__PURE__*/React.createElement("div", {
@@ -3856,7 +3883,30 @@ function AbaQuestionariosPaciente({
     className: "titulo-cartao-recurso"
   }, q.rotulo)), /*#__PURE__*/React.createElement("p", {
     className: "descricao-cartao-recurso"
-  }, q.desc), !q.pronto && /*#__PURE__*/React.createElement("span", {
+  }, q.desc), q.pronto ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 12,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: () => setAberto(q.id)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "eye",
+    tamanho: 14
+  }), " Visualizar"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      background: "#25D366"
+    },
+    disabled: enviandoId === q.id,
+    onClick: () => enviarPorWhatsApp(q)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "message-circle",
+    tamanho: 14
+  }), " ", enviandoId === q.id ? "Gerando..." : "Enviar WhatsApp")) : /*#__PURE__*/React.createElement("span", {
     className: "texto-vazio",
     style: {
       fontSize: 11.5
