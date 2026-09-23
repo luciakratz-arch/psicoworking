@@ -253,6 +253,31 @@ function CamposPaciente({
       status: s.valor
     })
   }, s.rotulo)))), /*#__PURE__*/React.createElement("div", {
+    className: "campo-largura-total"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setForm({
+      ...form,
+      ehMenorDeIdade: !form.ehMenorDeIdade
+    }),
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 10,
+      padding: "7px 14px",
+      borderRadius: 20,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer",
+      border: form.ehMenorDeIdade ? "1.5px solid #0891b2" : "1.5px solid var(--borda)",
+      background: form.ehMenorDeIdade ? "#0891b2" : "white",
+      color: form.ehMenorDeIdade ? "white" : "var(--texto-suave)"
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "users",
+    tamanho: 14
+  }), " Paciente menor de 18 anos")), form.ehMenorDeIdade && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "campo-largura-total titulo-secao-form",
     style: {
       color: "#0891b2",
@@ -267,7 +292,7 @@ function CamposPaciente({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "users",
     tamanho: 13
-  }), " Respons\xE1vel / Pais \u2014 para pacientes menores de idade")), /*#__PURE__*/React.createElement("div", {
+  }), " Respons\xE1vel / Pais")), /*#__PURE__*/React.createElement("div", {
     className: "campo-largura-total"
   }, /*#__PURE__*/React.createElement("label", null, "Nome do Respons\xE1vel ", /*#__PURE__*/React.createElement("span", {
     className: "opcional"
@@ -345,7 +370,7 @@ function CamposPaciente({
       responsavelObs: e.target.value
     }),
     placeholder: "Ex: Pais separados, guarda compartilhada. M\xE3e tem autoridade para autorizar procedimentos..."
-  })), /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "campo-largura-total titulo-secao-form"
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -548,8 +573,11 @@ function PerfilPaciente({
 function AbaPerfilPaciente({
   paciente
 }) {
+  // Se já existe algum dado de responsável salvo (cadastros antigos,
+  // antes do botão existir), abre a seção automaticamente.
   const [form, setForm] = useState({
-    ...paciente
+    ...paciente,
+    ehMenorDeIdade: paciente.ehMenorDeIdade || !!paciente.responsavelNome
   });
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState("");
