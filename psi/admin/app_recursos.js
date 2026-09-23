@@ -441,6 +441,7 @@ const FERRAMENTAS_INTERATIVAS_DISPONIVEIS = [
   { valor: "muscle-relaxation", rotulo: "Relaxamento Muscular Progressivo" },
   { valor: "emotional-eating", rotulo: "Rastreamento Emocional da Alimentação" },
   { valor: "treino-neuro-auditivo", rotulo: "Treino Neuro-Auditivo" },
+  { valor: "baralho-distorcoes", rotulo: "Baralho das Distorções Cognitivas" },
 ];
 
 // Cada tipo de bloco tem seu formato de dados default — porta fiel de
@@ -1335,6 +1336,7 @@ const PREVIEWS_INTERATIVOS = {
   "muscle-relaxation": PreviewFerramentaRelaxamento,
   "emotional-eating": PreviewFerramentaRastreamento,
   "treino-neuro-auditivo": PreviewFerramentaTreino,
+  "baralho-distorcoes": PreviewBaralhoDistorcoes,
 };
 
 // Itens cadastrados antes de existir o campo "Tipo de ferramenta
@@ -1351,6 +1353,7 @@ const TITULO_PARA_FORMULARIO_KEY = {
   "relaxamento muscular progressivo": "muscle-relaxation",
   "rastreamento emocional da alimentação": "emotional-eating",
   "treino neuro-auditivo": "treino-neuro-auditivo",
+  "baralho das distorções cognitivas": "baralho-distorcoes",
 };
 function resolverFormularioKey(item) {
   if (item.formularioKey) return item.formularioKey;
@@ -2229,6 +2232,219 @@ function PreviewFerramentaTreino() {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Preview: Baralho das Distorções Cognitivas ─────────────────
+// Mesmo fluxo da ferramenta real do paciente (selecionar frases →
+// ordenar por influência → sessão com perguntas socráticas), só que
+// sem gravar nada: não existe paciente real nesta tela.
+const BARALHO_CATEGORIAS_PREVIEW = [
+  {
+    id: "desvalor", nome: "Desvalor", cor: "#C0392B", bg: "#fdf2f2",
+    desc: "Crenças de que não tenho valor como pessoa",
+    frases: [
+      "Eu nunca faço nada certo.",
+      "Não tenho valor como pessoa.",
+      "Sou um fardo para as pessoas ao meu redor.",
+      "Qualquer um faria melhor do que eu.",
+      "Não mereço as coisas boas que acontecem na minha vida.",
+      "Sou inferior aos outros.",
+      "Meus erros me definem para sempre.",
+      "Não tenho nada de especial para oferecer.",
+      "Quando me conhecem de verdade, acabam me rejeitando.",
+      "Preciso ser perfeito para ter algum valor.",
+    ],
+  },
+  {
+    id: "desamor", nome: "Desamor", cor: "#1A5276", bg: "#eaf1f8",
+    desc: "Crenças de que não sou amado ou amável",
+    frases: [
+      "Ninguém me ama de verdade.",
+      "Sou difícil de amar.",
+      "As pessoas só ficam perto de mim por interesse.",
+      "Não mereço um amor verdadeiro.",
+      "Sempre vou terminar sozinho.",
+      "Quando me mostro como sou, as pessoas se afastam.",
+      "Nunca serei prioridade para ninguém.",
+      "O amor que recebo sempre tem um preço.",
+      "As pessoas que dizem me amar vão embora cedo ou tarde.",
+      "Sou muito intenso/complicado para ser amado.",
+    ],
+  },
+  {
+    id: "desamparo", nome: "Desamparo", cor: "#6C3483", bg: "#f5eeff",
+    desc: "Crenças de que não tenho controle ou suporte",
+    frases: [
+      "Não adianta tentar, as coisas nunca mudam.",
+      "Não tenho controle sobre o que acontece na minha vida.",
+      "Sempre vou precisar dos outros para sobreviver.",
+      "Não consigo me proteger sozinho.",
+      "O mundo é perigoso e eu estou sozinho nele.",
+      "Não importa o que eu faça, sempre dá errado.",
+      "Sou impotente diante dos meus problemas.",
+      "Ninguém vai me ajudar quando eu precisar de verdade.",
+      "Fui feito para sofrer.",
+      "Não tenho forças para mudar minha situação.",
+    ],
+  },
+];
+
+const BARALHO_PERGUNTAS_PREVIEW = {
+  desvalor: [
+    "Que evidências reais você tem de que isso é verdade?",
+    "Você julgaria um amigo da mesma forma que se julga?",
+    "O que diria sobre você alguém que te conhece bem e te ama?",
+  ],
+  desamor: [
+    "Existem pessoas na sua vida que demonstram cuidado por você?",
+    "O que tornaria alguém digno de ser amado, na sua visão?",
+    "Que experiências antigas podem ter ensinado essa crença?",
+  ],
+  desamparo: [
+    "Houve algum momento em que as coisas realmente mudaram na sua vida?",
+    "Quais recursos internos você tem que te ajudaram antes?",
+    "O que você poderia fazer, mesmo que pequeno, para se sentir mais em controle?",
+  ],
+};
+
+function PreviewBaralhoDistorcoes() {
+  const [tela, setTela] = useState("selecao");
+  const [categoriaSel, setCategoriaSel] = useState(null);
+  const [selecionadas, setSelecionadas] = useState([]);
+  const [ordenadas, setOrdenadas] = useState([]);
+  const [respostas, setRespostas] = useState({});
+  const [reflexao, setReflexao] = useState("");
+  const [msg, setMsg] = useState("");
+
+  const categoria = (id) => BARALHO_CATEGORIAS_PREVIEW.find((c) => c.id === id);
+
+  function alternar(catId, frase) {
+    setSelecionadas((prev) => {
+      const existe = prev.find((f) => f.categoriaId === catId && f.frase === frase);
+      if (existe) return prev.filter((f) => !(f.categoriaId === catId && f.frase === frase));
+      return [...prev, { categoriaId: catId, frase }];
+    });
+  }
+
+  function mover(idx, dir) {
+    setOrdenadas((prev) => {
+      const arr = [...prev];
+      const alvo = idx + dir;
+      if (alvo < 0 || alvo >= arr.length) return arr;
+      [arr[idx], arr[alvo]] = [arr[alvo], arr[idx]];
+      return arr;
+    });
+  }
+
+  if (tela === "selecao") {
+    const cat = categoriaSel ? categoria(categoriaSel) : null;
+    return (
+      <div>
+        <p className="texto-vazio">O paciente marca as frases com que se identifica, dentro de 3 categorias de crença.</p>
+        {!cat && (
+          <div>
+            {BARALHO_CATEGORIAS_PREVIEW.map((c) => (
+              <div
+                key={c.id}
+                onClick={() => setCategoriaSel(c.id)}
+                style={{ background: c.bg, border: "2px solid " + c.cor + "40", borderRadius: 14, padding: "14px", marginBottom: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}
+              >
+                <div style={{ width: 16, height: 16, borderRadius: "50%", background: c.cor, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, color: c.cor, fontSize: 14 }}>{c.nome}</div>
+                  <div style={{ fontSize: 12, color: "var(--texto-suave)" }}>
+                    {selecionadas.filter((f) => f.categoriaId === c.id).length} selecionadas de {c.frases.length}
+                  </div>
+                </div>
+                <Icone nome="chevron-right" tamanho={16} />
+              </div>
+            ))}
+            {selecionadas.length > 0 && (
+              <button className="botao-primario" style={{ width: "100%", justifyContent: "center" }} onClick={() => { setOrdenadas([...selecionadas]); setTela("ordenacao"); }}>
+                Ordenar por influência ({selecionadas.length}) <Icone nome="arrow-right" tamanho={14} />
+              </button>
+            )}
+          </div>
+        )}
+        {cat && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <button className="botao-secundario" onClick={() => setCategoriaSel(null)}><Icone nome="arrow-left" tamanho={14} /> Voltar</button>
+              <strong style={{ color: cat.cor }}>{cat.nome}</strong>
+            </div>
+            {cat.frases.map((frase, i) => {
+              const sel = !!selecionadas.find((f) => f.categoriaId === cat.id && f.frase === frase);
+              return (
+                <div
+                  key={i}
+                  onClick={() => alternar(cat.id, frase)}
+                  style={{ background: sel ? cat.bg : "white", border: "2px solid " + (sel ? cat.cor : "#E5E7EB"), borderRadius: 12, padding: "12px 14px", marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, fontSize: 13.5 }}
+                >
+                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: sel ? cat.cor : "transparent", border: "2px solid " + (sel ? cat.cor : "#D1D5DB"), display: "flex", alignItems: "center", justifyContent: "center", color: "white", flexShrink: 0 }}>
+                    {sel && <Icone nome="check" tamanho={11} />}
+                  </div>
+                  {frase}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (tela === "ordenacao") {
+    return (
+      <div>
+        <p className="texto-vazio">O paciente ordena as crenças da mais influente para a menos influente.</p>
+        {ordenadas.map((item, i) => {
+          const cat = categoria(item.categoriaId);
+          return (
+            <div key={i} style={{ background: "white", border: "2px solid " + cat.cor + "30", borderRadius: 14, padding: 12, marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ minWidth: 28, height: 28, borderRadius: "50%", background: cat.cor, color: "white", fontWeight: 800, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>{i + 1}</div>
+              <div style={{ flex: 1, fontSize: 13 }}>{item.frase}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <button className="botao-icone" disabled={i === 0} onClick={() => mover(i, -1)}><Icone nome="chevron-up" tamanho={13} /></button>
+                <button className="botao-icone" disabled={i === ordenadas.length - 1} onClick={() => mover(i, 1)}><Icone nome="chevron-down" tamanho={13} /></button>
+              </div>
+            </div>
+          );
+        })}
+        <div className="acoes-modal" style={{ justifyContent: "space-between" }}>
+          <button className="botao-secundario" onClick={() => setTela("selecao")}><Icone nome="arrow-left" tamanho={14} /> Voltar</button>
+          <button className="botao-primario" onClick={() => setTela("sessao")}>Iniciar sessão com a número 1 <Icone nome="arrow-right" tamanho={14} /></button>
+        </div>
+      </div>
+    );
+  }
+
+  const item = ordenadas[0];
+  const cat = item ? categoria(item.categoriaId) : null;
+  const perguntas = item ? BARALHO_PERGUNTAS_PREVIEW[item.categoriaId] : [];
+
+  return (
+    <div>
+      <div style={{ background: cat?.bg, border: "2px solid " + cat?.cor + "30", borderRadius: 16, padding: "20px 18px", marginBottom: 16, textAlign: "center" }}>
+        <Icone nome="layers" tamanho={26} />
+        <div style={{ fontSize: 14, color: cat?.cor, fontWeight: 700, margin: "8px 0" }}>{cat?.nome}</div>
+        <div style={{ fontSize: 15.5, fontStyle: "italic", lineHeight: 1.6 }}>"{item?.frase}"</div>
+      </div>
+      {perguntas.map((p, i) => (
+        <div key={i} style={{ marginBottom: 14 }}>
+          <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 6 }}>{i + 1}. {p}</label>
+          <TextAreaVoz className="campo-descricao" rows={2} value={respostas[i] || ""} onChange={(e) => setRespostas((prev) => ({ ...prev, [i]: e.target.value }))} placeholder="Resposta do paciente..." />
+        </div>
+      ))}
+      <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 6 }}>Reflexão final</label>
+      <TextAreaVoz className="campo-descricao" rows={3} value={reflexao} onChange={(e) => setReflexao(e.target.value)} placeholder="O que você percebe agora sobre essa crença?" />
+      <div className="acoes-modal" style={{ justifyContent: "space-between" }}>
+        <button className="botao-secundario" onClick={() => setTela("ordenacao")}><Icone nome="arrow-left" tamanho={14} /> Voltar</button>
+        <button className="botao-primario" onClick={() => setMsg("✓ Sessão salva! (visualização — nada foi salvo de verdade)")}>
+          <Icone nome="save" tamanho={14} /> {msg || "Salvar sessão"}
+        </button>
+      </div>
     </div>
   );
 }

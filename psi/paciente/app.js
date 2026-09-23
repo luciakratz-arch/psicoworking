@@ -1157,6 +1157,7 @@ const COMPONENTES_FERRAMENTA = {
   "muscle-relaxation": FerramentaRelaxamento,
   "emotional-eating": FerramentaRastreamento,
   "treino-neuro-auditivo": FerramentaTreino,
+  "baralho-distorcoes": FerramentaBaralhoDistorcoes,
 };
 
 // Itens cadastrados antes de existir o campo "Tipo de ferramenta
@@ -1173,6 +1174,7 @@ const TITULO_PARA_FORMULARIO_KEY = {
   "relaxamento muscular progressivo": "muscle-relaxation",
   "rastreamento emocional da alimentação": "emotional-eating",
   "treino neuro-auditivo": "treino-neuro-auditivo",
+  "baralho das distorções cognitivas": "baralho-distorcoes",
 };
 function resolverFormularioKey(item) {
   if (item.formularioKey) return item.formularioKey;
@@ -2512,6 +2514,506 @@ function FerramentaTreino({ usuario, paciente, recurso }) {
       ))}
     </div>
   );
+}
+
+// ─── Ferramenta: Baralho das Distorções Cognitivas ──────────────
+// O paciente marca as crenças com que se identifica, ordena da mais
+// influente pra menos, e trabalha uma por sessão com perguntas
+// socráticas. Guarda a hierarquia inteira num único documento e vai
+// avançando o contador `concluidas` a cada sessão — é isso que
+// permite "continuar de onde parei" numa próxima visita.
+const BARALHO_CATEGORIAS = [
+  {
+    id: "desvalor", nome: "Desvalor", cor: "#C0392B", bg: "#fdf2f2",
+    desc: "Crenças de que não tenho valor como pessoa",
+    frases: [
+      "Eu nunca faço nada certo.",
+      "Não tenho valor como pessoa.",
+      "Sou um fardo para as pessoas ao meu redor.",
+      "Qualquer um faria melhor do que eu.",
+      "Não mereço as coisas boas que acontecem na minha vida.",
+      "Sou inferior aos outros.",
+      "Meus erros me definem para sempre.",
+      "Não tenho nada de especial para oferecer.",
+      "Quando me conhecem de verdade, acabam me rejeitando.",
+      "Preciso ser perfeito para ter algum valor.",
+    ],
+  },
+  {
+    id: "desamor", nome: "Desamor", cor: "#1A5276", bg: "#eaf1f8",
+    desc: "Crenças de que não sou amado ou amável",
+    frases: [
+      "Ninguém me ama de verdade.",
+      "Sou difícil de amar.",
+      "As pessoas só ficam perto de mim por interesse.",
+      "Não mereço um amor verdadeiro.",
+      "Sempre vou terminar sozinho.",
+      "Quando me mostro como sou, as pessoas se afastam.",
+      "Nunca serei prioridade para ninguém.",
+      "O amor que recebo sempre tem um preço.",
+      "As pessoas que dizem me amar vão embora cedo ou tarde.",
+      "Sou muito intenso/complicado para ser amado.",
+    ],
+  },
+  {
+    id: "desamparo", nome: "Desamparo", cor: "#6C3483", bg: "#f5eeff",
+    desc: "Crenças de que não tenho controle ou suporte",
+    frases: [
+      "Não adianta tentar, as coisas nunca mudam.",
+      "Não tenho controle sobre o que acontece na minha vida.",
+      "Sempre vou precisar dos outros para sobreviver.",
+      "Não consigo me proteger sozinho.",
+      "O mundo é perigoso e eu estou sozinho nele.",
+      "Não importa o que eu faça, sempre dá errado.",
+      "Sou impotente diante dos meus problemas.",
+      "Ninguém vai me ajudar quando eu precisar de verdade.",
+      "Fui feito para sofrer.",
+      "Não tenho forças para mudar minha situação.",
+    ],
+  },
+];
+
+const BARALHO_PERGUNTAS = {
+  desvalor: [
+    "Que evidências reais você tem de que isso é verdade?",
+    "Você julgaria um amigo da mesma forma que se julga?",
+    "O que diria sobre você alguém que te conhece bem e te ama?",
+    "Que qualidades suas você costuma ignorar quando pensa isso?",
+    "Existe alguma situação em que você provou que essa crença está errada?",
+  ],
+  desamor: [
+    "Existem pessoas na sua vida que demonstram cuidado por você?",
+    "O que tornaria alguém digno de ser amado, na sua visão?",
+    "Você aplicaria esse critério a alguém que você ama?",
+    "Que experiências antigas podem ter ensinado essa crença?",
+    "Como seria sua vida se acreditasse que merece amor?",
+  ],
+  desamparo: [
+    "Houve algum momento em que as coisas realmente mudaram na sua vida?",
+    "Quais recursos internos você tem que te ajudaram antes?",
+    "O que você poderia fazer, mesmo que pequeno, para se sentir mais em controle?",
+    "Quem poderia ser um apoio real para você agora?",
+    "Se um amigo te dissesse isso, o que você responderia?",
+  ],
+};
+
+function baralhoCategoria(id) {
+  return BARALHO_CATEGORIAS.find((c) => c.id === id);
+}
+
+// Escolhe 3 das 5 perguntas, sempre as mesmas pra mesma frase (o
+// paciente reencontra as mesmas perguntas se voltar na sessão).
+function baralhoPerguntasPara(item) {
+  const pool = BARALHO_PERGUNTAS[item.categoriaId] || BARALHO_PERGUNTAS.desvalor;
+  const frases = baralhoCategoria(item.categoriaId)?.frases || [];
+  const semente = Math.max(0, frases.indexOf(item.frase));
+  const ordem = [0, 1, 2, 3, 4].sort((a, b) => ((a * 7 + semente) % 5) - ((b * 7 + semente) % 5));
+  return ordem.slice(0, 3).map((i) => pool[i]);
+}
+
+function FerramentaBaralhoDistorcoes({ usuario, paciente, recurso }) {
+  const [tela, setTela] = useState("intro");
+  const [categoriaSel, setCategoriaSel] = useState(null);
+  const [frasesSelecionadas, setFrasesSelecionadas] = useState([]);
+  const [ordenadas, setOrdenadas] = useState([]);
+  const [sessaoIdx, setSessaoIdx] = useState(0);
+  const [etapaSessao, setEtapaSessao] = useState(0);
+  const [respostas, setRespostas] = useState({});
+  const [reflexaoFinal, setReflexaoFinal] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [carregando, setCarregando] = useState(true);
+  const [historico, setHistorico] = useState(null);
+
+  useEffect(() => {
+    db.collection("clinica_baralho_distorcoes")
+      .where("pacienteId", "==", usuario.uid)
+      .get()
+      .then((snap) => {
+        if (!snap.empty) {
+          const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+          setHistorico(docs[0]);
+        }
+        setCarregando(false);
+      })
+      .catch(() => setCarregando(false));
+  }, [usuario.uid]);
+
+  function alternarFrase(categoriaId, frase) {
+    setFrasesSelecionadas((prev) => {
+      const existe = prev.find((f) => f.categoriaId === categoriaId && f.frase === frase);
+      if (existe) return prev.filter((f) => !(f.categoriaId === categoriaId && f.frase === frase));
+      return [...prev, { categoriaId, frase }];
+    });
+  }
+
+  function estaSelecionada(categoriaId, frase) {
+    return !!frasesSelecionadas.find((f) => f.categoriaId === categoriaId && f.frase === frase);
+  }
+
+  function moverItem(idx, direcao) {
+    setOrdenadas((prev) => {
+      const arr = [...prev];
+      const novo = idx + direcao;
+      if (novo < 0 || novo >= arr.length) return arr;
+      [arr[idx], arr[novo]] = [arr[novo], arr[idx]];
+      return arr;
+    });
+  }
+
+  function iniciarSessao(hierarquia, indiceInicial) {
+    setOrdenadas(hierarquia);
+    setSessaoIdx(indiceInicial);
+    setEtapaSessao(0);
+    setRespostas({});
+    setReflexaoFinal("");
+    setMsg("");
+    setTela("sessao");
+  }
+
+  async function salvarSessao() {
+    const itemAtual = ordenadas[sessaoIdx];
+    const perguntas = baralhoPerguntasPara(itemAtual);
+    setSalvando(true);
+    try {
+      const registro = {
+        psi_id: usuario.psiId,
+        pacienteId: usuario.uid,
+        pacienteNome: paciente?.nome || "",
+        hierarquia: ordenadas,
+        concluidas: sessaoIdx + 1,
+        sessaoAtual: {
+          idx: sessaoIdx,
+          frase: itemAtual.frase,
+          categoriaId: itemAtual.categoriaId,
+          registros: perguntas.map((p, i) => ({ pergunta: p, resposta: respostas[i] || "" })),
+          reflexaoFinal,
+          data: new Date().toLocaleDateString("pt-BR"),
+        },
+        data: new Date().toLocaleDateString("pt-BR"),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      if (historico?.id) {
+        await db.collection("clinica_baralho_distorcoes").doc(historico.id).update(registro);
+      } else {
+        const novo = await db.collection("clinica_baralho_distorcoes").add(registro);
+        setHistorico({ id: novo.id, ...registro });
+      }
+      setTela("concluido");
+    } catch (e) {
+      setMsg("Erro ao salvar: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  if (carregando) return <p className="texto-vazio-p">Carregando...</p>;
+
+  // ── Introdução ──
+  if (tela === "intro") {
+    const emProgresso = historico && (historico.hierarquia || []).length > 0;
+    return (
+      <div>
+        <div style={{ background: "linear-gradient(135deg, #4c0094, var(--cor-marca))", borderRadius: 16, padding: "28px 22px", textAlign: "center", color: "white", marginBottom: 18 }}>
+          <Icone nome="layers" tamanho={40} />
+          <div style={{ fontSize: 19, fontWeight: 800, margin: "8px 0 4px" }}>Baralho das Distorções</div>
+          <div style={{ fontSize: 13.5, opacity: 0.85 }}>Identifique e trabalhe suas crenças limitantes</div>
+        </div>
+
+        <div className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB", marginBottom: 14 }}>
+          <strong style={{ color: "var(--cor-marca)" }}>Como funciona</strong>
+          <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.8, marginTop: 8 }}>
+            <div>1. Leia as frases e marque as que você se identifica.</div>
+            <div>2. Ordene da mais influente para a menos influente.</div>
+            <div>3. A cada sessão trabalhamos uma crença com perguntas reflexivas.</div>
+          </div>
+        </div>
+
+        {BARALHO_CATEGORIAS.map((cat) => (
+          <div key={cat.id} style={{ background: cat.bg, border: "2px solid " + cat.cor + "20", borderRadius: 12, padding: "12px 14px", marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 14, height: 14, borderRadius: "50%", background: cat.cor, flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 700, color: cat.cor, fontSize: 13.5 }}>{cat.nome}</div>
+              <div style={{ fontSize: 12, color: "#6B7280" }}>{cat.desc}</div>
+            </div>
+          </div>
+        ))}
+
+        {emProgresso && (
+          <div style={{ background: "#F0FDF4", border: "2px solid #22C55E30", borderRadius: 14, padding: "14px 16px", margin: "14px 0" }}>
+            <div style={{ fontWeight: 700, color: "#166534", fontSize: 13.5, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+              <Icone nome="rotate-ccw" tamanho={14} /> Você tem uma sessão em progresso
+            </div>
+            <div style={{ fontSize: 12, color: "#4B5563", marginBottom: 10 }}>
+              Próxima crença: {(historico.concluidas || 0) + 1} de {(historico.hierarquia || []).length}
+            </div>
+            <button
+              className="botao-primario-p"
+              style={{ width: "100%", justifyContent: "center", background: "#22C55E" }}
+              onClick={() => {
+                const hier = historico.hierarquia || [];
+                const feitas = historico.concluidas || 0;
+                iniciarSessao(hier, feitas < hier.length ? feitas : 0);
+              }}
+            >
+              Continuar de onde parei <Icone nome="arrow-right" tamanho={14} />
+            </button>
+          </div>
+        )}
+
+        <button className="botao-primario-p" style={{ width: "100%", justifyContent: "center", marginTop: 8 }} onClick={() => setTela("selecao")}>
+          {emProgresso ? "Iniciar nova hierarquia" : "Começar agora"} <Icone nome="arrow-right" tamanho={14} />
+        </button>
+      </div>
+    );
+  }
+
+  // ── Seleção das frases ──
+  if (tela === "selecao") {
+    const cat = categoriaSel ? baralhoCategoria(categoriaSel) : null;
+    return (
+      <div>
+        <div style={{ background: cat ? cat.cor : "var(--cor-marca)", borderRadius: 14, padding: "16px 14px", color: "white", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            className="botao-secundario-p"
+            style={{ background: "rgba(255,255,255,0.2)", color: "white", border: "none", padding: "6px 10px" }}
+            onClick={() => (categoriaSel ? setCategoriaSel(null) : setTela("intro"))}
+          >
+            <Icone nome="arrow-left" tamanho={15} />
+          </button>
+          <div>
+            <div style={{ fontSize: 15.5, fontWeight: 800 }}>{cat ? cat.nome : "Selecione suas frases"}</div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>{cat ? cat.desc : frasesSelecionadas.length + " frases selecionadas"}</div>
+          </div>
+        </div>
+
+        {!categoriaSel && (
+          <div>
+            <p className="texto-vazio-p" style={{ textAlign: "center", marginBottom: 14 }}>Escolha uma categoria para explorar as frases.</p>
+            {BARALHO_CATEGORIAS.map((c) => (
+              <div
+                key={c.id}
+                onClick={() => setCategoriaSel(c.id)}
+                style={{ background: c.bg, border: "2px solid " + c.cor + "40", borderRadius: 14, padding: "16px 14px", marginBottom: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 14 }}
+              >
+                <div style={{ width: 16, height: 16, borderRadius: "50%", background: c.cor, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, color: c.cor, fontSize: 14.5 }}>{c.nome}</div>
+                  <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                    {frasesSelecionadas.filter((f) => f.categoriaId === c.id).length} selecionadas de {c.frases.length}
+                  </div>
+                </div>
+                <Icone nome="chevron-right" tamanho={18} />
+              </div>
+            ))}
+            {frasesSelecionadas.length > 0 && (
+              <button
+                className="botao-primario-p"
+                style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
+                onClick={() => { setOrdenadas([...frasesSelecionadas]); setTela("ordenacao"); }}
+              >
+                Ordenar por influência ({frasesSelecionadas.length}) <Icone nome="arrow-right" tamanho={14} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {categoriaSel && (
+          <div>
+            {cat.frases.map((frase, i) => {
+              const sel = estaSelecionada(cat.id, frase);
+              return (
+                <div
+                  key={i}
+                  onClick={() => alternarFrase(cat.id, frase)}
+                  style={{ background: sel ? cat.bg : "white", border: "2px solid " + (sel ? cat.cor : "#E5E7EB"), borderRadius: 12, padding: "13px 14px", marginBottom: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 12, fontSize: 13.5, lineHeight: 1.5, color: sel ? "#1F2937" : "#4B5563" }}
+                >
+                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: sel ? cat.cor : "transparent", border: "2px solid " + (sel ? cat.cor : "#D1D5DB"), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "white" }}>
+                    {sel && <Icone nome="check" tamanho={12} />}
+                  </div>
+                  <span>{frase}</span>
+                </div>
+              );
+            })}
+            <button className="botao-secundario-p" style={{ width: "100%", justifyContent: "center", marginTop: 8 }} onClick={() => setCategoriaSel(null)}>
+              Voltar e ver outras categorias
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Ordenação por influência ──
+  if (tela === "ordenacao") {
+    return (
+      <div>
+        <div style={{ background: "var(--cor-marca)", borderRadius: 14, padding: "16px 14px", color: "white", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
+          <button className="botao-secundario-p" style={{ background: "rgba(255,255,255,0.2)", color: "white", border: "none", padding: "6px 10px" }} onClick={() => setTela("selecao")}>
+            <Icone nome="arrow-left" tamanho={15} />
+          </button>
+          <div>
+            <div style={{ fontSize: 15.5, fontWeight: 800 }}>Ordene por influência</div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>A mais influente fica no topo</div>
+          </div>
+        </div>
+
+        <p style={{ background: "#FEF9FF", border: "1px solid #E9D5FF", borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 12.5, color: "#6B21A8", display: "flex", alignItems: "center", gap: 8 }}>
+          <Icone nome="lightbulb" tamanho={15} /> Use as setas para mover cada crença. A número 1 é a que mais influencia sua vida agora.
+        </p>
+
+        {ordenadas.map((item, i) => {
+          const cat = baralhoCategoria(item.categoriaId);
+          return (
+            <div key={i} style={{ background: "white", border: "2px solid " + (cat?.cor || "#E5E7EB") + "30", borderRadius: 14, padding: "12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ minWidth: 30, height: 30, borderRadius: "50%", background: cat?.cor || "var(--cor-marca)", color: "white", fontWeight: 800, fontSize: 13.5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
+              <div style={{ flex: 1, fontSize: 13, color: "#374151", lineHeight: 1.4 }}>
+                <div style={{ fontSize: 10.5, color: cat?.cor, fontWeight: 700, marginBottom: 2, textTransform: "uppercase" }}>{cat?.nome}</div>
+                {item.frase}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+                <button className="botao-icone" disabled={i === 0} onClick={() => moverItem(i, -1)}><Icone nome="chevron-up" tamanho={14} /></button>
+                <button className="botao-icone" disabled={i === ordenadas.length - 1} onClick={() => moverItem(i, 1)}><Icone nome="chevron-down" tamanho={14} /></button>
+              </div>
+            </div>
+          );
+        })}
+
+        <button className="botao-primario-p" style={{ width: "100%", justifyContent: "center", marginTop: 8 }} onClick={() => iniciarSessao(ordenadas, 0)}>
+          Iniciar sessão com a número 1 <Icone nome="arrow-right" tamanho={14} />
+        </button>
+      </div>
+    );
+  }
+
+  // ── Sessão de trabalho ──
+  if (tela === "sessao") {
+    const itemAtual = ordenadas[sessaoIdx];
+    if (!itemAtual) return <p className="texto-vazio-p">Nenhuma crença selecionada.</p>;
+    const cat = baralhoCategoria(itemAtual.categoriaId);
+    const perguntas = baralhoPerguntasPara(itemAtual);
+
+    return (
+      <div>
+        <div style={{ background: cat?.cor || "var(--cor-marca)", borderRadius: 14, padding: "16px 14px", color: "white", marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <button className="botao-secundario-p" style={{ background: "rgba(255,255,255,0.2)", color: "white", border: "none", padding: "6px 10px" }} onClick={() => setTela("ordenacao")}>
+              <Icone nome="arrow-left" tamanho={15} />
+            </button>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{cat?.nome} — Crença {sessaoIdx + 1}</div>
+              <div style={{ fontSize: 11, opacity: 0.8 }}>{sessaoIdx + 1} de {ordenadas.length} na sua hierarquia</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, background: i <= etapaSessao ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.3)" }} />
+            ))}
+          </div>
+        </div>
+
+        {etapaSessao === 0 && (
+          <div>
+            <div style={{ background: cat?.bg, border: "2px solid " + (cat?.cor || "var(--cor-marca)") + "30", borderRadius: 16, padding: "22px 18px", marginBottom: 18, textAlign: "center" }}>
+              <Icone nome="layers" tamanho={28} />
+              <div style={{ fontSize: 15, color: cat?.cor, fontWeight: 700, margin: "10px 0" }}>{cat?.nome}</div>
+              <div style={{ fontSize: 16, color: "#1F2937", fontStyle: "italic", lineHeight: 1.6, fontWeight: 500 }}>"{itemAtual.frase}"</div>
+            </div>
+            <div className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB", marginBottom: 18 }}>
+              <strong style={{ color: "var(--cor-marca)" }}>Sobre essa sessão</strong>
+              <p style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.7, marginTop: 8 }}>
+                Vamos olhar com cuidado para essa crença. Ela não define quem você é — é apenas um padrão aprendido que pode ser transformado.
+                Responda as perguntas no seu tempo, com honestidade.
+              </p>
+            </div>
+            <button className="botao-primario-p" style={{ width: "100%", justifyContent: "center", background: cat?.cor }} onClick={() => setEtapaSessao(1)}>
+              Continuar <Icone nome="arrow-right" tamanho={14} />
+            </button>
+          </div>
+        )}
+
+        {etapaSessao === 1 && (
+          <div>
+            <div className="rotulo-mini" style={{ color: "var(--cor-marca)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 }}>
+              Perguntas para reflexão
+            </div>
+            {perguntas.map((pergunta, i) => (
+              <div key={i} style={{ marginBottom: 16 }}>
+                <label style={{ fontWeight: 600, fontSize: 13.5, display: "block", marginBottom: 6 }}>{i + 1}. {pergunta}</label>
+                <TextAreaVoz
+                  rows={3}
+                  value={respostas[i] || ""}
+                  onChange={(e) => setRespostas((prev) => ({ ...prev, [i]: e.target.value }))}
+                  placeholder="Escreva sua resposta aqui..."
+                />
+              </div>
+            ))}
+            <button className="botao-primario-p" style={{ width: "100%", justifyContent: "center", background: cat?.cor }} onClick={() => setEtapaSessao(2)}>
+              Próximo <Icone nome="arrow-right" tamanho={14} />
+            </button>
+          </div>
+        )}
+
+        {etapaSessao === 2 && (
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+              <Icone nome="sparkles" tamanho={15} /> Reflexão final
+            </div>
+            <p className="texto-vazio-p" style={{ marginBottom: 12 }}>
+              Depois de pensar nessas perguntas, o que você percebe? Há alguma nova perspectiva sobre essa crença?
+            </p>
+            <TextAreaVoz
+              rows={5}
+              value={reflexaoFinal}
+              onChange={(e) => setReflexaoFinal(e.target.value)}
+              placeholder="O que você percebe agora sobre essa crença?"
+            />
+            {msg && <p className="erro-p">{msg}</p>}
+            <button className="botao-primario-p" style={{ width: "100%", justifyContent: "center", background: cat?.cor, marginTop: 14 }} disabled={salvando} onClick={salvarSessao}>
+              <Icone nome="save" tamanho={14} /> {salvando ? "Salvando..." : "Salvar sessão"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Conclusão ──
+  if (tela === "concluido") {
+    const itemTrabalhado = ordenadas[sessaoIdx] || ordenadas[0];
+    const cat = baralhoCategoria(itemTrabalhado?.categoriaId);
+    const proximo = ordenadas[sessaoIdx + 1];
+    return (
+      <div>
+        <div style={{ background: "linear-gradient(135deg, #4c0094, var(--cor-marca))", borderRadius: 16, padding: "32px 22px", textAlign: "center", color: "white", marginBottom: 18 }}>
+          <Icone nome="award" tamanho={44} />
+          <div style={{ fontSize: 19, fontWeight: 800, margin: "10px 0 4px" }}>Sessão concluída!</div>
+          <div style={{ fontSize: 13.5, opacity: 0.85 }}>Você trabalhou com coragem suas crenças hoje.</div>
+        </div>
+
+        <div style={{ background: cat?.bg, border: "2px solid " + (cat?.cor || "var(--cor-marca)") + "20", borderRadius: 14, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, color: cat?.cor, marginBottom: 6, fontSize: 13.5 }}>Crença trabalhada hoje</div>
+          <div style={{ fontStyle: "italic", fontSize: 13.5, color: "#374151" }}>"{itemTrabalhado?.frase}"</div>
+        </div>
+
+        {proximo && (
+          <div style={{ background: "#FEF9FF", border: "1px solid #E9D5FF", borderRadius: 14, padding: 16, marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, color: "#6B21A8", marginBottom: 6, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6 }}>
+              <Icone nome="skip-forward" tamanho={14} /> Próxima sessão
+            </div>
+            <div style={{ fontStyle: "italic", fontSize: 13.5, color: "#374151" }}>"{proximo.frase}"</div>
+          </div>
+        )}
+
+        <button className="botao-primario-p" style={{ width: "100%", justifyContent: "center" }} onClick={() => setTela("intro")}>
+          Voltar ao início
+        </button>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 // ─── Fábula (leitor real, grava reflexões) ──────────────────────

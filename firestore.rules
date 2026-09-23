@@ -198,6 +198,17 @@ service cloud.firestore {
                            && request.resource.data.psi_id == carimboClinica();
     }
 
+    // Baralho das Distorções: o paciente vai atualizando o MESMO
+    // documento a cada sessão (guarda a hierarquia e quantas crenças
+    // já trabalhou), por isso aqui ele também precisa de update.
+    match /clinica_baralho_distorcoes/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow read, update: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
+      allow create: if estaLogado() && carimboPapel() == 'paciente'
+                     && request.resource.data.psi_id == carimboClinica()
+                     && request.resource.data.pacienteId == request.auth.uid;
+    }
+
     match /clinica_agenda/{eventoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
