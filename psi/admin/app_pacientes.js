@@ -799,9 +799,9 @@ const QUESTIONARIOS_DISPONIVEIS = [
   { id: "anamnese", rotulo: "Anamnese", icone: "clipboard-list", desc: "Marcos do desenvolvimento, histórico clínico e familiar.", pronto: true },
   { id: "entrevista", rotulo: "Entrevista Clínica Inicial", icone: "brain", desc: "Perfil etário, escalas de observação e hipóteses diagnósticas DSM-5.", pronto: false },
   { id: "rastreamento", rotulo: "Rastreamento Bipolar / Borderline", icone: "bar-chart-2", desc: "Avaliação diferencial DSM-5, com laudo comparativo.", pronto: true },
-  { id: "sexual", rotulo: "Rastreamento de Saúde Sexual", icone: "heart", desc: "Rastreamento confidencial, respondido só pelo paciente.", pronto: false },
-  { id: "alimentar", rotulo: "Hábitos Alimentares", icone: "utensils", desc: "Rastreamento de padrões e comportamentos alimentares.", pronto: false },
-  { id: "neuro", rotulo: "Funcionamento e Comportamento", icone: "activity", desc: "Rastreamento de atenção, agitação e interação social.", pronto: false },
+  { id: "sexual", rotulo: "Rastreamento de Saúde Sexual", icone: "heart", desc: "Rastreamento confidencial, respondido só pelo paciente.", pronto: true },
+  { id: "alimentar", rotulo: "Hábitos Alimentares", icone: "utensils", desc: "Rastreamento de padrões e comportamentos alimentares.", pronto: true },
+  { id: "neuro", rotulo: "Funcionamento e Comportamento", icone: "activity", desc: "Rastreamento de atenção, agitação e interação social.", pronto: true },
   { id: "dependencia", rotulo: "Dependência Química e Substâncias", icone: "triangle-alert", desc: "Rastreamento DSM-5 para Transtornos por Uso de Substâncias.", pronto: true },
   { id: "jogos", rotulo: "Jogos e Apostas", icone: "dice-5", desc: "Rastreamento de Gaming e Gambling Disorder (DSM-5 / CID-11).", pronto: true },
 ];
@@ -1516,6 +1516,1015 @@ ${respostasHtml}
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Rastreamento de Hábitos Alimentares — bespoke (3 eixos: Anorexia,
+// Bulimia/TCA, TCA puro), igual ao modelo (admin/questionarios.js).
+// ═══════════════════════════════════════════════════════════════════
+
+const PERGUNTAS_ALIMENTAR = [
+  { id: "p1", eixo: "Anorexia", texto: "Restrição persistente / peso abaixo do esperado" },
+  { id: "p2", eixo: "Anorexia", texto: "Medo intenso de engordar" },
+  { id: "p3", eixo: "Anorexia", texto: "Distorção da imagem corporal" },
+  { id: "p4", eixo: "Anorexia", texto: "Padrão de controle de peso (últimos 3 meses)" },
+  { id: "p5", eixo: "Bulimia/TCA", texto: "Episódios de ingestão muito acima do normal" },
+  { id: "p6", eixo: "Bulimia/TCA", texto: "Perda de controle durante os episódios" },
+  { id: "p7", eixo: "Bulimia/TCA", texto: "Frequência dos episódios" },
+  { id: "p8", eixo: "Bulimia/TCA", texto: "Uso de métodos compensatórios após ingestão excessiva" },
+  { id: "p9", eixo: "TCA Puro", texto: "Padrão de ingestão rápida, secreta ou exagerada" },
+  { id: "p10", eixo: "TCA Puro", texto: "Culpa intensa sem comportamentos compensatórios" },
+  { id: "p11", eixo: "ARFID", texto: "Restrição por aversão sensorial / medo de engasgar" },
+  { id: "p12", eixo: "ARFID", texto: "Impacto clínico da restrição (peso, nutrição, vida social)" },
+];
+
+const COR_LETRA_TRIAGEM = { A: "#16A34A", B: "#D97706", C: "#DC2626" };
+
+function pontuarLetraTriagem(letra) {
+  return { A: 0, B: 1, C: 2 }[letra] || 0;
+}
+
+function calcularEscoresAlimentar(doc) {
+  const p = (id) => pontuarLetraTriagem(doc[id]);
+  return {
+    anorexia: ["p1", "p2", "p3", "p4"].reduce((s, id) => s + p(id), 0),
+    bulimia: ["p5", "p6", "p7", "p8"].reduce((s, id) => s + p(id), 0),
+    tca: ["p9", "p10"].reduce((s, id) => s + p(id), 0),
+  };
+}
+
+// p11/p12 (ARFID) são coletados mas não entram na fórmula — mesma
+// assimetria proposital do modelo original.
+function laudoAlimentar(escores, doc) {
+  const { anorexia, bulimia, tca } = escores;
+  const pAn = Math.round((anorexia / 8) * 100);
+  const pBu = Math.round((bulimia / 8) * 100);
+  const pTc = Math.round((tca / 4) * 100);
+
+  let hipotese = [];
+  const criterios = [];
+  const atencao = [];
+
+  if (pAn >= 50) {
+    const subtipo = doc?.p4 === "C" ? "Subtipo Compulsão/Purgativo" : "Subtipo Restritivo";
+    hipotese.push("Anorexia Nervosa — " + subtipo);
+    criterios.push({ label: "Anorexia Nervosa (DSM-5 F50.0)", atende: true, obs: "Escores elevados nos três critérios nucleares: restrição (p1), medo de engordar (p2) e distorção da imagem corporal (p3). Subtipo: " + subtipo + "." });
+    atencao.push("Avaliar IMC atual e velocidade de perda de peso — risco clínico de desnutrição grave.");
+    atencao.push("Solicitar exames laboratoriais urgentes: eletrólitos, hemograma, função cardíaca (ECG) e densidade óssea.");
+    if (doc?.p4 === "C") atencao.push("Padrão purgativo confirmado — investigar lesões esofágicas, erosão dentária e hipocalemia.");
+  } else {
+    criterios.push({ label: "Anorexia Nervosa", atende: false, obs: "Escores abaixo do limiar — sem os três critérios nucleares simultâneos." });
+  }
+
+  if (pBu >= 50) {
+    const temPurgacao = doc?.p8 === "C";
+    if (temPurgacao) {
+      hipotese.push("Bulimia Nervosa");
+      criterios.push({ label: "Bulimia Nervosa (DSM-5 F50.2)", atende: true, obs: "Compulsão recorrente (p5/p6), frequência ≥1x/semana por 3 meses (p7) e comportamentos compensatórios (p8) confirmados." });
+      atencao.push("Investigar desequilíbrio eletrolítico (hipocalemia, hiponatremia) — risco cardíaco.");
+      atencao.push("Avaliar erosão dentária, calosidades nos nós dos dedos (sinal de Russell) e lesões esofágicas.");
+    } else if (pTc >= 50) {
+      hipotese.push("Transtorno de Compulsão Alimentar (TCA)");
+      criterios.push({ label: "TCA — Compulsão sem Purgação (DSM-5 F50.8)", atende: true, obs: "Compulsão recorrente com sofrimento intenso e ausência de comportamentos compensatórios — perfil clássico de TCA." });
+      atencao.push("Avaliar sobrepeso/obesidade como consequência do TCA e impacto metabólico.");
+      atencao.push("Rastrear depressão e ansiedade associadas — alta comorbidade com TCA.");
+    }
+  } else if (pTc >= 50 && pBu < 50) {
+    hipotese.push("Transtorno de Compulsão Alimentar (TCA) leve");
+    criterios.push({ label: "TCA (traços)", atende: null, obs: "Padrão de compulsão com culpa presente, mas frequência abaixo do limiar diagnóstico pleno." });
+    atencao.push("Monitorar frequência dos episódios — se aumentar para ≥1x/semana por 3 meses, revisar diagnóstico.");
+  }
+
+  if (hipotese.length === 0) {
+    if (doc?.p4 === "B") {
+      hipotese.push("ARFID ou restrição alimentar subliminar — investigar");
+      criterios.push({ label: "ARFID (DSM-5 F50.82)", atende: null, obs: "Restrição presente sem distorção de imagem ou medo de engordar — investigar seletividade sensorial ou medo de engasgo." });
+    } else {
+      hipotese.push("Sem hipótese diagnóstica definida pelos escores — avaliação clínica aprofundada indicada.");
+      criterios.push({ label: "Transtornos Alimentares", atende: false, obs: "Escores abaixo do limiar para todos os diagnósticos avaliados." });
+    }
+  }
+
+  return { hipotese: hipotese.join(" / "), criterios, atencao, pAn, pBu, pTc };
+}
+
+function gerarHtmlLaudoTriagem({ titulo, pacNome, nomeClinica, data, docs, perguntas, barras, hipotese, criterios, atencao, respostasHtmlExtra }) {
+  const criteriosHtml = criterios.map((c) => `
+    <div class="criterio">
+      <div class="nome">${c.label} &nbsp; <span class="${c.atende === true ? "badge-sim" : c.atende === false ? "badge-nao" : "badge-inv"}">${c.atende === true ? "Critérios presentes" : c.atende === false ? "Não atende" : "Investigar"}</span></div>
+      <div style="font-size:12px;color:#4b5563;margin-top:4px">${c.obs}</div>
+    </div>`).join("");
+  const atencaoHtml = atencao.length === 0
+    ? "<p style='color:#6b7280;font-size:12px'>Nenhum ponto de atenção crítico identificado pelos escores.</p>"
+    : atencao.map((a) => `<div class="atencao-item">${a}</div>`).join("");
+  const barrasHtml = barras.map((b) => `
+    <div class="barra-wrap">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span><strong>${b.label}</strong></span><span style="color:${b.cor};font-weight:700">${b.pct}%</span></div>
+      <div class="barra-bg"><div style="width:${b.pct}%;background:${b.cor};height:100%;border-radius:20px"></div></div>
+    </div>`).join("");
+
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<title>${titulo} — ${pacNome}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;color:#1f2937;padding:32px;max-width:800px;margin:0 auto;font-size:13px;line-height:1.6}
+h1{font-size:20px;color:#3d006a;margin-bottom:4px}
+h2{font-size:14px;color:#7B00C4;margin:20px 0 8px;border-bottom:1px solid #ede9fe;padding-bottom:4px}
+h3{font-size:12.5px;color:#374151;margin:12px 0 6px}
+.header{border-bottom:2px solid #7B00C4;padding-bottom:16px;margin-bottom:20px}
+.sub{font-size:12px;color:#6b7280;margin-top:2px}
+.barra-wrap{margin-bottom:10px}
+.barra-bg{background:#f3f4f6;border-radius:20px;height:10px;overflow:hidden;margin-top:3px}
+.hipotese{background:#f5f3ff;border:1px solid #c4b5fd;border-radius:10px;padding:14px 18px;margin:12px 0}
+.hipotese .label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#7B00C4;margin-bottom:4px}
+.hipotese .valor{font-size:15px;font-weight:700;color:#3d006a}
+.criterio{border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:8px}
+.criterio .nome{font-weight:700;font-size:13px;margin-bottom:4px}
+.badge-sim{background:#fef2f2;color:#dc2626;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-nao{background:#f0fdf4;color:#16a34a;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-inv{background:#fffbeb;color:#d97706;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700}
+.atencao-item{background:#fff7ed;border-left:3px solid #f97316;padding:8px 12px;margin-bottom:6px;border-radius:0 6px 6px 0;font-size:12px}
+.resp-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11.5px}
+.resp-table th{background:#f5f3ff;padding:6px 10px;text-align:left;font-size:10.5px;color:#7B00C4;border:1px solid #ede9fe}
+.resp-table td{padding:6px 10px;border:1px solid #e5e7eb;vertical-align:top}
+.resp-table tr:nth-child(even) td{background:#fafafa}
+.letra{font-weight:700;font-size:13px}
+.rodape{margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center}
+@media print{body{padding:16px}.no-print{display:none}}
+</style></head><body>
+<div class="no-print" style="margin-bottom:20px">
+  <button onclick="window.print()" style="background:#7B00C4;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px">Imprimir / Salvar PDF</button>
+</div>
+<div class="header">
+  <h1>${titulo}</h1>
+  <div class="sub">Paciente: <strong>${pacNome}</strong> · Data: ${data} · ${nomeClinica}</div>
+  <div class="sub">Respondentes: ${docs.length} (${docs.map((d) => (d.tipoRespondente === "paciente" ? "próprio paciente" : d.parentesco || "familiar")).join(", ")})</div>
+</div>
+<h2>I. Escores por Eixo</h2>
+${barrasHtml}
+<h2>II. Hipótese Diagnóstica Provável</h2>
+<div class="hipotese">
+  <div class="label">Hipótese principal</div>
+  <div class="valor">${hipotese}</div>
+</div>
+<h3>Análise por Critério DSM-5</h3>
+${criteriosHtml}
+<h2>III. Pontos de Atenção para a Entrevista Clínica</h2>
+${atencaoHtml}
+<h2>IV. Respostas por Respondente</h2>
+${respostasHtmlExtra}
+<div class="rodape">Documento gerado em ${data} · Uso exclusivo para fins clínicos · Confidencial · LGPD</div>
+</body></html>`;
+}
+
+function AbaRastreamentoAlimentarView({ usuario, paciente, aoVoltar }) {
+  const [docs, setDocs] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [gerandoLink, setGerandoLink] = useState(false);
+  const [linkGerado, setLinkGerado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    db.collection("clinica_rastreamento_alimentar")
+      .where("psi_id", "==", usuario.psiId)
+      .where("pacienteId", "==", paciente.id)
+      .get()
+      .then((snap) => {
+        const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        lista.sort((a, b) => (b.criadoEm?.seconds || 0) - (a.criadoEm?.seconds || 0));
+        setDocs(lista);
+        setCarregando(false);
+      })
+      .catch(() => setCarregando(false));
+  }, [usuario.psiId, paciente.id]);
+
+  async function gerarLink() {
+    setGerandoLink(true);
+    try {
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        tipo: "alimentar",
+        titulo: "Rastreamento de Hábitos Alimentares",
+        nomeClinica: cfg.nome || "PsiCoWorking",
+        corMarca: cfg.corPrimaria || "#6A2BD9",
+        logoUrl: cfg.logoUrl || "",
+        status: "enviado",
+        cancelado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setLinkGerado(window.location.origin + "/psi/atividade/?t=" + token);
+    } catch (e) {
+      alert("Não foi possível gerar o link: " + e.message);
+    } finally {
+      setGerandoLink(false);
+    }
+  }
+
+  function abrirWhatsApp() {
+    const primeiroNome = (paciente.nome || "").split(" ")[0];
+    const mensagem =
+      `Olá!\n\n` +
+      `Preparei um questionário clínico para você preencher sobre *${primeiroNome}*: *Rastreamento de Hábitos Alimentares*.\n\n` +
+      `Leva de 6 a 10 minutos — é só abrir o link abaixo e responder com calma:\n\n` +
+      `${linkGerado}\n\n` +
+      `Qualquer dúvida, me chama por aqui.`;
+    const numero = (paciente.telefone || "").replace(/\D/g, "");
+    const url = numero
+      ? "https://wa.me/55" + numero + "?text=" + encodeURIComponent(mensagem)
+      : "https://wa.me/?text=" + encodeURIComponent(mensagem);
+    window.open(url, "_blank");
+  }
+
+  function copiarLink() {
+    navigator.clipboard.writeText(linkGerado).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
+
+  async function gerarLaudo() {
+    if (docs.length === 0) return;
+    const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+    const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+    const nomeClinica = cfg.nome || "PsiCoWorking";
+    const pacNome = paciente.nome || "Paciente";
+    const dataDoc = new Date().toLocaleDateString("pt-BR");
+    const doc = docs[0];
+    const escores = calcularEscoresAlimentar(doc);
+    const laudo = laudoAlimentar(escores, doc);
+
+    const respostasHtml = docs.map((d) => `
+      <h3>${d.tipoRespondente === "paciente" ? "Próprio paciente" : (d.nomeRespondente || "Familiar") + " (" + (d.parentesco || "—") + ")"}</h3>
+      <table class="resp-table">
+        <thead><tr><th>#</th><th>Item</th><th>Eixo</th><th>Resp.</th></tr></thead>
+        <tbody>
+          ${PERGUNTAS_ALIMENTAR.map((p) => `<tr><td>${p.id.replace("p", "")}</td><td>${p.texto}</td><td>${p.eixo}</td><td><span class="letra" style="color:${COR_LETRA_TRIAGEM[d[p.id]] || "#6b7280"}">${d[p.id] || "—"}</span></td></tr>`).join("")}
+          ${d.obsFinais ? `<tr><td colspan="2"><strong>Observações livres</strong></td><td colspan="2">${d.obsFinais}</td></tr>` : ""}
+        </tbody>
+      </table>`).join("");
+
+    const html = gerarHtmlLaudoTriagem({
+      titulo: "Laudo Analítico — Hábitos Alimentares",
+      pacNome, nomeClinica, data: dataDoc, docs,
+      barras: [
+        { label: "Anorexia Nervosa", pct: laudo.pAn, cor: "#DC2626" },
+        { label: "Bulimia Nervosa / TCA", pct: laudo.pBu, cor: "#7C3AED" },
+        { label: "TCA Puro (sem purgação)", pct: laudo.pTc, cor: "#2563EB" },
+      ],
+      hipotese: laudo.hipotese, criterios: laudo.criterios, atencao: laudo.atencao,
+      respostasHtmlExtra: respostasHtml,
+    });
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+  }
+
+  return (
+    <div>
+      <button className="botao-secundario botao-voltar-perfil" onClick={aoVoltar} style={{ marginBottom: 16 }}>
+        <Icone nome="arrow-left" tamanho={15} /> Voltar para Questionários
+      </button>
+
+      <h3 style={{ marginBottom: 2 }}>Rastreamento de Hábitos Alimentares</h3>
+      <p className="subtitulo-pagina" style={{ marginBottom: 20 }}>Avaliação diferencial DSM-5 (12 critérios) · Instrumento aplicado ao paciente e/ou familiares</p>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        {!linkGerado ? (
+          <button className="botao-primario" onClick={gerarLink} disabled={gerandoLink}>
+            <Icone nome="link" tamanho={15} /> {gerandoLink ? "Gerando..." : "Gerar link do questionário"}
+          </button>
+        ) : (
+          <>
+            <button className="botao-secundario" onClick={copiarLink}>
+              <Icone nome={copiado ? "check" : "link"} tamanho={14} /> {copiado ? "Copiado!" : "Copiar link"}
+            </button>
+            <button className="botao-primario" onClick={abrirWhatsApp} style={{ background: "#25D366" }}>
+              <Icone nome="message-circle" tamanho={14} /> Enviar pelo WhatsApp
+            </button>
+          </>
+        )}
+        {docs.length > 0 && (
+          <button className="botao-secundario" onClick={gerarLaudo}>
+            <Icone nome="file-text" tamanho={14} /> Gerar laudo em PDF
+          </button>
+        )}
+      </div>
+
+      {carregando && <p className="texto-vazio">Carregando...</p>}
+
+      {!carregando && docs.length === 0 && (
+        <div className="cartao-secao">
+          <p className="texto-vazio">Nenhuma resposta recebida ainda. Gere o link acima e envie ao paciente ou familiar.</p>
+        </div>
+      )}
+
+      {!carregando && docs.length > 0 && (() => {
+        const doc = docs[0];
+        const escores = calcularEscoresAlimentar(doc);
+        const laudo = laudoAlimentar(escores, doc);
+        return (
+          <div>
+            <div style={{ background: "#F5F3FF", border: "1px solid #C4B5FD", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--cor-marca)", marginBottom: 4 }}>Hipótese diagnóstica provável</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#3D006A", lineHeight: 1.4 }}>{laudo.hipotese}</div>
+            </div>
+
+            <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Escores por eixo (resposta mais recente)</div>
+              <BarraEscoreBipolar label="Anorexia Nervosa" valor={escores.anorexia} max={8} cor="#DC2626" />
+              <BarraEscoreBipolar label="Bulimia Nervosa / TCA" valor={escores.bulimia} max={8} cor="#7C3AED" />
+              <BarraEscoreBipolar label="TCA Puro (sem purgação)" valor={escores.tca} max={4} cor="#2563EB" />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
+              {laudo.criterios.map((c, i) => (
+                <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
+                    <CorBadgeCriterio atende={c.atende} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
+                </div>
+              ))}
+            </div>
+
+            {laudo.atencao.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Pontos de atenção para a entrevista clínica</div>
+                {laudo.atencao.map((a, i) => (
+                  <div key={i} style={{ background: "#FFF7ED", borderLeft: "3px solid #F97316", padding: "8px 12px", marginBottom: 6, borderRadius: "0 6px 6px 0", fontSize: 12 }}>{a}</div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Respostas por respondente</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {docs.map((d) => (
+                <div key={d.id} style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                    {d.tipoRespondente === "paciente" ? "Próprio paciente" : (d.nomeRespondente || "Familiar") + " · " + (d.parentesco || "")}
+                  </div>
+                  {PERGUNTAS_ALIMENTAR.map((p) => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
+                      <div style={{
+                        width: 24, height: 24, minWidth: 24, borderRadius: "50%",
+                        background: d[p.id] ? COR_LETRA_TRIAGEM[d[p.id]] + "22" : "#F3F4F6",
+                        border: "2px solid " + (d[p.id] ? COR_LETRA_TRIAGEM[d[p.id]] : "#E5E7EB"),
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700,
+                        color: d[p.id] ? COR_LETRA_TRIAGEM[d[p.id]] : "#9CA3AF",
+                      }}>
+                        {d[p.id] || "—"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#374151", flex: 1 }}>{p.texto}</div>
+                      <div style={{ fontSize: 10, color: "#9CA3AF", whiteSpace: "nowrap" }}>{p.eixo}</div>
+                    </div>
+                  ))}
+                  {d.obsFinais && (
+                    <div style={{ marginTop: 12, background: "#F9FAFB", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "#4B5563" }}>
+                      <strong>Observações:</strong> {d.obsFinais}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Rastreamento de Saúde Sexual — bespoke, respondido apenas pelo
+// paciente (confidencial). Traz análise etiológica diferencial além
+// das hipóteses DSM-5, igual ao modelo.
+// ═══════════════════════════════════════════════════════════════════
+
+const PERGUNTAS_SEXUAL = [
+  { id: "p1", eixo: "Desejo", texto: "Ausência ou redução persistente de desejo sexual (≥6m)" },
+  { id: "p2", eixo: "Desejo", texto: "Repulsa ou aversão ativa ao contato sexual" },
+  { id: "p3", eixo: "Excitação", texto: "Dificuldade na resposta física de excitação" },
+  { id: "p4", eixo: "Orgasmo", texto: "Atraso ou ausência de orgasmo" },
+  { id: "p5", eixo: "Ejaculação", texto: "Ejaculação precoce / involuntária (homens)" },
+  { id: "p6", eixo: "Ejaculação", texto: "Atraso ou ausência de ejaculação (homens)" },
+  { id: "p7", eixo: "Dor", texto: "Dor genital ou pélvica durante penetração" },
+  { id: "p8", eixo: "Dor", texto: "Contração involuntária e medo da penetração (mulheres)" },
+  { id: "p9", eixo: "Contexto", texto: "Persistência ≥6 meses com sofrimento clínico" },
+  { id: "p10", eixo: "Contexto", texto: "Generalizado vs. situacional" },
+  { id: "p11", eixo: "Contexto", texto: "Fator etiológico associado" },
+];
+
+function laudoSexual(doc) {
+  const p = (id) => doc[id] || "A";
+  let hipotese = [];
+  const criterios = [];
+  const atencao = [];
+  const temCriterio = p("p9") === "C";
+  const generalizado = p("p10") === "C";
+  const etiologia = p("p11");
+
+  if (p("p1") === "C") {
+    hipotese.push("Transtorno do Desejo Sexual Hipoativo");
+    criterios.push({ label: "Desejo Sexual Hipoativo (DSM-5 F52.0)", atende: temCriterio, obs: "Ausência crônica de desejo por ≥6 meses com sofrimento clínico. " + (generalizado ? "Caráter generalizado." : "Caráter situacional — avaliar fatores relacionais.") });
+    atencao.push("Investigar queda hormonal (testosterona/estrogênio), uso de antidepressivos ISRS e conflitos relacionais.");
+  }
+  if (p("p2") === "C") {
+    hipotese.push("Aversão Sexual");
+    criterios.push({ label: "Aversão Sexual", atende: temCriterio, obs: "Evitação fóbica ativa de contato sexual. Avaliar histórico de trauma ou abuso sexual." });
+    atencao.push("Rastrear histórico de trauma sexual — alta prevalência de TEPT associado à aversão sexual.");
+  }
+  if (p("p3") === "C") {
+    hipotese.push("Transtorno de Excitação");
+    criterios.push({ label: "Transtorno de Excitação (DSM-5 F52.22/F52.21)", atende: temCriterio, obs: "Disfunção erétil ou déficit de lubrificação crônico. " + (etiologia === "B" ? "Possível efeito iatrogênico de medicação." : etiologia === "A" ? "Investigar causa orgânica vascular/neurológica." : "Fator psicogênico predominante.") });
+    if (etiologia === "A") atencao.push("Encaminhar para urologia/ginecologia — possível causa orgânica vascular ou hormonal.");
+    if (etiologia === "B") atencao.push("Revisar medicações em uso — ISRS, anti-hipertensivos e anticoncepcionais são causas iatrogênicas frequentes.");
+  }
+  if (p("p4") === "C") {
+    hipotese.push("Transtorno do Orgasmo / Anorgasmia");
+    criterios.push({ label: "Anorgasmia (DSM-5 F52.31/F52.32)", atende: temCriterio, obs: "Ausência ou grande dificuldade persistente de atingir o orgasmo. Avaliar se é primária (nunca teve) ou secundária (perdeu após período funcional)." });
+    atencao.push("Diferenciar anorgasmia primária (nunca vivenciou orgasmo) de secundária (perdeu após período funcional).");
+  }
+  if (p("p5") === "C") {
+    hipotese.push("Ejaculação Precoce");
+    criterios.push({ label: "Ejaculação Precoce (DSM-5 F52.4)", atende: temCriterio, obs: "Padrão persistente de ejaculação involuntária. " + (generalizado ? "Caráter generalizado — não situacional." : "Caráter situacional.") });
+    atencao.push("Avaliar ansiedade de desempenho como fator primário — técnica de start-stop e terapia sexual indicadas.");
+  }
+  if (p("p6") === "C") {
+    hipotese.push("Ejaculação Retardada");
+    criterios.push({ label: "Ejaculação Retardada (DSM-5 F52.32)", atende: temCriterio, obs: "Atraso extremo ou incapacidade de ejacular intravaginal. Investigar uso de antidepressivos e fatores psicogênicos." });
+    atencao.push("Ejaculação retardada tem alta correlação com uso de ISRS — avaliar ajuste medicamentoso com psiquiatra.");
+  }
+  if (p("p7") === "C") {
+    hipotese.push("Dispareunia / Dor Gênito-Pélvica");
+    criterios.push({ label: "Transtorno de Dor Gênito-Pélvica/Penetração (DSM-5 F52.6)", atende: temCriterio, obs: "Dor genital/pélvica recorrente. Diferencial com endometriose, vulvodínia e vaginismo deve ser feito em consulta ginecológica." });
+    atencao.push("Encaminhar para ginecologia — descartar endometriose, vulvodínia e outras causas orgânicas de dispareunia.");
+  }
+  if (p("p8") === "C") {
+    if (!hipotese.includes("Dispareunia / Dor Gênito-Pélvica")) hipotese.push("Vaginismo");
+    criterios.push({ label: "Vaginismo (DSM-5 F52.6)", atende: temCriterio, obs: "Espasmo involuntário da musculatura pélvica com medo fóbico da penetração. Alta resposta à terapia sexual com fisioterapia pélvica." });
+    atencao.push("Vaginismo tem excelente prognóstico com fisioterapia pélvica + terapia sexual — encaminhar para especialistas.");
+    atencao.push("Rastrear histórico de trauma sexual — fator etiológico frequente no vaginismo.");
+  }
+
+  if (hipotese.length === 0) {
+    hipotese.push("Sem hipótese diagnóstica definida pelos escores — avaliação clínica aprofundada indicada.");
+    criterios.push({ label: "Disfunções Sexuais DSM-5", atende: false, obs: "Escores abaixo do limiar para todos os diagnósticos avaliados." });
+  }
+
+  const etioLabel = etiologia === "A" ? "Orgânica/Médica" : etiologia === "B" ? "Iatrogênica (medicação)" : "Psicogênica/Relacional";
+  const etioObs = etiologia === "A" ? "Investigação médica especializada indicada (urologia, ginecologia, endocrinologia)." :
+    etiologia === "B" ? "Revisar medicações — especialmente ISRS, anti-hipertensivos e anticoncepcionais. Discutir com médico prescritor." :
+    "Terapia sexual, psicoterapia cognitivo-comportamental e trabalho com crenças disfuncionais indicados.";
+
+  return { hipotese: hipotese.join(" + "), criterios, atencao, etioLabel, etioObs, temCriterio, generalizado };
+}
+
+function AbaRastreamentoSexualView({ usuario, paciente, aoVoltar }) {
+  const [docs, setDocs] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [gerandoLink, setGerandoLink] = useState(false);
+  const [linkGerado, setLinkGerado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    db.collection("clinica_rastreamento_sexual")
+      .where("psi_id", "==", usuario.psiId)
+      .where("pacienteId", "==", paciente.id)
+      .get()
+      .then((snap) => {
+        const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        lista.sort((a, b) => (b.criadoEm?.seconds || 0) - (a.criadoEm?.seconds || 0));
+        setDocs(lista);
+        setCarregando(false);
+      })
+      .catch(() => setCarregando(false));
+  }, [usuario.psiId, paciente.id]);
+
+  async function gerarLink() {
+    setGerandoLink(true);
+    try {
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        tipo: "sexual",
+        titulo: "Rastreamento de Saúde Sexual",
+        nomeClinica: cfg.nome || "PsiCoWorking",
+        corMarca: cfg.corPrimaria || "#6A2BD9",
+        logoUrl: cfg.logoUrl || "",
+        status: "enviado",
+        cancelado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setLinkGerado(window.location.origin + "/psi/atividade/?t=" + token);
+    } catch (e) {
+      alert("Não foi possível gerar o link: " + e.message);
+    } finally {
+      setGerandoLink(false);
+    }
+  }
+
+  function abrirWhatsApp() {
+    const primeiroNome = (paciente.nome || "").split(" ")[0];
+    const mensagem =
+      `Olá!\n\n` +
+      `Preparei um questionário clínico confidencial para você preencher: *Rastreamento de Saúde Sexual*.\n\n` +
+      `Leva de 5 a 10 minutos — suas respostas são lidas apenas por mim. É só abrir o link abaixo:\n\n` +
+      `${linkGerado}\n\n` +
+      `Qualquer dúvida, me chama por aqui.`;
+    const numero = (paciente.telefone || "").replace(/\D/g, "");
+    const url = numero
+      ? "https://wa.me/55" + numero + "?text=" + encodeURIComponent(mensagem)
+      : "https://wa.me/?text=" + encodeURIComponent(mensagem);
+    window.open(url, "_blank");
+  }
+
+  function copiarLink() {
+    navigator.clipboard.writeText(linkGerado).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
+
+  async function gerarLaudo() {
+    if (docs.length === 0) return;
+    const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+    const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+    const nomeClinica = cfg.nome || "PsiCoWorking";
+    const pacNome = paciente.nome || "Paciente";
+    const dataDoc = new Date().toLocaleDateString("pt-BR");
+    const doc = docs[0];
+    const laudo = laudoSexual(doc);
+
+    const respostasHtml = `
+      <h3>Próprio paciente · Confidencial</h3>
+      <table class="resp-table">
+        <thead><tr><th>#</th><th>Item</th><th>Eixo</th><th>Resp.</th></tr></thead>
+        <tbody>
+          ${PERGUNTAS_SEXUAL.map((p) => `<tr><td>${p.id.replace("p", "")}</td><td>${p.texto}</td><td>${p.eixo}</td><td><span class="letra" style="color:${COR_LETRA_TRIAGEM[doc[p.id]] || "#6b7280"}">${doc[p.id] || "—"}</span></td></tr>`).join("")}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2563eb;margin-bottom:4px">Etiologia predominante indicada</div>
+        <div style="font-size:14px;font-weight:700;color:#1e40af;margin-bottom:6px">${laudo.etioLabel}</div>
+        <div style="font-size:12px;color:#374151">${laudo.etioObs}</div>
+      </div>`;
+
+    const html = gerarHtmlLaudoTriagem({
+      titulo: "Laudo de Rastreamento — Saúde Sexual",
+      pacNome, nomeClinica, data: dataDoc, docs,
+      barras: [],
+      hipotese: laudo.hipotese, criterios: laudo.criterios, atencao: laudo.atencao,
+      respostasHtmlExtra: respostasHtml,
+    });
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+  }
+
+  return (
+    <div>
+      <button className="botao-secundario botao-voltar-perfil" onClick={aoVoltar} style={{ marginBottom: 16 }}>
+        <Icone nome="arrow-left" tamanho={15} /> Voltar para Questionários
+      </button>
+
+      <h3 style={{ marginBottom: 2 }}>Rastreamento de Saúde Sexual</h3>
+      <p className="subtitulo-pagina" style={{ marginBottom: 12 }}>Avaliação diferencial DSM-5 (11 critérios) · Confidencial</p>
+
+      <div style={{ background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#065F46", marginBottom: 16 }}>
+        Este questionário é respondido apenas pelo próprio paciente. Nenhum familiar tem acesso.
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        {!linkGerado ? (
+          <button className="botao-primario" onClick={gerarLink} disabled={gerandoLink}>
+            <Icone nome="link" tamanho={15} /> {gerandoLink ? "Gerando..." : "Gerar link do questionário"}
+          </button>
+        ) : (
+          <>
+            <button className="botao-secundario" onClick={copiarLink}>
+              <Icone nome={copiado ? "check" : "link"} tamanho={14} /> {copiado ? "Copiado!" : "Copiar link"}
+            </button>
+            <button className="botao-primario" onClick={abrirWhatsApp} style={{ background: "#25D366" }}>
+              <Icone nome="message-circle" tamanho={14} /> Enviar pelo WhatsApp
+            </button>
+          </>
+        )}
+        {docs.length > 0 && (
+          <button className="botao-secundario" onClick={gerarLaudo}>
+            <Icone nome="file-text" tamanho={14} /> Gerar laudo em PDF
+          </button>
+        )}
+      </div>
+
+      {carregando && <p className="texto-vazio">Carregando...</p>}
+
+      {!carregando && docs.length === 0 && (
+        <div className="cartao-secao">
+          <p className="texto-vazio">Nenhuma resposta recebida ainda. Gere o link acima e envie ao paciente.</p>
+        </div>
+      )}
+
+      {!carregando && docs.length > 0 && (() => {
+        const doc = docs[0];
+        const laudo = laudoSexual(doc);
+        return (
+          <div>
+            <div style={{ background: "#F5F3FF", border: "1px solid #C4B5FD", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--cor-marca)", marginBottom: 4 }}>Hipótese diagnóstica provável</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#3D006A", lineHeight: 1.4 }}>{laudo.hipotese}</div>
+            </div>
+
+            <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#2563EB", marginBottom: 4 }}>Etiologia predominante</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#1E40AF", marginBottom: 4 }}>{laudo.etioLabel}</div>
+              <div style={{ fontSize: 12, color: "#374151" }}>{laudo.etioObs}</div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
+              {laudo.criterios.map((c, i) => (
+                <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
+                    <CorBadgeCriterio atende={c.atende} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
+                </div>
+              ))}
+            </div>
+
+            {laudo.atencao.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Pontos de atenção para a entrevista clínica</div>
+                {laudo.atencao.map((a, i) => (
+                  <div key={i} style={{ background: "#FFF7ED", borderLeft: "3px solid #F97316", padding: "8px 12px", marginBottom: 6, borderRadius: "0 6px 6px 0", fontSize: 12 }}>{a}</div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Respostas do paciente</div>
+            <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 16 }}>
+              {PERGUNTAS_SEXUAL.map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
+                  <div style={{
+                    width: 24, height: 24, minWidth: 24, borderRadius: "50%",
+                    background: doc[p.id] ? COR_LETRA_TRIAGEM[doc[p.id]] + "22" : "#F3F4F6",
+                    border: "2px solid " + (doc[p.id] ? COR_LETRA_TRIAGEM[doc[p.id]] : "#E5E7EB"),
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700,
+                    color: doc[p.id] ? COR_LETRA_TRIAGEM[doc[p.id]] : "#9CA3AF",
+                  }}>
+                    {doc[p.id] || "—"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#374151", flex: 1 }}>{p.texto}</div>
+                  <div style={{ fontSize: 10, color: "#9CA3AF", whiteSpace: "nowrap" }}>{p.eixo}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Rastreamento de Funcionamento e Comportamento (TDAH/TEA/TOD) —
+// bespoke, 4 eixos independentes (não excludentes entre si).
+// ═══════════════════════════════════════════════════════════════════
+
+const PERGUNTAS_NEURO = [
+  { id: "p1", eixo: "TDAH Inatenção", texto: "Falhas em detalhes / erros por descuido" },
+  { id: "p2", eixo: "TDAH Inatenção", texto: "Dificuldade em manter foco em tarefas longas" },
+  { id: "p3", eixo: "TDAH Inatenção", texto: "Abandona tarefas antes de terminar" },
+  { id: "p4", eixo: "TDAH Inatenção", texto: "Desorganização crônica de tempo e espaço" },
+  { id: "p5", eixo: "TDAH Inatenção", texto: "Evitação de tarefas com esforço mental prolongado" },
+  { id: "p6", eixo: "TDAH Inatenção", texto: "Perda frequente de objetos essenciais" },
+  { id: "p7", eixo: "TDAH Inatenção", texto: "Distrabilidade por estímulos externos" },
+  { id: "p8", eixo: "TDAH Inatenção", texto: "Esquecimentos de compromissos e rotinas" },
+  { id: "p9", eixo: "TDAH Hiperatividade", texto: "Inquietação motora (mãos, pés, corpo)" },
+  { id: "p10", eixo: "TDAH Hiperatividade", texto: "Dificuldade em permanecer sentado(a)" },
+  { id: "p11", eixo: "TDAH Hiperatividade", texto: "Sensação de aceleração interna crônica" },
+  { id: "p12", eixo: "TDAH Hiperatividade", texto: "Fala excessiva / monopoliza conversas" },
+  { id: "p13", eixo: "TDAH Hiperatividade", texto: "Precipitação de respostas / completa frases alheias" },
+  { id: "p14", eixo: "TDAH Hiperatividade", texto: "Dificuldade para esperar / impaciência extrema" },
+  { id: "p15", eixo: "TDAH Hiperatividade", texto: "Interrupção ou intrusão em atividades alheias" },
+  { id: "p16", eixo: "TEA", texto: "Dificuldade na reciprocidade social" },
+  { id: "p17", eixo: "TEA", texto: "Uso atípico de contato visual / expressão facial" },
+  { id: "p18", eixo: "TEA", texto: "Dificuldade em fazer e manter amigos" },
+  { id: "p19", eixo: "TEA", texto: "Movimentos ou falas repetitivas (stimming)" },
+  { id: "p20", eixo: "TEA", texto: "Angústia severa diante de mudanças de rotina" },
+  { id: "p21", eixo: "TEA", texto: "Interesses restritos e hiperfixados" },
+  { id: "p22", eixo: "TEA", texto: "Hiper ou hipossensibilidade sensorial" },
+  { id: "p23", eixo: "TOD", texto: "Humor irritável e irascível" },
+  { id: "p24", eixo: "TOD", texto: "Discussões com figuras de autoridade" },
+  { id: "p25", eixo: "TOD", texto: "Desobediência ativa e recusa de regras" },
+  { id: "p26", eixo: "TOD", texto: "Incomoda deliberadamente outras pessoas" },
+  { id: "p27", eixo: "TOD", texto: "Culpa os outros pelos próprios erros" },
+  { id: "p28", eixo: "TOD", texto: "Rancor e vingança persistentes" },
+];
+
+function calcularEscoresNeuro(doc) {
+  const pontuar = (id) => pontuarLetraTriagem(doc[id]);
+  const ids = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => "p" + (a + i));
+  return {
+    tdahIn: ids(1, 8).reduce((s, id) => s + pontuar(id), 0),
+    tdahHi: ids(9, 15).reduce((s, id) => s + pontuar(id), 0),
+    tea: ids(16, 22).reduce((s, id) => s + pontuar(id), 0),
+    tod: ids(23, 28).reduce((s, id) => s + pontuar(id), 0),
+  };
+}
+
+function laudoNeuro(escores) {
+  const { tdahIn, tdahHi, tea, tod } = escores;
+  const pIn = Math.round((tdahIn / 16) * 100);
+  const pHi = Math.round((tdahHi / 14) * 100);
+  const pTea = Math.round((tea / 14) * 100);
+  const pTod = Math.round((tod / 12) * 100);
+  const nivel = (pct) => (pct >= 75 ? "Severo" : pct >= 50 ? "Moderado" : pct >= 25 ? "Leve" : "Subliminar");
+
+  let hipotese = [];
+  const criterios = [];
+  const atencao = [];
+
+  if (pIn >= 50 || pHi >= 50) {
+    const subtipo = pIn >= 50 && pHi >= 50 ? "Apresentação Combinada" : pIn >= 50 ? "Predominantemente Desatento" : "Predominantemente Hiperativo/Impulsivo";
+    hipotese.push("TDAH — " + subtipo);
+    criterios.push({ label: "TDAH (" + subtipo + ")", atende: true, obs: "Inatenção: " + nivel(pIn) + " (" + pIn + "%) · Hiperatividade: " + nivel(pHi) + " (" + pHi + "%). Verificar início antes dos 12 anos e prejuízo em múltiplos contextos (DSM-5 Critério C)." });
+    atencao.push("Confirmar início dos sintomas antes dos 12 anos de idade (critério obrigatório DSM-5).");
+    atencao.push("Verificar se os sintomas ocorrem em pelo menos 2 contextos (escola/trabalho, casa, social).");
+  } else {
+    criterios.push({ label: "TDAH", atende: false, obs: "Escores abaixo do limiar clínico para ambos os subtipos." });
+  }
+
+  if (pTea >= 50) {
+    hipotese.push("TEA — Transtorno do Espectro Autista");
+    criterios.push({ label: "TEA (DSM-5 F84.0)", atende: true, obs: "Escore " + nivel(pTea) + " (" + pTea + "%). Verificar se déficits em comunicação social e padrões restritos estão presentes desde o período do desenvolvimento precoce." });
+    atencao.push("Investigar histórico de desenvolvimento precoce — sinais de TEA devem estar presentes desde a infância.");
+    atencao.push("Diferenciar hiperfoco do TEA (restrito e intenso) da desatenção seletiva do TDAH.");
+    if (pIn >= 40) atencao.push("Alta sobreposição TDAH + TEA detectada — avaliar comorbidade (presente em ~50% dos casos de TEA).");
+  } else {
+    criterios.push({ label: "TEA", atende: false, obs: "Escores abaixo do limiar — traços presentes mas insuficientes para indicação clínica de TEA." });
+  }
+
+  if (pTod >= 50) {
+    hipotese.push("TOD — Transtorno Opositivo-Desafiador");
+    criterios.push({ label: "TOD (DSM-5 F91.3)", atende: true, obs: "Escore " + nivel(pTod) + " (" + pTod + "%). Avaliar se o padrão é persistente por ≥6 meses e presente com pelo menos uma pessoa que não seja irmão." });
+    atencao.push("Diferenciar se a irritabilidade e oposição decorrem de desregulação emocional do TDAH ou de TOD independente.");
+    atencao.push("Verificar duração ≥6 meses e prejuízo em pelo menos um contexto (DSM-5 Critério B).");
+  } else {
+    criterios.push({ label: "TOD", atende: false, obs: "Escores abaixo do limiar clínico." });
+  }
+
+  if (hipotese.length === 0) hipotese.push("Sem hipótese diagnóstica definida pelos escores — avaliação clínica aprofundada indicada.");
+
+  return { hipotese: hipotese.join(" + "), criterios, atencao, pIn, pHi, pTea, pTod, nivel };
+}
+
+function AbaRastreamentoNeuroView({ usuario, paciente, aoVoltar }) {
+  const [docs, setDocs] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [gerandoLink, setGerandoLink] = useState(false);
+  const [linkGerado, setLinkGerado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    db.collection("clinica_rastreamento_neuro")
+      .where("psi_id", "==", usuario.psiId)
+      .where("pacienteId", "==", paciente.id)
+      .get()
+      .then((snap) => {
+        const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        lista.sort((a, b) => (b.criadoEm?.seconds || 0) - (a.criadoEm?.seconds || 0));
+        setDocs(lista);
+        setCarregando(false);
+      })
+      .catch(() => setCarregando(false));
+  }, [usuario.psiId, paciente.id]);
+
+  async function gerarLink() {
+    setGerandoLink(true);
+    try {
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        tipo: "neuro",
+        titulo: "Rastreamento de Funcionamento e Comportamento",
+        nomeClinica: cfg.nome || "PsiCoWorking",
+        corMarca: cfg.corPrimaria || "#6A2BD9",
+        logoUrl: cfg.logoUrl || "",
+        status: "enviado",
+        cancelado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setLinkGerado(window.location.origin + "/psi/atividade/?t=" + token);
+    } catch (e) {
+      alert("Não foi possível gerar o link: " + e.message);
+    } finally {
+      setGerandoLink(false);
+    }
+  }
+
+  function abrirWhatsApp() {
+    const primeiroNome = (paciente.nome || "").split(" ")[0];
+    const mensagem =
+      `Olá!\n\n` +
+      `Preparei um questionário clínico para você preencher sobre *${primeiroNome}*: *Rastreamento de Funcionamento e Comportamento*.\n\n` +
+      `Leva de 10 a 15 minutos — é só abrir o link abaixo e responder com calma:\n\n` +
+      `${linkGerado}\n\n` +
+      `Qualquer dúvida, me chama por aqui.`;
+    const numero = (paciente.telefone || "").replace(/\D/g, "");
+    const url = numero
+      ? "https://wa.me/55" + numero + "?text=" + encodeURIComponent(mensagem)
+      : "https://wa.me/?text=" + encodeURIComponent(mensagem);
+    window.open(url, "_blank");
+  }
+
+  function copiarLink() {
+    navigator.clipboard.writeText(linkGerado).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
+
+  async function gerarLaudo() {
+    if (docs.length === 0) return;
+    const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+    const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+    const nomeClinica = cfg.nome || "PsiCoWorking";
+    const pacNome = paciente.nome || "Paciente";
+    const dataDoc = new Date().toLocaleDateString("pt-BR");
+    const escoresPorDoc = docs.map((d) => ({ ...d, escores: calcularEscoresNeuro(d) }));
+    const n = docs.length;
+    const media = {
+      tdahIn: Math.round((escoresPorDoc.reduce((s, d) => s + d.escores.tdahIn, 0) / n) * 10) / 10,
+      tdahHi: Math.round((escoresPorDoc.reduce((s, d) => s + d.escores.tdahHi, 0) / n) * 10) / 10,
+      tea: Math.round((escoresPorDoc.reduce((s, d) => s + d.escores.tea, 0) / n) * 10) / 10,
+      tod: Math.round((escoresPorDoc.reduce((s, d) => s + d.escores.tod, 0) / n) * 10) / 10,
+    };
+    const laudo = laudoNeuro(media);
+
+    const respostasHtml = escoresPorDoc.map((d) => `
+      <h3>${d.tipoRespondente === "paciente" ? "Próprio paciente" : (d.nomeRespondente || "Familiar") + " (" + (d.parentesco || "—") + ")"}</h3>
+      <table class="resp-table">
+        <thead><tr><th>#</th><th>Item</th><th>Eixo</th><th>Resp.</th></tr></thead>
+        <tbody>
+          ${PERGUNTAS_NEURO.map((p) => `<tr><td>${p.id.replace("p", "")}</td><td>${p.texto}</td><td>${p.eixo}</td><td><span class="letra" style="color:${COR_LETRA_TRIAGEM[d[p.id]] || "#6b7280"}">${d[p.id] || "—"}</span></td></tr>`).join("")}
+          ${d.obsFinais ? `<tr><td colspan="2"><strong>Observações livres</strong></td><td colspan="2">${d.obsFinais}</td></tr>` : ""}
+        </tbody>
+      </table>`).join("");
+
+    const html = gerarHtmlLaudoTriagem({
+      titulo: "Laudo de Rastreamento — Funcionamento e Comportamento",
+      pacNome, nomeClinica, data: dataDoc, docs,
+      barras: [
+        { label: "TDAH — Inatenção (8 itens)", pct: laudo.pIn, cor: "#7C3AED" },
+        { label: "TDAH — Hiperatividade/Impulsividade (7 itens)", pct: laudo.pHi, cor: "#DC2626" },
+        { label: "TEA — Espectro Autista (7 itens)", pct: laudo.pTea, cor: "#2563EB" },
+        { label: "TOD — Transtorno Opositivo-Desafiador (6 itens)", pct: laudo.pTod, cor: "#D97706" },
+      ],
+      hipotese: laudo.hipotese, criterios: laudo.criterios, atencao: laudo.atencao,
+      respostasHtmlExtra: respostasHtml,
+    });
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+  }
+
+  return (
+    <div>
+      <button className="botao-secundario botao-voltar-perfil" onClick={aoVoltar} style={{ marginBottom: 16 }}>
+        <Icone nome="arrow-left" tamanho={15} /> Voltar para Questionários
+      </button>
+
+      <h3 style={{ marginBottom: 2 }}>Funcionamento e Comportamento</h3>
+      <p className="subtitulo-pagina" style={{ marginBottom: 20 }}>Avaliação de TDAH, TEA e TOD (28 critérios DSM-5) · Instrumento aplicado ao paciente e/ou familiares</p>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        {!linkGerado ? (
+          <button className="botao-primario" onClick={gerarLink} disabled={gerandoLink}>
+            <Icone nome="link" tamanho={15} /> {gerandoLink ? "Gerando..." : "Gerar link do questionário"}
+          </button>
+        ) : (
+          <>
+            <button className="botao-secundario" onClick={copiarLink}>
+              <Icone nome={copiado ? "check" : "link"} tamanho={14} /> {copiado ? "Copiado!" : "Copiar link"}
+            </button>
+            <button className="botao-primario" onClick={abrirWhatsApp} style={{ background: "#25D366" }}>
+              <Icone nome="message-circle" tamanho={14} /> Enviar pelo WhatsApp
+            </button>
+          </>
+        )}
+        {docs.length > 0 && (
+          <button className="botao-secundario" onClick={gerarLaudo}>
+            <Icone nome="file-text" tamanho={14} /> Gerar laudo em PDF
+          </button>
+        )}
+      </div>
+
+      {carregando && <p className="texto-vazio">Carregando...</p>}
+
+      {!carregando && docs.length === 0 && (
+        <div className="cartao-secao">
+          <p className="texto-vazio">Nenhuma resposta recebida ainda. Gere o link acima e envie ao paciente ou familiar.</p>
+        </div>
+      )}
+
+      {!carregando && docs.length > 0 && (() => {
+        const escoresPorDoc = docs.map((d) => ({ ...d, escores: calcularEscoresNeuro(d) }));
+        const n = docs.length;
+        const media = {
+          tdahIn: Math.round((escoresPorDoc.reduce((s, d) => s + d.escores.tdahIn, 0) / n) * 10) / 10,
+          tdahHi: Math.round((escoresPorDoc.reduce((s, d) => s + d.escores.tdahHi, 0) / n) * 10) / 10,
+          tea: Math.round((escoresPorDoc.reduce((s, d) => s + d.escores.tea, 0) / n) * 10) / 10,
+          tod: Math.round((escoresPorDoc.reduce((s, d) => s + d.escores.tod, 0) / n) * 10) / 10,
+        };
+        const laudo = laudoNeuro(media);
+        return (
+          <div>
+            <div style={{ background: "#F5F3FF", border: "1px solid #C4B5FD", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--cor-marca)", marginBottom: 4 }}>Hipótese diagnóstica provável</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#3D006A", lineHeight: 1.4 }}>{laudo.hipotese}</div>
+            </div>
+
+            <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Escores médios por eixo ({docs.length} respondente{docs.length !== 1 ? "s" : ""})</div>
+              <BarraEscoreBipolar label="TDAH — Inatenção" valor={media.tdahIn} max={16} cor="#7C3AED" />
+              <BarraEscoreBipolar label="TDAH — Hiperatividade/Impulsividade" valor={media.tdahHi} max={14} cor="#DC2626" />
+              <BarraEscoreBipolar label="TEA — Espectro Autista" valor={media.tea} max={14} cor="#2563EB" />
+              <BarraEscoreBipolar label="TOD — Opositivo-Desafiador" valor={media.tod} max={12} cor="#D97706" />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
+              {laudo.criterios.map((c, i) => (
+                <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
+                    <CorBadgeCriterio atende={c.atende} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
+                </div>
+              ))}
+            </div>
+
+            {laudo.atencao.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Pontos de atenção para a entrevista clínica</div>
+                {laudo.atencao.map((a, i) => (
+                  <div key={i} style={{ background: "#FFF7ED", borderLeft: "3px solid #F97316", padding: "8px 12px", marginBottom: 6, borderRadius: "0 6px 6px 0", fontSize: 12 }}>{a}</div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Respostas por respondente</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {docs.map((doc) => (
+                <div key={doc.id} style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                    {doc.tipoRespondente === "paciente" ? "Próprio paciente" : (doc.nomeRespondente || "Familiar") + " · " + (doc.parentesco || "")}
+                  </div>
+                  {PERGUNTAS_NEURO.map((p) => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
+                      <div style={{
+                        width: 24, height: 24, minWidth: 24, borderRadius: "50%",
+                        background: doc[p.id] ? COR_LETRA_TRIAGEM[doc[p.id]] + "22" : "#F3F4F6",
+                        border: "2px solid " + (doc[p.id] ? COR_LETRA_TRIAGEM[doc[p.id]] : "#E5E7EB"),
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700,
+                        color: doc[p.id] ? COR_LETRA_TRIAGEM[doc[p.id]] : "#9CA3AF",
+                      }}>
+                        {doc[p.id] || "—"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#374151", flex: 1 }}>{p.texto}</div>
+                      <div style={{ fontSize: 10, color: "#9CA3AF", whiteSpace: "nowrap" }}>{p.eixo}</div>
+                    </div>
+                  ))}
+                  {doc.obsFinais && (
+                    <div style={{ marginTop: 12, background: "#F9FAFB", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "#4B5563" }}>
+                      <strong>Observações:</strong> {doc.obsFinais}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 function AbaQuestionariosPaciente({ usuario, paciente }) {
   const [aberto, setAberto] = useState(null);
 
@@ -1524,6 +2533,15 @@ function AbaQuestionariosPaciente({ usuario, paciente }) {
   }
   if (aberto === "rastreamento") {
     return <AbaRastreamentoBipolarView usuario={usuario} paciente={paciente} aoVoltar={() => setAberto(null)} />;
+  }
+  if (aberto === "alimentar") {
+    return <AbaRastreamentoAlimentarView usuario={usuario} paciente={paciente} aoVoltar={() => setAberto(null)} />;
+  }
+  if (aberto === "sexual") {
+    return <AbaRastreamentoSexualView usuario={usuario} paciente={paciente} aoVoltar={() => setAberto(null)} />;
+  }
+  if (aberto === "neuro") {
+    return <AbaRastreamentoNeuroView usuario={usuario} paciente={paciente} aoVoltar={() => setAberto(null)} />;
   }
   if (aberto && RASTREAMENTOS_ADMIN[aberto]) {
     return <AbaRastreamentoView usuario={usuario} paciente={paciente} tipo={aberto} aoVoltar={() => setAberto(null)} />;

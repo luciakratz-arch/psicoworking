@@ -320,6 +320,363 @@ const BLOCOS_RASTREAMENTO_BIPOLAR = [
   },
 ];
 
+// ── Instrumento: Hábitos Alimentares ──
+// 12 critérios DSM-5 (Anorexia, Bulimia/TCA, TCA puro, ARFID — os 2
+// últimos, p11/p12, são coletados mas não entram na fórmula de
+// pontuação, igual ao modelo original).
+const BLOCOS_RASTREAMENTO_ALIMENTAR = [
+  {
+    titulo: "Bloco 1 — Padrão de Alimentação e Peso",
+    sub: "Observe como a pessoa se relaciona com a alimentação, o peso corporal e a imagem que tem de si mesma.",
+    perguntas: [
+      { id: "p1", num: "1", texto: "A pessoa apresenta restrição persistente na quantidade de alimentos que consome, resultando em peso corporal muito abaixo do esperado para sua idade e altura?", opcoes: [
+        { letra: "A", texto: "Não há restrição calórica; alimenta-se de forma adequada e mantém peso saudável." },
+        { letra: "B", texto: "Apresenta restrições dietéticas leves ou modismos alimentares esporádicos, sem perda de peso clinicamente significativa." },
+        { letra: "C", texto: "Restrição alimentar drástica e contínua, resultando em magreza acentuada e peso corporal abaixo do limite mínimo esperado." },
+      ] },
+      { id: "p2", num: "2", texto: "A pessoa demonstra medo intenso e persistente de ganhar peso ou de engordar, mesmo quando está visivelmente abaixo do peso?", opcoes: [
+        { letra: "A", texto: "Não apresenta medo desproporcional em relação ao peso." },
+        { letra: "B", texto: "Preocupa-se com o peso esteticamente, mas sem pavor ou comportamentos fóbicos." },
+        { letra: "C", texto: "Medo intenso, irracional e persistente de engordar, acompanhado de pavor de qualquer alteração na balança." },
+      ] },
+      { id: "p3", num: "3", texto: "A pessoa tem uma percepção distorcida do próprio corpo, vendo-se acima do peso mesmo quando está muito magra, ou valoriza sua autoestima exclusivamente pelo número na balança?", opcoes: [
+        { letra: "A", texto: "Tem percepção realista e saudável de sua forma física." },
+        { letra: "B", texto: "Possui insatisfações estéticas comuns, mas sem distorção profunda da realidade corporal." },
+        { letra: "C", texto: "Distorção severa da imagem corporal e valor pessoal atrelado exclusivamente ao peso." },
+      ] },
+      { id: "p4", num: "4", texto: "Nos últimos 3 meses, como tem sido o padrão de controle de peso da pessoa?", opcoes: [
+        { letra: "A", texto: "Não se aplica — sem quadro restritivo." },
+        { letra: "B", texto: "Controla o peso principalmente por meio de dietas rígidas ou exercício excessivo, sem episódios de compulsão ou purgação." },
+        { letra: "C", texto: "Apresentou episódios de comer muito de uma vez seguidos de comportamentos para compensar (vômitos, laxantes ou jejum prolongado)." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 2 — Episódios de Ingestão Excessiva",
+    sub: "Observe se a pessoa tem momentos em que come muito mais do que o comum, com sensação de perda de controle.",
+    perguntas: [
+      { id: "p5", num: "5", texto: "A pessoa tem episódios em que come uma quantidade muito grande de alimentos em pouco tempo, claramente mais do que a maioria das pessoas comeria na mesma situação?", opcoes: [
+        { letra: "A", texto: "Nunca ocorrem episódios de ingestão descontrolada de grandes volumes." },
+        { letra: "B", texto: "Ocasionalmente come um pouco além da conta em festas ou feriados, sem padrão clínico." },
+        { letra: "C", texto: "Episódios recorrentes de ingestão volumosa e exagerada de comida." },
+      ] },
+      { id: "p6", num: "6", texto: "Durante esses episódios de ingestão excessiva, a pessoa sente que não consegue parar de comer ou controlar o quanto está comendo?", opcoes: [
+        { letra: "A", texto: "Mantém controle absoluto sobre a alimentação." },
+        { letra: "B", texto: "Sente que comeu rápido demais, mas sem perda de controle." },
+        { letra: "C", texto: "Sensação inegável de impotência e perda de controle sobre a quantidade ingerida." },
+      ] },
+      { id: "p7", num: "7", texto: "Com que frequência ocorrem esses episódios de comer em excesso?", opcoes: [
+        { letra: "A", texto: "Nunca ou em frequência irrelevante." },
+        { letra: "B", texto: "Ocorrem esporadicamente (menos de uma vez por semana)." },
+        { letra: "C", texto: "Ocorrem pelo menos uma vez por semana nos últimos 3 meses." },
+      ] },
+      { id: "p8", num: "8", texto: "Após comer em excesso, a pessoa adota métodos para compensar, como provocar vômito, usar laxantes, fazer jejum prolongado ou se exercitar de forma excessiva e punitiva?", opcoes: [
+        { letra: "A", texto: "Nunca utiliza métodos compensatórios." },
+        { letra: "B", texto: "Compensa reduzindo levemente a refeição seguinte de forma saudável." },
+        { letra: "C", texto: "Uso regular de métodos drásticos de compensação ou purgação após os episódios." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 3 — Comportamento Durante a Ingestão e Sentimentos Posteriores",
+    sub: "Observe como a pessoa se comporta durante e após os episódios de comer em excesso.",
+    perguntas: [
+      { id: "p9", num: "9", texto: "Durante os episódios de ingestão excessiva, a pessoa apresenta comportamentos como comer muito rápido, comer até sentir desconforto físico, comer escondida por vergonha ou comer sem sentir fome?", opcoes: [
+        { letra: "A", texto: "Não apresenta esses padrões de ingestão." },
+        { letra: "B", texto: "Apresenta esporadicamente um ou outro comportamento." },
+        { letra: "C", texto: "Apresenta sistematicamente esse padrão de ingestão rápida, secreta e exagerada sem fome." },
+      ] },
+      { id: "p10", num: "10", texto: "Após os episódios de comer em excesso, a pessoa sente culpa intensa, vergonha ou nojo de si mesma, mas NÃO adota comportamentos de compensação como vômito ou laxantes?", opcoes: [
+        { letra: "A", texto: "Não se aplica." },
+        { letra: "B", texto: "Há compulsão ocasional com leve culpa, mas sem padrão clínico." },
+        { letra: "C", texto: "Sofre intensamente com a culpa da compulsão, mas não usa métodos de compensação." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 4 — Restrição sem Preocupação com Peso (ARFID)",
+    sub: "Observe se a pessoa evita alimentos por razões que NÃO incluem medo de engordar, como aversão sensorial, medo de engasgar ou falta de interesse por comida.",
+    perguntas: [
+      { id: "p11", num: "11", texto: "A pessoa evita ou restringe alimentos por causa de características sensoriais (textura, cheiro, cor, temperatura) ou por medo de engasgar, vomitar ou ter reação adversa, sem preocupação com peso ou imagem corporal?", opcoes: [
+        { letra: "A", texto: "Não há restrição alimentar por razões sensoriais ou de medo." },
+        { letra: "B", texto: "Há algumas preferências sensoriais, mas sem impacto significativo na nutrição." },
+        { letra: "C", texto: "Restrição alimentar severa por aversão sensorial ou medo de engasgar, com impacto clínico na nutrição ou no funcionamento social." },
+      ] },
+      { id: "p12", num: "12", texto: "A restrição alimentar resulta em perda de peso significativa, deficiência nutricional, dependência de suplementos ou impacto importante nas atividades sociais (como não conseguir comer fora de casa)?", opcoes: [
+        { letra: "A", texto: "Não há impacto clínico na nutrição ou na vida social." },
+        { letra: "B", texto: "Há alguma limitação social, mas sem desnutrição ou perda de peso grave." },
+        { letra: "C", texto: "Impacto clínico significativo: perda de peso, deficiência nutricional ou comprometimento grave da vida social por causa da restrição alimentar." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Observações Finais",
+    sub: "Se quiser, compartilhe qualquer observação adicional sobre os hábitos alimentares da pessoa avaliada.",
+    perguntas: [],
+    obs: true,
+  },
+];
+
+// ── Instrumento: Saúde Sexual ──
+// 11 critérios DSM-5, respondido apenas pelo próprio paciente
+// (confidencial — sem opção de familiar, igual ao modelo original).
+const BLOCOS_RASTREAMENTO_SEXUAL = [
+  {
+    titulo: "Bloco 1 — Desejo e Interesse",
+    sub: "Responda sobre como você percebe seu interesse e desejo pela vida sexual nos últimos meses.",
+    perguntas: [
+      { id: "p1", num: "1", texto: "Você percebe uma ausência ou redução significativa do desejo por atividade sexual ou de fantasias sexuais, de forma persistente há 6 meses ou mais?", opcoes: [
+        { letra: "A", texto: "Mantenho um nível de desejo adequado e estável para minha realidade." },
+        { letra: "B", texto: "Percebo quedas pontuais de desejo associadas a estresse, cansaço ou momentos difíceis na relação." },
+        { letra: "C", texto: "Ausência crônica e marcante de desejo ou fantasias sexuais por 6 meses ou mais, causando sofrimento real." },
+      ] },
+      { id: "p2", num: "2", texto: "Você sente repulsa, aversão ou evita ativamente qualquer situação de contato sexual ou íntimo?", opcoes: [
+        { letra: "A", texto: "Não há qualquer aversão ao toque ou contato íntimo." },
+        { letra: "B", texto: "Em momentos de cansaço extremo, prefiro carícia sem ato sexual, mas sem repulsa." },
+        { letra: "C", texto: "Sinto repulsa ativa ou evito de forma intensa qualquer aproximação de cunho sexual." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 2 — Resposta Física e Orgasmo",
+    sub: "Responda sobre o que acontece com seu corpo durante a atividade sexual.",
+    perguntas: [
+      { id: "p3", num: "3", texto: "Você tem dificuldade persistente para obter ou manter a resposta física de excitação durante a atividade sexual (lubrificação, ereção) de forma adequada?", opcoes: [
+        { letra: "A", texto: "A resposta física de excitação ocorre normalmente quando há estímulo e intenção." },
+        { letra: "B", texto: "Ocorre ocasionalmente por ansiedade ou cansaço, mas não é um padrão." },
+        { letra: "C", texto: "Dificuldade crônica e recorrente para atingir ou sustentar a resposta física até o fim da relação." },
+      ] },
+      { id: "p4", num: "4", texto: "Você experimenta atraso acentuado, pouca frequência ou ausência total de orgasmo, mesmo após estimulação adequada?", opcoes: [
+        { letra: "A", texto: "Atinjo o orgasmo de forma satisfatória e regular quando estimulado(a)." },
+        { letra: "B", texto: "Ocorre variação esporádica no tempo dependendo do contexto." },
+        { letra: "C", texto: "Ausência ou grande dificuldade persistente de atingir o orgasmo, gerando frustração e sofrimento." },
+      ] },
+      { id: "p5", num: "5", texto: "(Para homens) A ejaculação ocorre de forma muito rápida, antes ou logo após o início da relação, sem que você consiga controlar?", opcoes: [
+        { letra: "A", texto: "Consigo controlar o momento da ejaculação adequadamente." },
+        { letra: "B", texto: "Ocorre de forma mais rápida raramente, em momentos de alta excitação." },
+        { letra: "C", texto: "Padrão persistente de ejaculação rápida e involuntária sem controle." },
+      ] },
+      { id: "p6", num: "6", texto: "(Para homens) Há um atraso muito grande ou impossibilidade de ejacular durante a relação sexual?", opcoes: [
+        { letra: "A", texto: "Tempo ejaculatório normal e satisfatório." },
+        { letra: "B", texto: "Variação esporádica no tempo ejaculatório." },
+        { letra: "C", texto: "Atraso extremo ou incapacidade de ejacular durante a relação, gerando grande desgaste." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 3 — Dor e Desconforto",
+    sub: "Responda sobre eventuais dores ou desconfortos físicos relacionados à atividade sexual.",
+    perguntas: [
+      { id: "p7", num: "7", texto: "Você sente dor física genital ou pélvica durante ou ao tentar ter relação sexual com penetração?", opcoes: [
+        { letra: "A", texto: "Nenhuma dor ou desconforto durante as relações." },
+        { letra: "B", texto: "Desconforto leve e pontual resolvido com lubrificação ou ajustes." },
+        { letra: "C", texto: "Dor genital ou pélvica acentuada, recorrente e significativa associada à penetração." },
+      ] },
+      { id: "p8", num: "8", texto: "(Para mulheres) Você percebe uma contração ou aperto involuntário dos músculos vaginais ao tentar a penetração, acompanhado de medo ou ansiedade intensa?", opcoes: [
+        { letra: "A", texto: "Musculatura relaxada e sem medo ou tensão associada." },
+        { letra: "B", texto: "Tensão leve inicial por inexperiência ou pressa que cede logo." },
+        { letra: "C", texto: "Contração involuntária severa da musculatura e medo intenso da penetração." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 4 — Contexto e Duração",
+    sub: "Responda sobre há quanto tempo isso acontece e em que situações.",
+    perguntas: [
+      { id: "p9", num: "9", texto: "Os sintomas ou dificuldades que você descreveu persistem há 6 meses ou mais e causam sofrimento real na sua vida ou nos seus relacionamentos?", opcoes: [
+        { letra: "A", texto: "Não preenchem o critério de 6 meses ou não causam sofrimento real." },
+        { letra: "B", texto: "Tenho dúvida sobre a constância ou duração do que sinto." },
+        { letra: "C", texto: "Sim, persistem há mais de 6 meses e causam forte sofrimento pessoal ou nas relações." },
+      ] },
+      { id: "p10", num: "10", texto: "As dificuldades ocorrem em todas as situações ou apenas com determinados parceiros ou contextos específicos?", opcoes: [
+        { letra: "A", texto: "Não se aplica — sem disfunção." },
+        { letra: "B", texto: "Ocorre apenas em situações ou com parceiros específicos (por exemplo, com alguém novo)." },
+        { letra: "C", texto: "Ocorre em todas as situações, independentemente do parceiro ou contexto." },
+      ] },
+      { id: "p11", num: "11", texto: "Você associa as dificuldades a algum desses fatores?", opcoes: [
+        { letra: "A", texto: "Problemas físicos ou hormonais já investigados por médico." },
+        { letra: "B", texto: "Início ou mudança de medicamentos (como antidepressivos, anticoncepcionais ou outros)." },
+        { letra: "C", texto: "Ansiedade, pensamentos negativos sobre o próprio corpo ou desempenho, traumas ou conflitos no relacionamento." },
+      ] },
+    ],
+  },
+];
+
+// ── Instrumento: Funcionamento e Comportamento (TDAH / TEA / TOD) ──
+// 28 critérios DSM-5 em 4 blocos + observações finais.
+const BLOCOS_RASTREAMENTO_NEURO = [
+  {
+    titulo: "Bloco 1 — Atenção e Foco",
+    sub: "Observe como a pessoa lida com tarefas que exigem concentração, organização e memória no dia a dia.",
+    perguntas: [
+      { id: "p1", num: "1", texto: "A pessoa costuma falhar em prestar atenção em detalhes, cometendo erros por descuido em tarefas escolares, profissionais ou cotidianas?", opcoes: [
+        { letra: "A", texto: "Raramente ou nunca." },
+        { letra: "B", texto: "Ocasionalmente, em momentos de muita exaustão." },
+        { letra: "C", texto: "Frequentemente — deixa passar detalhes essenciais ou erra por desatenção de forma recorrente." },
+      ] },
+      { id: "p2", num: "2", texto: "Apresenta dificuldade persistente em manter o foco em tarefas longas, leituras ou conversas?", opcoes: [
+        { letra: "A", texto: "Consegue manter a atenção pelo tempo necessário." },
+        { letra: "B", texto: "Distrai-se se o assunto for maçante, mas se esforça." },
+        { letra: "C", texto: "Frequentemente perde o foco com facilidade extrema, parecendo não escutar quando falam diretamente." },
+      ] },
+      { id: "p3", num: "3", texto: "Inicia tarefas mas logo se perde ou abandona o que começou antes de terminar?", opcoes: [
+        { letra: "A", texto: "Termina tudo o que começa de forma organizada." },
+        { letra: "B", texto: "Às vezes acumula tarefas, mas dá conta no prazo." },
+        { letra: "C", texto: "Frequentemente não segue instruções até o fim, deixando obrigações incompletas." },
+      ] },
+      { id: "p4", num: "4", texto: "Apresenta grande dificuldade para organizar tarefas, gerenciar o tempo ou manter o espaço de trabalho em ordem?", opcoes: [
+        { letra: "A", texto: "É uma pessoa organizada e pontual." },
+        { letra: "B", texto: "Tem momentos de desorganização sob estresse, mas se acha." },
+        { letra: "C", texto: "Desorganização crônica severa: prazos perdidos, espaços caóticos, incapacidade de gerenciar rotinas." },
+      ] },
+      { id: "p5", num: "5", texto: "Evita ou procrastina de forma extrema atividades que exigem foco e esforço mental prolongado?", opcoes: [
+        { letra: "A", texto: "Envolve-se normalmente nas tarefas exigidas." },
+        { letra: "B", texto: "Prefere as mais fáceis, mas faz as difíceis quando precisa." },
+        { letra: "C", texto: "Procrastina de forma extrema e evita ativamente qualquer atividade que exija esforço mental sustentado." },
+      ] },
+      { id: "p6", num: "6", texto: "Perde com frequência itens essenciais para o dia a dia (chaves, celular, documentos, carteira)?", opcoes: [
+        { letra: "A", texto: "Nunca ou raramente perde coisas." },
+        { letra: "B", texto: "Perde algo raramente." },
+        { letra: "C", texto: "Perde coisas constantemente, gerando grande desgaste e perda de tempo procurando." },
+      ] },
+      { id: "p7", num: "7", texto: "É facilmente distraído(a) por estímulos externos como barulhos, movimentos ao redor ou pensamentos paralelos?", opcoes: [
+        { letra: "A", texto: "Concentra-se bem mesmo com barulho ao redor." },
+        { letra: "B", texto: "Incomoda-se se o ambiente for muito caótico." },
+        { letra: "C", texto: "Distrai-se por qualquer estímulo irrelevante do ambiente com facilidade extrema." },
+      ] },
+      { id: "p8", num: "8", texto: "Esquece compromissos, contas a pagar, recados importantes ou tarefas rotineiras com frequência?", opcoes: [
+        { letra: "A", texto: "Tem boa memória para compromissos." },
+        { letra: "B", texto: "Esquece algo menor esporadicamente." },
+        { letra: "C", texto: "Esquece com alta frequência compromissos agendados, tarefas e obrigações básicas." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 2 — Agitação e Impulsividade",
+    sub: "Observe como a pessoa lida com a quietude, a espera e o controle dos próprios impulsos.",
+    perguntas: [
+      { id: "p9", num: "9", texto: "Remexe ou bate as mãos ou os pés, ou se contorce na cadeira quando precisa ficar sentado(a)?", opcoes: [
+        { letra: "A", texto: "Fica sentado(a) com tranquilidade." },
+        { letra: "B", texto: "Mexe as pernas levemente quando está ansioso(a)." },
+        { letra: "C", texto: "Incapacidade de ficar com o corpo parado; remexe-se ou balança os pés constantemente." },
+      ] },
+      { id: "p10", num: "10", texto: "Levanta-se em situações em que se espera que permaneça sentado(a), como em reuniões ou refeições?", opcoes: [
+        { letra: "A", texto: "Permanece sentado(a) sem problemas." },
+        { letra: "B", texto: "Sente leve alívio ao levantar, mas se controla." },
+        { letra: "C", texto: "Sente forte necessidade física de se levantar e circular fora de hora." },
+      ] },
+      { id: "p11", num: "11", texto: "Sente-se frequentemente acelerado(a) ou com muita energia em situações que não justificam isso?", opcoes: [
+        { letra: "A", texto: "Ritmo calmo e controlado." },
+        { letra: "B", texto: "Ritmo acelerado apenas em épocas de pico de trabalho." },
+        { letra: "C", texto: "Inquietação interna crônica, como se estivesse sempre sob pressão ou com o acelerador travado." },
+      ] },
+      { id: "p12", num: "12", texto: "Fala excessivamente em situações sociais ou de trabalho, monopolizando conversas?", opcoes: [
+        { letra: "A", texto: "Fala na medida certa, respeitando o turno de fala." },
+        { letra: "B", texto: "Fala bastante quando o assunto lhe interessa muito." },
+        { letra: "C", texto: "Monopoliza conversas, fala sem parar e atropela o interlocutor." },
+      ] },
+      { id: "p13", num: "13", texto: "Responde a perguntas antes que elas tenham sido concluídas ou completa a frase dos outros?", opcoes: [
+        { letra: "A", texto: "Espera o outro terminar de falar educadamente." },
+        { letra: "B", texto: "Ocorre raramente em momentos de pressa." },
+        { letra: "C", texto: "Frequentemente atropela as perguntas ou completa as frases alheias antes do término." },
+      ] },
+      { id: "p14", num: "14", texto: "Tem dificuldade em aguardar em filas, no trânsito ou em situações que exigem espera?", opcoes: [
+        { letra: "A", texto: "Aguarda pacientemente." },
+        { letra: "B", texto: "Fica impaciente, mas se controla." },
+        { letra: "C", texto: "Impaciência extrema em filas ou turnos, irritando-se ou tentando burlar a espera." },
+      ] },
+      { id: "p15", num: "15", texto: "Interrompe ou se intromete em conversas, jogos ou atividades dos outros sem permissão?", opcoes: [
+        { letra: "A", texto: "Respeita o espaço e a atividade alheia." },
+        { letra: "B", texto: "Dá pitacos esporádicos, mas percebe logo." },
+        { letra: "C", texto: "Entra em conversas alheias ou interrompe atividades de terceiros com frequência." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 3 — Comunicação e Interação Social",
+    sub: "Observe como a pessoa se relaciona com outras pessoas, como se comunica e como lida com rotinas e mudanças.",
+    perguntas: [
+      { id: "p16", num: "16", texto: "Tem dificuldade para manter uma conversa de forma natural e recíproca, ou para compartilhar interesses genuinamente?", opcoes: [
+        { letra: "A", texto: "Interage de forma natural e recíproca." },
+        { letra: "B", texto: "Pode ser mais reservado(a), mas compreende a troca." },
+        { letra: "C", texto: "Dificuldade marcante na reciprocidade; conversas parecem unilaterais, mecânicas ou distantes." },
+      ] },
+      { id: "p17", num: "17", texto: "Apresenta uso atípico de contato visual, expressão facial reduzida ou gestualidade limitada?", opcoes: [
+        { letra: "A", texto: "Contato visual e expressões perfeitamente naturais." },
+        { letra: "B", texto: "Um pouco contido(a) na expressão facial, mas funcional." },
+        { letra: "C", texto: "Evita contato visual direto, expressividade facial muito rígida ou gestualidade incomum." },
+      ] },
+      { id: "p18", num: "18", texto: "Apresenta grande dificuldade para ajustar o comportamento a diferentes contextos sociais ou para fazer e manter amigos?", opcoes: [
+        { letra: "A", texto: "Relaciona-se com facilidade e mantém amigos de longa data." },
+        { letra: "B", texto: "Tem poucos amigos, mas cultiva bons vínculos." },
+        { letra: "C", texto: "Dificuldade crônica para engajar em amizades ou entender códigos sociais implícitos." },
+      ] },
+      { id: "p19", num: "19", texto: "Apresenta movimentos repetitivos (como balançar as mãos, alinhar objetos) ou falas ecolálicas/repetitivas?", opcoes: [
+        { letra: "A", texto: "Nenhuma estereotipia motora presente." },
+        { letra: "B", texto: "Movimentos leves de ansiedade em momentos isolados." },
+        { letra: "C", texto: "Presença marcante de movimentos repetitivos ou falas/estereotipias frequentes para autorregulação." },
+      ] },
+      { id: "p20", num: "20", texto: "Sofre angústia severa diante de pequenas mudanças na rotina, imprevistos ou alterações no ambiente?", opcoes: [
+        { letra: "A", texto: "Adapta-se bem a mudanças de planos." },
+        { letra: "B", texto: "Prefere a rotina, mas tolera imprevistos se avisado(a)." },
+        { letra: "C", texto: "Rigidez extrema: qualquer alteração imprevista gera desorganização emocional intensa ou crise." },
+      ] },
+      { id: "p21", num: "21", texto: "Possui interesses muito restritos e fixos, com intensidade ou foco incomuns (como memorização exaustiva de dados técnicos específicos)?", opcoes: [
+        { letra: "A", texto: "Interesses comuns e variados." },
+        { letra: "B", texto: "Hobbies bem definidos, mas sem exclusividade obsessiva." },
+        { letra: "C", texto: "Hiperfoco profundo e restrito em tópicos específicos que dominam grande parte de seu tempo." },
+      ] },
+      { id: "p22", num: "22", texto: "Demonstra reatividade incomum a estímulos sensoriais (sons altos, texturas de roupas, luzes ou odores)?", opcoes: [
+        { letra: "A", texto: "Sensibilidade sensorial dentro da normalidade." },
+        { letra: "B", texto: "Incomoda-se com barulhos muito fortes eventuais." },
+        { letra: "C", texto: "Hipersensibilidade acentuada a sons, luzes, texturas ou cheiros, exigindo adaptações constantes." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 4 — Comportamento e Relações com Regras",
+    sub: "Observe como a pessoa lida com frustração, autoridade, regras e conflitos no dia a dia.",
+    perguntas: [
+      { id: "p23", num: "23", texto: "Perde a paciência com facilidade ou é frequentemente irritável e facilmente ofendido(a)?", opcoes: [
+        { letra: "A", texto: "Bom controle emocional, não se ofende com facilidade." },
+        { letra: "B", texto: "Estressa-se com cargas pesadas, mas pondera." },
+        { letra: "C", texto: "Humor cronicamente irritável, suscetível e zangado na maior parte do tempo." },
+      ] },
+      { id: "p24", num: "24", texto: "Discute ativamente com figuras de autoridade como pais, chefes, professores ou supervisores?", opcoes: [
+        { letra: "A", texto: "Respeita autoridades e cumpre diretrizes." },
+        { letra: "B", texto: "Reclama de regras burocráticas, mas cumpre." },
+        { letra: "C", texto: "Bate de frente sistematicamente, discute ordens e desafia autoridades de forma recorrente." },
+      ] },
+      { id: "p25", num: "25", texto: "Recusa-se ativamente a cumprir solicitações de autoridades ou regras fundamentais de convivência?", opcoes: [
+        { letra: "A", texto: "Cumpre acordos e regras estabelecidas." },
+        { letra: "B", texto: "Esquece regras menores ocasionalmente." },
+        { letra: "C", texto: "Recusa-se de forma desafiadora a obedecer diretrizes ou acordos estabelecidos." },
+      ] },
+      { id: "p26", num: "26", texto: "Incomoda deliberadamente outras pessoas ou provoca o esgotamento e a irritação alheia de forma recorrente?", opcoes: [
+        { letra: "A", texto: "Evita atritos e respeita o espaço alheio." },
+        { letra: "B", texto: "Brinca ou provoca de forma leve em contextos específicos." },
+        { letra: "C", texto: "Provoca intencionalmente o esgotamento ou a irritação alheia de maneira recorrente." },
+      ] },
+      { id: "p27", num: "27", texto: "Culpa frequentemente os outros pelos próprios erros ou falhas, sem assumir responsabilidade?", opcoes: [
+        { letra: "A", texto: "Assume responsabilidade quando erra." },
+        { letra: "B", texto: "Tenta justificar o erro antes de assumir, mas reconhece depois." },
+        { letra: "C", texto: "Jamais assume culpa; culpa sistematicamente os outros por tudo o que dá errado." },
+      ] },
+      { id: "p28", num: "28", texto: "Mostra-se rancoroso(a), vingativo(a) ou guarda ressentimentos profundos por longos períodos?", opcoes: [
+        { letra: "A", texto: "Perdoa e esquece desentendimentos facilmente." },
+        { letra: "B", texto: "Demora a digerir mágoas profundas, mas não age por vingança." },
+        { letra: "C", texto: "Apresenta nítida tendência a guardar rancor e buscar desforra por ofensas reais ou imaginadas." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Observações Finais",
+    sub: "Se quiser, compartilhe qualquer observação adicional sobre o comportamento ou a história da pessoa avaliada.",
+    perguntas: [],
+    obs: true,
+  },
+];
+
 // Ao adicionar um novo instrumento, é só acrescentar uma entrada aqui
 // — o motor abaixo (`FormularioRastreamento`) e o roteador em app.js
 // já funcionam pra qualquer instrumento cadastrado neste objeto.
@@ -338,6 +695,22 @@ const CONFIGS_RASTREAMENTO = {
     titulo: "Rastreamento Bipolar / Borderline",
     tempoEstimado: "8 a 12 minutos",
     blocos: BLOCOS_RASTREAMENTO_BIPOLAR,
+  },
+  alimentar: {
+    titulo: "Rastreamento de Hábitos Alimentares",
+    tempoEstimado: "6 a 10 minutos",
+    blocos: BLOCOS_RASTREAMENTO_ALIMENTAR,
+  },
+  sexual: {
+    titulo: "Rastreamento de Saúde Sexual",
+    tempoEstimado: "5 a 10 minutos",
+    blocos: BLOCOS_RASTREAMENTO_SEXUAL,
+    somentePaciente: true,
+  },
+  neuro: {
+    titulo: "Rastreamento de Funcionamento e Comportamento",
+    tempoEstimado: "10 a 15 minutos",
+    blocos: BLOCOS_RASTREAMENTO_NEURO,
   },
 };
 
@@ -361,6 +734,10 @@ function FormularioRastreamento({ link }) {
       </div>
     );
   }
+
+  useEffect(() => {
+    if (config?.somentePaciente) setTipoRespondente("paciente");
+  }, [config]);
 
   function iniciar() {
     if (!tipoRespondente) { setErro("Selecione quem está respondendo."); return; }
@@ -429,29 +806,38 @@ function FormularioRastreamento({ link }) {
           </ul>
         </div>
 
-        <p style={{ fontSize: 13.5, fontWeight: 600, color: "#3D006A", marginBottom: 10 }}>Quem está respondendo?</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-          {[
-            { id: "paciente", icone: "user", titulo: "O próprio paciente", desc: "Você é a pessoa que está sendo avaliada" },
-            { id: "familiar", icone: "users", titulo: "Familiar / pessoa próxima", desc: "Você conhece bem a pessoa avaliada" },
-          ].map((o) => (
-            <div
-              key={o.id}
-              onClick={() => setTipoRespondente(o.id)}
-              style={{
-                border: tipoRespondente === o.id ? "2px solid var(--cor-marca)" : "2px solid #EDE9FE",
-                background: tipoRespondente === o.id ? "#F5F0FF" : "white",
-                borderRadius: 14, padding: "18px 14px", textAlign: "center", cursor: "pointer",
-              }}
-            >
-              <Icone nome={o.icone} tamanho={28} />
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#3D006A", marginTop: 8 }}>{o.titulo}</div>
-              <div style={{ fontSize: 11.5, color: "#6B7280", marginTop: 4, lineHeight: 1.4 }}>{o.desc}</div>
+        {config.somentePaciente ? (
+          <div style={{ background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 12, padding: "13px 16px", fontSize: 12.5, color: "#065F46", lineHeight: 1.6, marginBottom: 16, display: "flex", gap: 10 }}>
+            <Icone nome="lock" tamanho={16} />
+            <span>Este questionário é confidencial e respondido apenas por você — nenhum familiar tem acesso.</span>
+          </div>
+        ) : (
+          <>
+            <p style={{ fontSize: 13.5, fontWeight: 600, color: "#3D006A", marginBottom: 10 }}>Quem está respondendo?</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              {[
+                { id: "paciente", icone: "user", titulo: "O próprio paciente", desc: "Você é a pessoa que está sendo avaliada" },
+                { id: "familiar", icone: "users", titulo: "Familiar / pessoa próxima", desc: "Você conhece bem a pessoa avaliada" },
+              ].map((o) => (
+                <div
+                  key={o.id}
+                  onClick={() => setTipoRespondente(o.id)}
+                  style={{
+                    border: tipoRespondente === o.id ? "2px solid var(--cor-marca)" : "2px solid #EDE9FE",
+                    background: tipoRespondente === o.id ? "#F5F0FF" : "white",
+                    borderRadius: 14, padding: "18px 14px", textAlign: "center", cursor: "pointer",
+                  }}
+                >
+                  <Icone nome={o.icone} tamanho={28} />
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#3D006A", marginTop: 8 }}>{o.titulo}</div>
+                  <div style={{ fontSize: 11.5, color: "#6B7280", marginTop: 4, lineHeight: 1.4 }}>{o.desc}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
 
-        {tipoRespondente === "familiar" && (
+        {!config.somentePaciente && tipoRespondente === "familiar" && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 5 }}>Seu nome completo</label>

@@ -134,6 +134,15 @@ service cloud.firestore {
     match /clinica_rastreamento_bipolar/{registroId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
     }
+    match /clinica_rastreamento_alimentar/{registroId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+    }
+    match /clinica_rastreamento_sexual/{registroId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+    }
+    match /clinica_rastreamento_neuro/{registroId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+    }
 
     match /clinica_tcc/{registroId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
