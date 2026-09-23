@@ -2513,6 +2513,40 @@ function BuscaPorSintoma({
     onClick: aoFechar
   }, "Fechar"))));
 }
+
+// Gera o token do link de atividade. É o endereço secreto da
+// atividade: quem tem ele abre, quem não tem não encontra (as regras
+// do banco proíbem listar a coleção). Por isso precisa ser comprido e
+// imprevisível — usa o gerador de números aleatórios do navegador,
+// não Math.random().
+function gerarTokenLink() {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Campos do material que a página pública precisa pra montar a tela.
+// Vai uma CÓPIA dentro do link porque a página pública não tem login
+// e não pode sair lendo o catálogo inteiro do banco.
+function copiaDoMaterial(item, tipo) {
+  return {
+    id: item.id || "",
+    tipo,
+    titulo: item.titulo || item.nome || "",
+    nome: item.nome || "",
+    descricao: item.descricao || "",
+    objetivo: item.objetivo || "",
+    conteudo: item.conteudo || "",
+    passos: item.passos || "",
+    formularioKey: item.formularioKey || "",
+    categoria: item.categoria || "",
+    icone: item.icone || "",
+    moral: item.moral || "",
+    paginas: Array.isArray(item.paginas) ? item.paginas : [],
+    perguntas: Array.isArray(item.perguntas) ? item.perguntas : [],
+    blocos: Array.isArray(item.blocos) ? item.blocos : []
+  };
+}
 function EnviarRecursoModal({
   usuario,
   item,
@@ -2523,7 +2557,8 @@ function EnviarRecursoModal({
   const [pacienteId, setPacienteId] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
-  const [sucesso, setSucesso] = useState("");
+  const [resultado, setResultado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
   useEffect(() => {
     db.collection("clinica_pacientes").where("psi_id", "==", usuario.psiId).get().then(snap => {
       const lista = snap.docs.map(d => ({
@@ -2542,6 +2577,9 @@ function EnviarRecursoModal({
     setErro("");
     setEnviando(true);
     try {
+      const paciente = pacientes.find(p => p.id === pacienteId) || {};
+
+      // 1) Ativa o material no Portal do Paciente (como já era antes)
       const pacRef = db.collection("clinica_pacientes").doc(pacienteId);
       const pacDoc = await pacRef.get();
       const configAtual = pacDoc.data()?.modulosConfig || {};
@@ -2559,20 +2597,61 @@ function EnviarRecursoModal({
         modulosConfig: novaConfig,
         modulosAtivos: ativos
       });
-      setSucesso("Enviado! Já aparece ativado na aba Módulos do paciente.");
+
+      // 2) Cria o link público, pro paciente preencher pelo celular sem
+      //    precisar entrar no Portal. Leva junto o visual da clínica,
+      //    pra a página abrir com a cara dela e não genérica.
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId,
+        pacienteNome: paciente.nome || "",
+        tipo,
+        titulo: item.titulo || item.nome || "",
+        item: copiaDoMaterial(item, tipo),
+        nomeClinica: cfg.nome || "PsiCoWorking",
+        corMarca: cfg.corPrimaria || "#6A2BD9",
+        logoUrl: cfg.logoUrl || "",
+        status: "enviado",
+        cancelado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setResultado({
+        paciente,
+        link: window.location.origin + "/psi/atividade/?t=" + token
+      });
     } catch (e) {
       setErro(e.message || "Não foi possível enviar.");
     } finally {
       setEnviando(false);
     }
   }
+
+  // Abre o WhatsApp já com o texto de orientação pronto — a psicóloga
+  // só confere e aperta enviar, sem copiar e colar nada.
+  function abrirWhatsApp() {
+    const primeiroNome = (resultado.paciente.nome || "").split(" ")[0];
+    const mensagem = "Olá, " + primeiroNome + "!\n\n" + "Preparei esta atividade para você: *" + (item.titulo || item.nome) + "*.\n\n" + "É só abrir o link abaixo no celular e preencher com calma, no seu tempo. " + "Não precisa de senha nem de instalar nada — suas respostas chegam direto para mim.\n\n" + resultado.link + "\n\n" + "Qualquer dúvida, é só me chamar por aqui.";
+    const numero = (resultado.paciente.telefone || "").replace(/\D/g, "");
+    const url = numero ? "https://wa.me/55" + numero + "?text=" + encodeURIComponent(mensagem) : "https://wa.me/?text=" + encodeURIComponent(mensagem);
+    window.open(url, "_blank");
+  }
+  function copiarLink() {
+    navigator.clipboard.writeText(resultado.link).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
+  const primeiroNomePac = resultado ? (resultado.paciente.nome || "").split(" ")[0] : "";
   return /*#__PURE__*/React.createElement("div", {
     className: "sobreposicao",
     onClick: aoFechar
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal",
     onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("h3", null, "Enviar \"", item.titulo || item.nome, "\""), !sucesso ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Paciente"), /*#__PURE__*/React.createElement("select", {
+  }, /*#__PURE__*/React.createElement("h3", null, "Enviar \"", item.titulo || item.nome, "\""), !resultado ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "Paciente"), /*#__PURE__*/React.createElement("select", {
     value: pacienteId,
     onChange: e => setPacienteId(e.target.value)
   }, /*#__PURE__*/React.createElement("option", {
@@ -2593,10 +2672,45 @@ function EnviarRecursoModal({
     disabled: enviando
   }, enviando ? "Enviando..." : "Enviar"))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
     className: "mensagem-sucesso"
-  }, sucesso), /*#__PURE__*/React.createElement("div", {
+  }, "Pronto! J\xE1 est\xE1 ativado na aba M\xF3dulos do paciente."), /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio",
+    style: {
+      marginBottom: 14
+    }
+  }, "Mande tamb\xE9m o link abaixo: com ele ", primeiroNomePac, " preenche pelo celular, sem precisar entrar no Portal."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F9FAFB",
+      border: "1px solid #E5E7EB",
+      borderRadius: 10,
+      padding: "10px 12px",
+      fontSize: 12,
+      wordBreak: "break-all",
+      marginBottom: 14
+    }
+  }, resultado.link), /*#__PURE__*/React.createElement("div", {
+    className: "acoes-modal",
+    style: {
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: copiarLink
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: copiado ? "check" : "link",
+    tamanho: 14
+  }), " ", copiado ? "Copiado!" : "Copiar link"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: abrirWhatsApp,
+    style: {
+      background: "#25D366"
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "message-circle",
+    tamanho: 14
+  }), " Enviar pelo WhatsApp")), /*#__PURE__*/React.createElement("div", {
     className: "acoes-modal"
   }, /*#__PURE__*/React.createElement("button", {
-    className: "botao-primario",
+    className: "botao-secundario",
     onClick: aoFechar
   }, "Fechar")))));
 }

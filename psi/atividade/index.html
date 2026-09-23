@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atividade Terapêutica</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+  <script src="https://unpkg.com/lucide@0.383.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="../compartilhado/estilo-paciente.css" />
+  <style>
+    /* Esta página é só a atividade — não tem menu nem abas do Portal. */
+    .envelope-atividade { max-width: 560px; margin: 0 auto; padding: 0 16px 60px; }
+    .topo-atividade {
+      background: var(--cor-marca); color: white; padding: 16px;
+      text-align: center; margin-bottom: 18px;
+    }
+    .topo-atividade img { max-height: 46px; margin-bottom: 6px; }
+    .rodape-atividade {
+      text-align: center; font-size: 11.5px; color: #9CA3AF;
+      margin-top: 28px; line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCJx1RwX5-FM2wcUqzeC_CYAUdkmTKU2u4",
+      authDomain: "psicoworking.firebaseapp.com",
+      projectId: "psicoworking",
+      storageBucket: "psicoworking.firebasestorage.app",
+      messagingSenderId: "176262015536",
+      appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
+    };
+    // Nome próprio pra não brigar com a sessão do admin ou do portal
+    // no mesmo navegador. Aqui ninguém faz login: é página aberta.
+    const appAtividade = firebase.initializeApp(firebaseConfig, "psicoworking-atividade");
+    const bancoReal = appAtividade.firestore();
+    const funcoes = appAtividade.functions();
+
+    // Token do link (?t=...). É ele que identifica a atividade e o
+    // paciente — quem não tem o link não consegue ver nem gravar nada.
+    const TOKEN_ATIVIDADE = new URLSearchParams(window.location.search).get("t") || "";
+
+    // ── Adaptador de banco ────────────────────────────────────────
+    // As ferramentas em ../compartilhado/ferramentas.js gravam usando
+    // `db.collection(...).add(...)`, porque no Portal existe paciente
+    // logado. Aqui não existe login nenhum, então `db` é um adaptador
+    // com a mesma cara: as gravações viram uma chamada à Cloud
+    // Function, que confere o token e carimba psi_id/pacienteId do
+    // lado do servidor. As leituras de histórico voltam vazias —
+    // histórico é coisa do Portal, aqui o paciente só preenche.
+    const enviarParaServidor = funcoes.httpsCallable("salvarAtividadePublica");
+
+    function consultaVazia() {
+      const encadeavel = {
+        where: () => encadeavel,
+        orderBy: () => encadeavel,
+        limit: () => encadeavel,
+        get: () => Promise.resolve({ empty: true, size: 0, docs: [], forEach: () => {} }),
+        onSnapshot: (aoReceber) => {
+          if (typeof aoReceber === "function") aoReceber({ empty: true, size: 0, docs: [], forEach: () => {} });
+          return () => {};
+        },
+      };
+      return encadeavel;
+    }
+
+    const db = {
+      collection(colecao) {
+        const consulta = consultaVazia();
+        return Object.assign({}, consulta, {
+          add: (dados) =>
+            enviarParaServidor({ token: TOKEN_ATIVIDADE, colecao, dados })
+              .then((r) => ({ id: r.data?.id || "" })),
+          doc: (docId) => ({
+            get: () => Promise.resolve({ exists: false, data: () => null }),
+            set: (dados) => enviarParaServidor({ token: TOKEN_ATIVIDADE, colecao, dados, docId }),
+            update: (dados) => enviarParaServidor({ token: TOKEN_ATIVIDADE, colecao, dados, docId }),
+          }),
+        });
+      },
+    };
+
+    // As ferramentas usam firebase.firestore.FieldValue.serverTimestamp().
+    // Como a gravação de verdade acontece na Cloud Function, aqui isso
+    // vira só uma marca que o servidor reconhece e troca pela hora real.
+    window.firebase = window.firebase || {};
+    firebase.firestore.FieldValue = {
+      serverTimestamp: () => ({ __horaDoServidor: true }),
+    };
+  </script>
+
+  <!-- Mesmo arquivo de ferramentas do Portal do Paciente -->
+  <script type="text/babel" data-presets="react" src="../compartilhado/ferramentas.js"></script>
+  <script type="text/babel" data-presets="react" src="app.js"></script>
+</body>
+</html>

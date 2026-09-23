@@ -451,6 +451,96 @@ Escolha as 3 a 5 opções mais indicadas, usando SOMENTE títulos que estão exa
 // só atualiza quando o nome digitado bate com EXATAMENTE UM paciente
 // daquela clínica — em caso de ambiguidade ou "não encontrado" quem
 // decide o que fazer é a psicóloga, não a function.
+// ═══════════════════════════════════════════════════════════════
+//  ATIVIDADE ABERTA POR LINK (WhatsApp) — gravação das respostas
+//
+//  A página psi/atividade/ não tem login: o paciente entra só com o
+//  link. Por isso ela NÃO pode gravar direto no banco — quem grava é
+//  esta função, que confere o token do link e carimba psi_id e
+//  pacienteId a partir do próprio documento do link, ignorando o que
+//  o navegador mandou. Assim um link só consegue escrever no
+//  prontuário do paciente pra quem ele foi criado, e em mais nada.
+// ═══════════════════════════════════════════════════════════════
+
+// Só estas coleções aceitam gravação vinda de link público — são as
+// que as ferramentas terapêuticas usam. Nada de financeiro, cadastro
+// ou configuração entra aqui.
+const COLECOES_ATIVIDADE_PUBLICA = [
+  "clinica_gestao_ansiedade",
+  "clinica_tcc",
+  "clinica_registro_abc",
+  "clinica_arvore_decisao",
+  "clinica_relaxamento",
+  "clinica_rastreamento_alimentar",
+  "clinica_treino_auditivo",
+  "clinica_baralho_distorcoes",
+  "clinica_reflexoes",
+];
+
+// A página manda a hora como { __horaDoServidor: true } porque lá não
+// existe SDK de escrita. Aqui isso vira a hora real do servidor.
+function trocarMarcasDeHora(valor) {
+  if (Array.isArray(valor)) return valor.map(trocarMarcasDeHora);
+  if (valor && typeof valor === "object") {
+    if (valor.__horaDoServidor) return admin.firestore.FieldValue.serverTimestamp();
+    const saida = {};
+    for (const chave of Object.keys(valor)) saida[chave] = trocarMarcasDeHora(valor[chave]);
+    return saida;
+  }
+  return valor;
+}
+
+exports.salvarAtividadePublica = onCall(async (request) => {
+  const { token, colecao, dados, docId } = request.data || {};
+
+  if (!token || typeof token !== "string") {
+    throw new HttpsError("invalid-argument", "Link inválido.");
+  }
+  if (!COLECOES_ATIVIDADE_PUBLICA.includes(colecao)) {
+    throw new HttpsError("permission-denied", "Este tipo de registro não pode ser gravado por link.");
+  }
+  if (!dados || typeof dados !== "object") {
+    throw new HttpsError("invalid-argument", "Nada para gravar.");
+  }
+
+  const linkRef = db.collection("clinica_links_partilhados").doc(token);
+  const linkDoc = await linkRef.get();
+  if (!linkDoc.exists) {
+    throw new HttpsError("not-found", "Link não encontrado ou expirado.");
+  }
+  const link = linkDoc.data();
+  if (link.cancelado) {
+    throw new HttpsError("permission-denied", "Este link foi desativado.");
+  }
+
+  // O navegador pode mandar o que quiser nestes campos — o que vale é
+  // sempre o que está gravado no link.
+  const registro = {
+    ...trocarMarcasDeHora(dados),
+    psi_id: link.psi_id,
+    pacienteId: link.pacienteId,
+    pacienteNome: link.pacienteNome || "",
+    origem: "link_publico",
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  let idGravado;
+  if (docId) {
+    await db.collection(colecao).doc(docId).set(registro, { merge: true });
+    idGravado = docId;
+  } else {
+    const novo = await db.collection(colecao).add(registro);
+    idGravado = novo.id;
+  }
+
+  await linkRef.update({
+    status: "respondido",
+    respondidoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { ok: true, id: idGravado };
+});
+
 exports.registrarNascimento = onCall(async (request) => {
   const { psiId, nome, dataNasc } = request.data || {};
   if (!psiId || !nome || !dataNasc) {

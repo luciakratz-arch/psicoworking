@@ -209,6 +209,22 @@ service cloud.firestore {
                      && request.resource.data.pacienteId == request.auth.uid;
     }
 
+    // ── Links de atividade enviados por WhatsApp ─────────────────
+    // O id do documento É o token do link. Quem tem o link consegue
+    // abrir aquele documento (allow get) e nada mais: listar a coleção
+    // é proibido, então ninguém descobre links de outras pessoas
+    // "chutando". O documento guarda uma cópia do material e o nome do
+    // paciente — nunca dados sensíveis do prontuário.
+    // Quem grava a RESPOSTA não é esta regra: é a Cloud Function
+    // salvarAtividadePublica, que confere o token do lado do servidor.
+    match /clinica_links_partilhados/{token} {
+      allow get: if true;
+      allow list: if ehEquipeDaClinica(resource.data.psi_id);
+      allow create: if ehEquipeDeAlgumaClinica()
+                     && request.resource.data.psi_id == carimboClinica();
+      allow update, delete: if ehEquipeDaClinica(resource.data.psi_id);
+    }
+
     match /clinica_agenda/{eventoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
