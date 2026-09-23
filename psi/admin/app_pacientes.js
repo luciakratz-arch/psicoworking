@@ -852,39 +852,50 @@ const RASTREAMENTOS_ADMIN = {
 // observar. Jogo patológico: 4 de 9 (leve 4-5, moderado 6-7, grave
 // 8-9). Uso de substâncias: 2 de 11 (leve 2-3, moderado 4-5, grave 6+).
 const REGRAS_DSM5_RASTREAMENTO = {
-  jogos: { nome: "Transtorno de Jogo / Apostas (Gambling/Gaming Disorder)", minimo: 4, provavel: 3, graus: [[8, "Grave"], [6, "Moderado"], [4, "Leve"]] },
-  dependencia: { nome: "Transtorno por Uso de Substâncias", minimo: 2, provavel: 1, graus: [[6, "Grave"], [4, "Moderado"], [2, "Leve"]] },
+  jogos: {
+    nome: "Transtorno de Jogo / Apostas (Gambling/Gaming Disorder)", minimo: 4, provavel: 3, graus: [[8, "Grave"], [6, "Moderado"], [4, "Leve"]],
+    confirmacoes: [
+      "Padrão problemático persistente ou recorrente ao longo de 12 meses, com sofrimento ou prejuízo clinicamente significativo?",
+      "O comportamento não é melhor explicado por um episódio maníaco?",
+    ],
+  },
+  dependencia: {
+    nome: "Transtorno por Uso de Substâncias", minimo: 2, provavel: 1, graus: [[6, "Grave"], [4, "Moderado"], [2, "Leve"]],
+    confirmacoes: [
+      "Padrão problemático de uso levando a prejuízo ou sofrimento clinicamente significativo, em um período de 12 meses?",
+    ],
+  },
 };
 
-function gravidadeRastreamento(doc, config) {
+function gravidadeRastreamento(doc, config, ajustes = {}) {
   const regra = REGRAS_DSM5_RASTREAMENTO[config.tipo];
-  const presentes = config.perguntas.filter((p) => doc[p.id] === "C");
-  const parciais = config.perguntas.filter((p) => doc[p.id] === "B");
-  const C = presentes.length;
+  const av = avaliarCriteriosDSM5({
+    nome: regra.nome,
+    criterios: config.perguntas.map((p) => ({ texto: p.texto, atende: doc[p.id] === "C" })),
+    minimoDiagnostico: regra.minimo, minimoProvavel: regra.provavel,
+    regra: "mínimo necessário: " + regra.minimo,
+    confirmacoes: regra.confirmacoes,
+    ajustes,
+  });
+  av.nomeCurto = regra.nome;
+  const C = av.n;
+  const parciais = config.perguntas.filter((p, i) => doc[p.id] === "B" && !av.itens[i].atende);
   const B = parciais.length;
-  const total = C;
-  const lista = (arr) => arr.map((p) => p.texto).join("; ");
-  let status, rotulo, cor, resumo;
-  if (C >= regra.minimo) {
+  let cor, rotulo, resumo = av.obs;
+  if (av.status === "diagnostico") {
     const grau = regra.graus.find(([min]) => C >= min)[1];
-    status = "diagnostico";
-    rotulo = "Diagnóstico — grau " + grau + " (" + C + " de " + config.totalCriterios + " critérios)";
     cor = grau === "Grave" ? "#DC2626" : grau === "Moderado" ? "#D97706" : "#B45309";
-    resumo = "Diagnóstico de " + regra.nome + ", grau " + grau + ": atende a " + C + " de " + config.totalCriterios + " critérios (mínimo necessário: " + regra.minimo + "). Critérios presentes: " + lista(presentes) + ".";
-  } else if (C >= regra.provavel) {
-    status = "provavel";
-    rotulo = "Diagnóstico provável (" + C + " de " + config.totalCriterios + " critérios)";
+    rotulo = av.labelStatus + " — grau " + grau + " (" + C + " de " + config.totalCriterios + ")";
+    resumo = "Grau " + grau + ". " + av.obs;
+  } else if (av.status === "provavel") {
     cor = "#D97706";
-    resumo = "Diagnóstico provável de " + regra.nome + ": atende a " + C + " de " + config.totalCriterios + " critérios, faltam " + (regra.minimo - C) + " para o mínimo de " + regra.minimo + ". Critérios presentes: " + lista(presentes) + ".";
+    rotulo = "Diagnóstico provável (" + C + " de " + config.totalCriterios + ")";
   } else {
-    status = "abaixo";
-    rotulo = "Abaixo do limiar diagnóstico (" + C + " de " + config.totalCriterios + " critérios)";
     cor = "#16A34A";
-    resumo = "Não atende ao diagnóstico de " + regra.nome + ": " + C + " de " + config.totalCriterios + " critérios presentes (mínimo necessário: " + regra.minimo + ")." + (C > 0 ? " Critérios presentes: " + lista(presentes) + "." : "");
+    rotulo = av.labelStatus + " (" + C + " de " + config.totalCriterios + ")";
   }
-  if (B > 0 && status !== "diagnostico") resumo += " Critérios parciais a observar na entrevista: " + lista(parciais) + ".";
-  else if (B > 0) resumo += " Critérios parciais adicionais (não contados): " + lista(parciais) + ".";
-  return { B, C, total, status, rotulo, cor, resumo };
+  if (B > 0) resumo += " Critérios parciais (resposta B, não contados): " + parciais.map((p) => p.texto).join("; ") + ".";
+  return { B, C, total: C, status: av.status, rotulo, cor, resumo, criterio: av };
 }
 
 const COR_LETRA_RASTREAMENTO = { A: "#16A34A", B: "#D97706", C: "#DC2626" };
@@ -896,6 +907,15 @@ const COR_LETRA_RASTREAMENTO = { A: "#16A34A", B: "#D97706", C: "#DC2626" };
 function AbaRastreamentoView({ usuario, paciente, tipo, aoVoltar }) {
   const config = { ...RASTREAMENTOS_ADMIN[tipo], tipo };
   const [docs, setDocs] = useState([]);
+  const [ajustesPorDoc, setAjustesPorDoc] = useState({});
+  const ajustesDe = (d) => ajustesPorDoc[d.id] || d.ajustesClinicos || {};
+  async function ajustarDoc(d, chave, valor) {
+    const novo = { ...ajustesDe(d) };
+    if (valor === null) delete novo[chave]; else novo[chave] = valor;
+    setAjustesPorDoc((m) => ({ ...m, [d.id]: novo }));
+    try { await db.collection("clinica_rastreamento_" + tipo).doc(d.id).update({ ajustesClinicos: novo }); }
+    catch (e) { alert("Não foi possível salvar sua resposta: " + e.message); }
+  }
   const [carregando, setCarregando] = useState(true);
   const [selecionado, setSelecionado] = useState(null);
   const [gerandoLink, setGerandoLink] = useState(false);
@@ -977,7 +997,7 @@ function AbaRastreamentoView({ usuario, paciente, tipo, aoVoltar }) {
     const dataDoc = new Date().toLocaleDateString("pt-BR");
 
     const linhasPorDoc = docs.map((doc) => {
-      const g = gravidadeRastreamento(doc, config);
+      const g = gravidadeRastreamento(doc, config, ajustesDe(doc));
       const respondente = doc.tipoRespondente === "paciente" ? "Próprio paciente" : (doc.nomeRespondente || "Familiar") + " (" + (doc.parentesco || "—") + ")";
       const linhasPerguntas = config.perguntas.map((p) =>
         `<tr><td>${p.id.replace("p", "")}</td><td>${p.texto}</td><td>${p.modulo}</td><td style="font-weight:700;color:${COR_LETRA_RASTREAMENTO[doc[p.id]] || "#6b7280"}">${doc[p.id] || "—"}</td></tr>`
@@ -1066,7 +1086,7 @@ ${linhasPorDoc}
       {!carregando && docs.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {docs.map((doc) => {
-            const g = gravidadeRastreamento(doc, config);
+            const g = gravidadeRastreamento(doc, config, ajustesDe(doc));
             const aberto = selecionado === doc.id;
             return (
               <div key={doc.id} style={{ border: "1px solid #E5E7EB", borderRadius: 12, overflow: "hidden" }}>
@@ -1089,7 +1109,7 @@ ${linhasPorDoc}
                 </div>
                 {aberto && (
                   <div style={{ borderTop: "1px solid #E5E7EB", padding: 16 }}>
-                    <div style={{ background: "#F5F3FF", border: "1px solid #C4B5FD", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 12.5, color: "#3D006A", lineHeight: 1.5 }}>{g.resumo}</div>
+                    <div style={{ marginBottom: 12 }}><ListaCriteriosDSM5 criterios={[g.criterio]} aoAjustar={(chave, v) => ajustarDoc(doc, chave, v)} /></div>
                     {config.perguntas.map((p) => (
                       <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
                         <div style={{
@@ -1168,33 +1188,158 @@ function criterioAtende(letra) {
 // número oficial de sintomas do manual — isso fica explícito em
 // `notaClinica`). Devolve texto pronto nomeando os critérios
 // presentes, não só um rótulo genérico de "possível"/"moderado".
-function avaliarCriteriosDSM5({ nome, codigo, criterios, minimoDiagnostico, minimoProvavel, notaClinica, statusForcado, regra }) {
-  const atendidos = criterios.filter((c) => c.atende);
+function avaliarCriteriosDSM5({ nome, codigo, criterios, minimoDiagnostico, minimoProvavel, notaClinica, statusFn, regra, confirmacoes = [], ajustes = {} }) {
+  // Cada critério pode ser corrigido pela psicóloga na entrevista
+  // ("sim"/"nao"), sobrepondo o que o questionário indicou.
+  const itens = criterios.map((c, i) => {
+    const chave = nome + "#" + i;
+    const aj = ajustes[chave] || null;
+    return { chave, texto: c.texto, atende: aj === "sim" ? true : aj === "nao" ? false : c.atende, automatico: c.atende, ajuste: aj };
+  });
+  const conf = confirmacoes.map((texto, j) => {
+    const chave = nome + "#conf" + j;
+    return { chave, texto, resposta: ajustes[chave] || null };
+  });
+  const refutadas = conf.filter((c) => c.resposta === "nao");
+  const pendentes = conf.filter((c) => !c.resposta);
+
+  const atendidos = itens.filter((c) => c.atende);
   const n = atendidos.length;
-  const total = criterios.length;
+  const total = itens.length;
   let status;
-  if (statusForcado) status = statusForcado;
+  if (statusFn) status = statusFn(itens);
   else if (n >= minimoDiagnostico) status = "diagnostico";
   else if (n >= minimoProvavel) status = "provavel";
   else status = "abaixo";
-  const textoMinimo = regra || ("mínimo necessário: " + minimoDiagnostico);
+  const contagemOk = status;
+  if (refutadas.length > 0 && status !== "abaixo") status = "abaixo";
+  const textoMinimo = (typeof regra === "function" ? regra(itens) : regra) || ("mínimo necessário: " + minimoDiagnostico);
 
   const atende = status === "diagnostico" ? true : status === "provavel" ? null : false;
-  const labelStatus = status === "diagnostico" ? "Diagnóstico" : status === "provavel" ? "Diagnóstico provável" : "Não atende";
+  let labelStatus;
+  if (refutadas.length > 0 && contagemOk !== "abaixo") labelStatus = "Não fecha diagnóstico";
+  else if (status === "diagnostico") {
+    if (conf.length === 0) labelStatus = "Diagnóstico";
+    else if (pendentes.length === 0) labelStatus = "Diagnóstico confirmado";
+    else if (pendentes.length === conf.length) labelStatus = "Diagnóstico (confirmar na entrevista)";
+    else labelStatus = "Diagnóstico (confirmação parcial)";
+  } else if (status === "provavel") labelStatus = "Diagnóstico provável";
+  else labelStatus = "Não atende";
+
   const listaAtendidos = atendidos.map((c) => c.texto).join("; ");
-  const faltando = criterios.filter((c) => !c.atende).map((c) => c.texto).join("; ");
+  const faltando = itens.filter((c) => !c.atende).map((c) => c.texto).join("; ");
 
   let obs;
   if (status === "diagnostico") {
     obs = `Diagnóstico — atende a ${n} de ${total} critérios avaliados (${textoMinimo}). Critérios presentes: ${listaAtendidos}.`;
   } else if (status === "provavel") {
     obs = `Diagnóstico provável — atende a ${n} de ${total} critérios avaliados, próximo do mínimo (${textoMinimo}) mas ainda sem fechar o diagnóstico. Critérios presentes: ${listaAtendidos || "nenhum"}. Observar/investigar na entrevista: ${faltando}.`;
+  } else if (refutadas.length > 0 && contagemOk !== "abaixo") {
+    obs = `Não fecha diagnóstico — os critérios contados (${n} de ${total}) seriam suficientes, mas a entrevista descartou um requisito obrigatório: ${refutadas.map((c) => c.texto).join("; ")}.`;
   } else {
     obs = `Não atende — apenas ${n} de ${total} critérios avaliados presentes, abaixo do limiar clínico (${textoMinimo}).`;
   }
+  if (status !== "abaixo" && conf.length > 0) {
+    const sims = conf.filter((c) => c.resposta === "sim");
+    if (sims.length > 0) obs += ` Confirmado na entrevista: ${sims.map((c) => c.texto).join("; ")}.`;
+    if (pendentes.length > 0) obs += ` A confirmar na entrevista: ${pendentes.map((c) => c.texto).join("; ")}.`;
+  }
   if (notaClinica) obs += " " + notaClinica;
 
-  return { label: codigo ? `${nome} (${codigo})` : nome, atende, status, labelStatus, obs, n, total };
+  return { label: codigo ? `${nome} (${codigo})` : nome, nome, atende, status, labelStatus, obs, n, total, itens, conf };
+}
+
+// Guarda as respostas da psicóloga (Sim/Não) no próprio registro do
+// questionário e recalcula o laudo a partir delas.
+function useAjustesClinicos(colecao, doc) {
+  const [ajustes, setAjustes] = useState({});
+  const docId = doc?.id;
+  useEffect(() => { setAjustes(doc?.ajustesClinicos || {}); }, [docId]);
+  async function ajustar(chave, valor) {
+    const novo = { ...ajustes };
+    if (valor === null) delete novo[chave]; else novo[chave] = valor;
+    setAjustes(novo);
+    if (docId) {
+      try { await db.collection(colecao).doc(docId).update({ ajustesClinicos: novo }); }
+      catch (e) { alert("Não foi possível salvar sua resposta: " + e.message); }
+    }
+  }
+  return [ajustes, ajustar];
+}
+
+// Lista de diagnósticos com painel "Reavaliar com a entrevista": a
+// psicóloga responde Sim/Não e o resultado é recalculado na hora.
+function BotaoTri({ ativo, rotulo, cor, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ padding: "3px 10px", borderRadius: 14, border: "1.5px solid " + (ativo ? cor : "#E5E7EB"), background: ativo ? cor : "white", color: ativo ? "white" : "#6B7280", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+    >
+      {rotulo}
+    </button>
+  );
+}
+
+function ListaCriteriosDSM5({ criterios, aoAjustar }) {
+  const [abertos, setAbertos] = useState({});
+  return (
+    <div>
+      {criterios.map((c, i) => {
+        const aberto = !!abertos[c.nome];
+        const temItens = c.itens && c.itens.length > 0;
+        return (
+          <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
+              <CorBadgeCriterio atende={c.atende} rotulo={c.labelStatus} />
+            </div>
+            <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
+            {temItens && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setAbertos((a) => ({ ...a, [c.nome]: !aberto }))}
+                  style={{ background: "none", border: "none", color: "var(--cor-marca)", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}
+                >
+                  {aberto ? "Fechar reavaliação" : "Reavaliar com a entrevista"}
+                </button>
+                {aberto && (
+                  <div style={{ marginTop: 8, background: "#F9FAFB", borderRadius: 8, padding: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Critérios — confirme ou corrija</div>
+                    {c.itens.map((it) => (
+                      <div key={it.chave} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #F3F4F6", flexWrap: "wrap" }}>
+                        <div style={{ flex: 1, minWidth: 180, fontSize: 12, color: "#374151" }}>
+                          {it.texto}
+                          <span style={{ fontSize: 10, color: "#9CA3AF", marginLeft: 6 }}>
+                            {it.ajuste ? "definido por você" : it.automatico ? "indicado no questionário" : "não indicado no questionário"}
+                          </span>
+                        </div>
+                        <BotaoTri ativo={it.ajuste === "sim"} rotulo="Presente" cor="#DC2626" onClick={() => aoAjustar(it.chave, it.ajuste === "sim" ? null : "sim")} />
+                        <BotaoTri ativo={it.ajuste === "nao"} rotulo="Ausente" cor="#16A34A" onClick={() => aoAjustar(it.chave, it.ajuste === "nao" ? null : "nao")} />
+                      </div>
+                    ))}
+                    {c.conf && c.conf.length > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Perguntas da entrevista (requisitos do DSM-5)</div>
+                        {c.conf.map((q) => (
+                          <div key={q.chave} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #F3F4F6", flexWrap: "wrap" }}>
+                            <div style={{ flex: 1, minWidth: 180, fontSize: 12, color: "#374151" }}>{q.texto}</div>
+                            <BotaoTri ativo={q.resposta === "sim"} rotulo="Sim" cor="#16A34A" onClick={() => aoAjustar(q.chave, q.resposta === "sim" ? null : "sim")} />
+                            <BotaoTri ativo={q.resposta === "nao"} rotulo="Não" cor="#DC2626" onClick={() => aoAjustar(q.chave, q.resposta === "nao" ? null : "nao")} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // Diagnóstico diferencial a partir do respondente mais recente
@@ -1205,7 +1350,7 @@ function avaliarCriteriosDSM5({ nome, codigo, criterios, minimoDiagnostico, mini
 // (proxy dos sintomas nucleares — o instrumento não tem itens
 // suficientes pra replicar os "3 de 7"/"5 de 9" oficiais do manual),
 // então usam limiar "3 de 3", com a ressalva registrada no texto.
-function laudoDiferencialBipolar(doc) {
+function laudoDiferencialBipolar(doc, ajustes = {}) {
   const c = (id) => criterioAtende(doc[id]);
 
   const mania = avaliarCriteriosDSM5({
@@ -1216,7 +1361,12 @@ function laudoDiferencialBipolar(doc) {
       { texto: "Autoconfiança exagerada ou comportamento de risco incomum", atende: c("p3") },
     ],
     minimoDiagnostico: 3, minimoProvavel: 2,
-    notaClinica: "Instrumento tem só 3 itens de mania (proxy) — o DSM-5 pede 3 de 7 sintomas + duração ≥7 dias (mania) ou 4-6 dias (hipomania). Confirmar duração e prejuízo funcional na entrevista.",
+    notaClinica: "Instrumento tem só 3 itens de mania (proxy) — o DSM-5 pede 3 de 7 sintomas + duração ≥7 dias (mania) ou 4-6 dias (hipomania). Use a reavaliação para completar os sintomas que o questionário não cobre.",
+    confirmacoes: [
+      "Humor elevado/irritável e aumento de energia por pelo menos 4 dias (hipomania) ou 7 dias (mania)?",
+      "Os sintomas não são atribuíveis a substância, medicação ou condição médica?",
+    ],
+    ajustes,
   });
 
   const depressao = avaliarCriteriosDSM5({
@@ -1228,6 +1378,12 @@ function laudoDiferencialBipolar(doc) {
     ],
     minimoDiagnostico: 3, minimoProvavel: 2,
     notaClinica: "Instrumento tem só 3 itens (proxy) — o DSM-5 pede 5 de 9 sintomas por ≥2 semanas. Se o critério de ideação suicida estiver presente, acionar protocolo de segurança imediatamente.",
+    confirmacoes: [
+      "Sintomas presentes na maior parte do dia, quase todos os dias, por pelo menos 2 semanas?",
+      "Sofrimento clinicamente significativo ou prejuízo social/profissional?",
+      "Os sintomas não são atribuíveis a substância, medicação ou condição médica?",
+    ],
+    ajustes,
   });
 
   const borderline = avaliarCriteriosDSM5({
@@ -1245,6 +1401,11 @@ function laudoDiferencialBipolar(doc) {
     ],
     minimoDiagnostico: 5, minimoProvavel: 4,
     notaClinica: "Estas 9 perguntas seguem a ordem dos 9 critérios oficiais do DSM-5 — o mínimo de 5 é o critério real do manual, não uma estimativa.",
+    confirmacoes: [
+      "Padrão pervasivo e persistente, com início até a adolescência/início da vida adulta e presente em vários contextos?",
+      "As oscilações de humor são reativas a estressores interpessoais (e não episódios autônomos de dias/semanas)?",
+    ],
+    ajustes,
   });
 
   const partes = [];
@@ -1267,10 +1428,10 @@ function laudoDiferencialBipolar(doc) {
   return { hipotese, criterios: [mania, depressao, borderline], atencao };
 }
 
-function CorBadgeCriterio({ atende }) {
-  if (atende === true) return <span style={{ background: "#FEF2F2", color: "#DC2626", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Diagnóstico</span>;
-  if (atende === false) return <span style={{ background: "#F0FDF4", color: "#16A34A", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Não atende</span>;
-  return <span style={{ background: "#FFFBEB", color: "#D97706", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Diagnóstico provável</span>;
+function CorBadgeCriterio({ atende, rotulo }) {
+  if (atende === true) return <span style={{ background: "#FEF2F2", color: "#DC2626", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{rotulo || "Diagnóstico"}</span>;
+  if (atende === false) return <span style={{ background: "#F0FDF4", color: "#16A34A", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{rotulo || "Não atende"}</span>;
+  return <span style={{ background: "#FFFBEB", color: "#D97706", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{rotulo || "Diagnóstico provável"}</span>;
 }
 
 function BarraEscoreBipolar({ label, valor, max, cor }) {
@@ -1298,6 +1459,7 @@ function AbaRastreamentoBipolarView({ usuario, paciente, aoVoltar }) {
   const [gerandoLink, setGerandoLink] = useState(false);
   const [linkGerado, setLinkGerado] = useState(null);
   const [copiado, setCopiado] = useState(false);
+  const [ajustes, ajustar] = useAjustesClinicos("clinica_rastreamento_bipolar", docs[0]);
 
   useEffect(() => {
     db.collection("clinica_rastreamento_bipolar")
@@ -1371,7 +1533,7 @@ function AbaRastreamentoBipolarView({ usuario, paciente, aoVoltar }) {
     const dataDoc = new Date().toLocaleDateString("pt-BR");
 
     const doc = docs[0];
-    const laudo = laudoDiferencialBipolar(doc);
+    const laudo = laudoDiferencialBipolar(doc, ajustes);
     const [mania, depressao, borderline] = laudo.criterios;
 
     const criteriosHtml = laudo.criterios.map((c) => `
@@ -1503,7 +1665,7 @@ ${respostasHtml}
 
       {!carregando && docs.length > 0 && (() => {
         const doc = docs[0];
-        const laudo = laudoDiferencialBipolar(doc);
+        const laudo = laudoDiferencialBipolar(doc, ajustes);
         const [mania, depressao, borderline] = laudo.criterios;
         return (
           <div>
@@ -1522,15 +1684,7 @@ ${respostasHtml}
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
-              {laudo.criterios.map((c, i) => (
-                <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
-                    <CorBadgeCriterio atende={c.atende} />
-                  </div>
-                  <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
-                </div>
-              ))}
+              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustar={ajustar} />
             </div>
 
             {laudo.atencao.length > 0 && (
@@ -1629,7 +1783,7 @@ function montarHipoteseCriterios(avaliacoes, textoNenhum) {
 // oficiais (p1-p3, subtipo em p4). Bulimia: compulsão com perda de
 // controle + frequência + compensação. TCA: 5 requisitos, incluindo
 // ausência de compensação. ARFID: p11-p12 sem preocupação com peso.
-function laudoAlimentar(doc) {
+function laudoAlimentar(doc, ajustes) {
   const c = (id) => doc[id] === "C";
   const comp = c("p8");
   const compulsao = c("p5") && c("p6");
@@ -1643,6 +1797,8 @@ function laudoAlimentar(doc) {
     ],
     minimoDiagnostico: 3, minimoProvavel: 2,
     notaClinica: "Subtipo: " + (c("p4") ? "Compulsão/Purgativo." : "Restritivo."),
+    confirmacoes: ["Peso significativamente baixo para idade, sexo e estatura (IMC ou histórico de perda de peso confirmado)?"],
+    ajustes,
   });
   anorexia.nomeCurto = "Anorexia Nervosa";
 
@@ -1654,7 +1810,11 @@ function laudoAlimentar(doc) {
       { texto: "Comportamentos compensatórios inadequados (vômito, laxantes, jejum, exercício excessivo)", atende: comp },
     ],
     minimoDiagnostico: 3, minimoProvavel: 2,
-    notaClinica: "O DSM-5 exige ainda autoavaliação influenciada por forma/peso, não coberta por este instrumento — confirmar na entrevista.",
+    confirmacoes: [
+      "Autoavaliação indevidamente influenciada pela forma e pelo peso corporal?",
+      "Os episódios não ocorrem exclusivamente durante episódios de anorexia nervosa?",
+    ],
+    ajustes,
   });
   bulimia.nomeCurto = "Bulimia Nervosa";
 
@@ -1668,6 +1828,8 @@ function laudoAlimentar(doc) {
       { texto: "Ausência de comportamentos compensatórios regulares", atende: !comp },
     ],
     minimoDiagnostico: 5, minimoProvavel: 4,
+    confirmacoes: ["Sofrimento acentuado em relação à compulsão alimentar?"],
+    ajustes,
   });
   tca.nomeCurto = "Transtorno de Compulsão Alimentar";
 
@@ -1679,6 +1841,8 @@ function laudoAlimentar(doc) {
       { texto: "Sem medo de engordar nem distorção da imagem corporal", atende: !c("p2") && !c("p3") },
     ],
     minimoDiagnostico: 3, minimoProvavel: 2,
+    confirmacoes: ["A restrição não é explicada por falta de alimento ou prática cultural, nem por outro transtorno mental/condição médica?"],
+    ajustes,
   });
   arfid.nomeCurto = "ARFID";
 
@@ -1778,6 +1942,7 @@ function AbaRastreamentoAlimentarView({ usuario, paciente, aoVoltar }) {
   const [gerandoLink, setGerandoLink] = useState(false);
   const [linkGerado, setLinkGerado] = useState(null);
   const [copiado, setCopiado] = useState(false);
+  const [ajustes, ajustar] = useAjustesClinicos("clinica_rastreamento_alimentar", docs[0]);
 
   useEffect(() => {
     db.collection("clinica_rastreamento_alimentar")
@@ -1850,7 +2015,7 @@ function AbaRastreamentoAlimentarView({ usuario, paciente, aoVoltar }) {
     const pacNome = paciente.nome || "Paciente";
     const dataDoc = new Date().toLocaleDateString("pt-BR");
     const doc = docs[0];
-    const laudo = laudoAlimentar(doc);
+    const laudo = laudoAlimentar(doc, ajustes);
 
     const respostasHtml = docs.map((d) => `
       <h3>${d.tipoRespondente === "paciente" ? "Próprio paciente" : (d.nomeRespondente || "Familiar") + " (" + (d.parentesco || "—") + ")"}</h3>
@@ -1915,7 +2080,7 @@ function AbaRastreamentoAlimentarView({ usuario, paciente, aoVoltar }) {
 
       {!carregando && docs.length > 0 && (() => {
         const doc = docs[0];
-        const laudo = laudoAlimentar(doc);
+        const laudo = laudoAlimentar(doc, ajustes);
         return (
           <div>
             <div style={{ background: "#F5F3FF", border: "1px solid #C4B5FD", borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -1932,15 +2097,7 @@ function AbaRastreamentoAlimentarView({ usuario, paciente, aoVoltar }) {
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
-              {laudo.criterios.map((c, i) => (
-                <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
-                    <CorBadgeCriterio atende={c.atende} />
-                  </div>
-                  <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
-                </div>
-              ))}
+              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustar={ajustar} />
             </div>
 
             {laudo.atencao.length > 0 && (
@@ -2009,7 +2166,7 @@ const PERGUNTAS_SEXUAL = [
   { id: "p11", eixo: "Contexto", texto: "Fator etiológico associado" },
 ];
 
-function laudoSexual(doc) {
+function laudoSexual(doc, ajustes) {
   const p = (id) => doc[id] || "A";
   const atencao = [];
   const temCriterio = p("p9") === "C";
@@ -2041,6 +2198,10 @@ function laudoSexual(doc) {
       ],
       minimoDiagnostico: 2, minimoProvavel: 1,
       notaClinica: d.nota,
+      confirmacoes: [
+        "Os sintomas não são melhor explicados por outro transtorno mental, uso de substância/medicação, condição médica ou conflito relacional grave?",
+      ],
+      ajustes,
     });
     av.nomeCurto = d.nome;
     criterios.push(av);
@@ -2069,6 +2230,7 @@ function AbaRastreamentoSexualView({ usuario, paciente, aoVoltar }) {
   const [gerandoLink, setGerandoLink] = useState(false);
   const [linkGerado, setLinkGerado] = useState(null);
   const [copiado, setCopiado] = useState(false);
+  const [ajustes, ajustar] = useAjustesClinicos("clinica_rastreamento_sexual", docs[0]);
 
   useEffect(() => {
     db.collection("clinica_rastreamento_sexual")
@@ -2141,7 +2303,7 @@ function AbaRastreamentoSexualView({ usuario, paciente, aoVoltar }) {
     const pacNome = paciente.nome || "Paciente";
     const dataDoc = new Date().toLocaleDateString("pt-BR");
     const doc = docs[0];
-    const laudo = laudoSexual(doc);
+    const laudo = laudoSexual(doc, ajustes);
 
     const respostasHtml = `
       <h3>Próprio paciente · Confidencial</h3>
@@ -2214,7 +2376,7 @@ function AbaRastreamentoSexualView({ usuario, paciente, aoVoltar }) {
 
       {!carregando && docs.length > 0 && (() => {
         const doc = docs[0];
-        const laudo = laudoSexual(doc);
+        const laudo = laudoSexual(doc, ajustes);
         return (
           <div>
             <div style={{ background: "#F5F3FF", border: "1px solid #C4B5FD", borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -2230,15 +2392,7 @@ function AbaRastreamentoSexualView({ usuario, paciente, aoVoltar }) {
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
-              {laudo.criterios.map((c, i) => (
-                <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
-                    <CorBadgeCriterio atende={c.atende} />
-                  </div>
-                  <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
-                </div>
-              ))}
+              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustar={ajustar} />
             </div>
 
             {laudo.atencao.length > 0 && (
@@ -2318,7 +2472,7 @@ const PERGUNTAS_NEURO = [
 // a estrutura real: Critério A (3 domínios sociais, todos exigidos) +
 // Critério B (ao menos 2 de 4 padrões restritos/repetitivos). TOD: 4
 // de 8 sintomas no DSM-5 → 4 de 6 aqui.
-function laudoNeuro(doc) {
+function laudoNeuro(doc, ajustes = {}) {
   const c = (id) => doc[id] === "C";
   const lista = (textos, a) => textos.map((t, i) => ({ texto: t, atende: c("p" + (a + i)) }));
 
@@ -2331,7 +2485,12 @@ function laudoNeuro(doc) {
     ], 1),
     minimoDiagnostico: 5, minimoProvavel: 4,
     regra: "mínimo: 5 de 8 (equivalente proporcional aos 6 de 9 do DSM-5)",
-    notaClinica: "Confirmar início antes dos 12 anos, duração ≥6 meses e prejuízo em ao menos 2 contextos.",
+    confirmacoes: [
+      "Vários sintomas já estavam presentes antes dos 12 anos?",
+      "Sintomas presentes em 2 ou mais contextos (escola/trabalho, casa, social)?",
+      "Persistem há pelo menos 6 meses, com prejuízo claro no funcionamento?",
+    ],
+    ajustes,
   });
   desatencao.nomeCurto = "TDAH — Desatenção";
 
@@ -2343,25 +2502,37 @@ function laudoNeuro(doc) {
     ], 9),
     minimoDiagnostico: 5, minimoProvavel: 4,
     regra: "mínimo: 5 de 7 (equivalente proporcional aos 6 de 9 do DSM-5)",
-    notaClinica: "Confirmar início antes dos 12 anos, duração ≥6 meses e prejuízo em ao menos 2 contextos.",
+    confirmacoes: [
+      "Vários sintomas já estavam presentes antes dos 12 anos?",
+      "Sintomas presentes em 2 ou mais contextos (escola/trabalho, casa, social)?",
+      "Persistem há pelo menos 6 meses, com prejuízo claro no funcionamento?",
+    ],
+    ajustes,
   });
   hiperatividade.nomeCurto = "TDAH — Hiperatividade/Impulsividade";
 
   const socialTextos = ["Dificuldade de reciprocidade social/emocional", "Uso atípico de contato visual e comunicação não verbal", "Dificuldade de fazer, manter e compreender relações"];
   const restritosTextos = ["Movimentos ou falas repetitivas (estereotipias)", "Insistência em rotina / sofrimento com mudanças", "Interesses restritos e hiperfixados", "Hiper ou hiporreatividade sensorial"];
-  const socialN = [16, 17, 18].filter((i) => c("p" + i)).length;
-  const restritosN = [19, 20, 21, 22].filter((i) => c("p" + i)).length;
-  const teaStatus = socialN === 3 && restritosN >= 2 ? "diagnostico"
-    : (socialN >= 2 && restritosN >= 2) || (socialN === 3 && restritosN === 1) ? "provavel" : "abaixo";
+  const contarAB = (itens) => ({ A: itens.slice(0, 3).filter((x) => x.atende).length, B: itens.slice(3).filter((x) => x.atende).length });
   const tea = avaliarCriteriosDSM5({
     nome: "TEA — Transtorno do Espectro Autista", codigo: "DSM-5 F84.0",
     criterios: [
       ...socialTextos.map((t, i) => ({ texto: "Critério A — " + t, atende: c("p" + (16 + i)) })),
       ...restritosTextos.map((t, i) => ({ texto: "Critério B — " + t, atende: c("p" + (19 + i)) })),
     ],
-    statusForcado: teaStatus,
-    regra: "exigido: Critério A com os 3 domínios sociais + Critério B com ao menos 2 de 4 padrões restritos. Encontrado: A " + socialN + "/3, B " + restritosN + "/4",
-    notaClinica: "Confirmar que os sinais estão presentes desde o desenvolvimento precoce.",
+    statusFn: (itens) => {
+      const { A, B } = contarAB(itens);
+      return A === 3 && B >= 2 ? "diagnostico" : (A >= 2 && B >= 2) || (A === 3 && B === 1) ? "provavel" : "abaixo";
+    },
+    regra: (itens) => {
+      const { A, B } = contarAB(itens);
+      return "exigido: Critério A com os 3 domínios sociais + Critério B com ao menos 2 de 4 padrões restritos. Encontrado: A " + A + "/3, B " + B + "/4";
+    },
+    confirmacoes: [
+      "Os sintomas estão presentes desde o período do desenvolvimento precoce?",
+      "Causam prejuízo clinicamente significativo no funcionamento?",
+    ],
+    ajustes,
   });
   tea.nomeCurto = "TEA — Espectro Autista";
 
@@ -2373,7 +2544,11 @@ function laudoNeuro(doc) {
     ], 23),
     minimoDiagnostico: 4, minimoProvavel: 3,
     regra: "mínimo: 4 de 6 (equivalente proporcional aos 4 de 8 do DSM-5)",
-    notaClinica: "Confirmar duração ≥6 meses e interação com ao menos uma pessoa que não seja irmão.",
+    confirmacoes: [
+      "Padrão presente há pelo menos 6 meses?",
+      "Ocorre com ao menos uma pessoa que não seja irmão/irmã?",
+    ],
+    ajustes,
   });
   tod.nomeCurto = "TOD — Opositivo-Desafiador";
 
@@ -2410,6 +2585,7 @@ function AbaRastreamentoNeuroView({ usuario, paciente, aoVoltar }) {
   const [gerandoLink, setGerandoLink] = useState(false);
   const [linkGerado, setLinkGerado] = useState(null);
   const [copiado, setCopiado] = useState(false);
+  const [ajustes, ajustar] = useAjustesClinicos("clinica_rastreamento_neuro", docs[0]);
 
   useEffect(() => {
     db.collection("clinica_rastreamento_neuro")
@@ -2481,7 +2657,7 @@ function AbaRastreamentoNeuroView({ usuario, paciente, aoVoltar }) {
     const nomeClinica = cfg.nome || "PsiCoWorking";
     const pacNome = paciente.nome || "Paciente";
     const dataDoc = new Date().toLocaleDateString("pt-BR");
-    const laudo = laudoNeuro(docs[0]);
+    const laudo = laudoNeuro(docs[0], ajustes);
 
     const respostasHtml = docs.map((d) => `
       <h3>${d.tipoRespondente === "paciente" ? "Próprio paciente" : (d.nomeRespondente || "Familiar") + " (" + (d.parentesco || "—") + ")"}</h3>
@@ -2545,7 +2721,7 @@ function AbaRastreamentoNeuroView({ usuario, paciente, aoVoltar }) {
       )}
 
       {!carregando && docs.length > 0 && (() => {
-        const laudo = laudoNeuro(docs[0]);
+        const laudo = laudoNeuro(docs[0], ajustes);
         return (
           <div>
             <div style={{ background: "#F5F3FF", border: "1px solid #C4B5FD", borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -2562,15 +2738,7 @@ function AbaRastreamentoNeuroView({ usuario, paciente, aoVoltar }) {
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
-              {laudo.criterios.map((c, i) => (
-                <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
-                    <CorBadgeCriterio atende={c.atende} />
-                  </div>
-                  <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
-                </div>
-              ))}
+              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustar={ajustar} />
             </div>
 
             {laudo.atencao.length > 0 && (
