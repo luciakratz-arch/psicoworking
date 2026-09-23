@@ -798,7 +798,7 @@ function AbaModulosPaciente({ paciente }) {
 const QUESTIONARIOS_DISPONIVEIS = [
   { id: "anamnese", rotulo: "Anamnese", icone: "clipboard-list", desc: "Marcos do desenvolvimento, histórico clínico e familiar.", pronto: true },
   { id: "entrevista", rotulo: "Entrevista Clínica Inicial", icone: "brain", desc: "Perfil etário, escalas de observação e hipóteses diagnósticas DSM-5.", pronto: false },
-  { id: "rastreamento", rotulo: "Rastreamento Bipolar / Borderline", icone: "bar-chart-2", desc: "Avaliação diferencial DSM-5, com laudo comparativo.", pronto: false },
+  { id: "rastreamento", rotulo: "Rastreamento Bipolar / Borderline", icone: "bar-chart-2", desc: "Avaliação diferencial DSM-5, com laudo comparativo.", pronto: true },
   { id: "sexual", rotulo: "Rastreamento de Saúde Sexual", icone: "heart", desc: "Rastreamento confidencial, respondido só pelo paciente.", pronto: false },
   { id: "alimentar", rotulo: "Hábitos Alimentares", icone: "utensils", desc: "Rastreamento de padrões e comportamentos alimentares.", pronto: false },
   { id: "neuro", rotulo: "Funcionamento e Comportamento", icone: "activity", desc: "Rastreamento de atenção, agitação e interação social.", pronto: false },
@@ -1092,11 +1092,438 @@ ${linhasPorDoc}
   );
 }
 
+// Lista resumida (pra montar a tabela do laudo) das 20 perguntas do
+// instrumento — mesmo texto do formulário público em
+// psi/atividade/formulario-rastreamento.js. Perguntas p16-p20 são
+// coletadas mas não entram na fórmula de pontuação, igual ao modelo.
+const PERGUNTAS_BIPOLAR = [
+  { id: "p1", bloco: "Energia e Aceleração", texto: "Fases de energia acima do normal / aceleração" },
+  { id: "p2", bloco: "Energia e Aceleração", texto: "Padrão de sono e fala durante agitação" },
+  { id: "p3", bloco: "Energia e Aceleração", texto: "Autoconfiança exagerada ou riscos incomuns" },
+  { id: "p4", bloco: "Tristeza e Depressão", texto: "Tristeza profunda ou perda de interesse" },
+  { id: "p5", bloco: "Tristeza e Depressão", texto: "Disposição física, sono e apetite nas fases de baixa" },
+  { id: "p6", bloco: "Tristeza e Depressão", texto: "Desesperança, culpa excessiva ou ideação suicida" },
+  { id: "p7", bloco: "Relacionamentos e Identidade", texto: "Reação ao abandono real ou imaginado" },
+  { id: "p8", bloco: "Relacionamentos e Identidade", texto: "Relações intensas e instáveis" },
+  { id: "p9", bloco: "Relacionamentos e Identidade", texto: "Instabilidade de identidade ou objetivos" },
+  { id: "p10", bloco: "Impulsos, Humor e Emoções", texto: "Comportamentos impulsivos no dia a dia" },
+  { id: "p11", bloco: "Impulsos, Humor e Emoções", texto: "Automutilação ou tentativas de autoextermínio" },
+  { id: "p12", bloco: "Impulsos, Humor e Emoções", texto: "Oscilação rápida de humor" },
+  { id: "p13", bloco: "Impulsos, Humor e Emoções", texto: "Vazio interior persistente ou tédio crônico" },
+  { id: "p14", bloco: "Impulsos, Humor e Emoções", texto: "Manejo da raiva e da frustração" },
+  { id: "p15", bloco: "Impulsos, Humor e Emoções", texto: "Dissociação ou paranoia sob estresse extremo" },
+  { id: "p16", bloco: "Cognição e Humor Misto", texto: "Pensamentos acelerados / fuga de ideias" },
+  { id: "p17", bloco: "Cognição e Humor Misto", texto: "Distrabilidade nos episódios de agitação" },
+  { id: "p18", bloco: "Cognição e Humor Misto", texto: "Agitação psicomotora ou lentidão visível" },
+  { id: "p19", bloco: "Cognição e Humor Misto", texto: "Dificuldade de concentração e memória" },
+  { id: "p20", bloco: "Cognição e Humor Misto", texto: "Humor misto: tristeza e agitação simultâneas" },
+];
+
+const COR_LETRA_BIPOLAR = { A: "#16A34A", B: "#D97706", C: "#DC2626", D: "#7F1D1D" };
+
+function pontuarLetraBipolar(letra) {
+  return { A: 0, B: 1, C: 2, D: 3 }[letra] || 0;
+}
+
+// Só as 15 perguntas originais entram na pontuação — as 5 novas de
+// "Cognição e Humor Misto" (p16-p20) são coletadas mas ficam de fora
+// da fórmula, igual ao modelo original (assimetria proposital dele,
+// não é bug — quando a psicóloga quiser, dá pra incorporar depois).
+function calcularEscoresBipolar(doc) {
+  const bipolarMania = ["p1", "p2", "p3"].reduce((s, k) => s + pontuarLetraBipolar(doc[k]), 0);
+  const bipolarDep = ["p4", "p5", "p6"].reduce((s, k) => s + pontuarLetraBipolar(doc[k]), 0);
+  const borderline = ["p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15"].reduce((s, k) => s + pontuarLetraBipolar(doc[k]), 0);
+  return { bipolarMania, bipolarDep, borderline };
+}
+
+// Gera a hipótese diagnóstica diferencial a partir dos 3 escores
+// médios — mesma lógica do modelo (percentuais e limiares idênticos).
+function laudoDiferencialBipolar(escores) {
+  const { bipolarMania, bipolarDep, borderline } = escores;
+  const maxMania = 8, maxDep = 6, maxBorder = 18;
+  const pctMania = (bipolarMania / maxMania) * 100;
+  const pctDep = (bipolarDep / maxDep) * 100;
+  const pctBorder = (borderline / maxBorder) * 100;
+
+  let hipotese = "";
+  const criterios = [];
+  const atencao = [];
+
+  if (pctMania >= 75) {
+    hipotese = "Transtorno Bipolar Tipo I (episódio maníaco com comprometimento grave)";
+    criterios.push({ label: "TB Tipo I", atende: true, obs: "Escores de mania/hipomania elevados (≥75%). Verificar duração ≥7 dias e comprometimento funcional (Critério A do DSM-5)." });
+    atencao.push("Confirmar duração exata dos episódios de aceleração (≥7 dias = mania; 4–6 dias = hipomania).");
+    atencao.push("Checar se houve internação ou prejuízo grave — diferencial TB I vs TB II.");
+  } else if (pctMania >= 45) {
+    hipotese = "Transtorno Bipolar Tipo II (hipomania + depressão) — verificar";
+    criterios.push({ label: "TB Tipo II", atende: true, obs: "Indícios moderados de hipomania (45–74%). Confirmar ausência de episódio maníaco pleno." });
+    atencao.push("Investigar se os episódios de aceleração duraram 4–6 dias sem internação (perfil Tipo II).");
+  } else if (pctMania >= 20 && pctDep >= 30) {
+    hipotese = "Ciclotimia ou Transtorno Depressivo com características mistas — investigar";
+    criterios.push({ label: "Ciclotimia", atende: null, obs: "Flutuações leves de humor sem critério pleno para mania ou depressão maior." });
+    atencao.push("Mapear se as oscilações são crônicas (≥2 anos em adultos) para confirmar Ciclotimia (DSM-5 301.13).");
+  } else {
+    criterios.push({ label: "TB Tipo I", atende: false, obs: "Escores de energia/aceleração abaixo do limiar clínico." });
+    criterios.push({ label: "TB Tipo II", atende: false, obs: "Sem indícios consistentes de hipomania." });
+  }
+
+  if (pctDep >= 60) {
+    criterios.push({ label: "Episódio Depressivo Maior", atende: true, obs: "Escores depressivos elevados. Avaliar ≥5 critérios por ≥2 semanas (DSM-5 Critério A)." });
+    atencao.push("Verificar presença de ideação suicida ativa (p6=C) — acionar protocolo de segurança se necessário.");
+  } else if (pctDep >= 30) {
+    criterios.push({ label: "Depressão leve/moderada", atende: null, obs: "Indícios moderados. Não preenche critérios plenos — monitorar." });
+  } else {
+    criterios.push({ label: "Episódio Depressivo Maior", atende: false, obs: "Escores abaixo do limiar." });
+  }
+
+  if (pctBorder >= 70) {
+    hipotese = hipotese ? hipotese + " com forte sobreposição de TPB" : "Transtorno da Personalidade Borderline (TPB)";
+    criterios.push({ label: "TPB (DSM-5 301.83)", atende: true, obs: "Escores elevados em ≥5 dos 9 critérios DSM-5 para TPB (escore ≥70%)." });
+    atencao.push("Diferenciar oscilação de humor rápida (horas) do Borderline vs episódios longos do TB (dias/semanas).");
+    atencao.push("Investigar história de automutilação, vazio crônico e instabilidade de identidade como critérios centrais do TPB.");
+  } else if (pctBorder >= 40) {
+    criterios.push({ label: "TPB (traços)", atende: null, obs: "Traços limítrofes moderados. Não preenche critérios plenos — avaliar longitudinalmente." });
+    atencao.push("Checar se oscilações emocionais são reativas a estressores interpessoais (perfil Borderline) ou autônomas (perfil Bipolar).");
+  } else {
+    criterios.push({ label: "TPB", atende: false, obs: "Escores abaixo do limiar de critérios borderline." });
+  }
+
+  if (pctMania >= 45 && pctBorder >= 55) {
+    atencao.push("Alta probabilidade de COMORBIDADE TB + TPB — padrão encontrado em até 20% dos casos. Priorizar diagnóstico longitudinal.");
+  }
+
+  if (!hipotese) hipotese = "Sem hipótese diagnóstica definida pelos escores — avaliação clínica aprofundada indicada.";
+
+  return { hipotese, criterios, atencao, pctMania, pctDep, pctBorder };
+}
+
+function CorBadgeCriterio({ atende }) {
+  if (atende === true) return <span style={{ background: "#FEF2F2", color: "#DC2626", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Critérios presentes</span>;
+  if (atende === false) return <span style={{ background: "#F0FDF4", color: "#16A34A", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Não atende</span>;
+  return <span style={{ background: "#FFFBEB", color: "#D97706", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Investigar</span>;
+}
+
+function BarraEscoreBipolar({ label, valor, max, cor }) {
+  const pct = Math.min(100, Math.round((valor / max) * 100));
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+        <span style={{ fontWeight: 600, color: "#374151" }}>{label}</span>
+        <span style={{ color: cor, fontWeight: 700 }}>{pct}%</span>
+      </div>
+      <div style={{ background: "#F3F4F6", borderRadius: 20, height: 8, overflow: "hidden" }}>
+        <div style={{ width: pct + "%", background: cor, height: "100%", borderRadius: 20, transition: "width .5s" }} />
+      </div>
+    </div>
+  );
+}
+
+// Visualizador do Rastreamento Bipolar/Borderline — não usa o motor
+// genérico dos outros (AbaRastreamentoView) porque a pontuação é
+// diferente: 3 eixos ponderados com hipótese diagnóstica diferencial,
+// em vez de uma contagem simples de B+C.
+function AbaRastreamentoBipolarView({ usuario, paciente, aoVoltar }) {
+  const [docs, setDocs] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [gerandoLink, setGerandoLink] = useState(false);
+  const [linkGerado, setLinkGerado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    db.collection("clinica_rastreamento_bipolar")
+      .where("psi_id", "==", usuario.psiId)
+      .where("pacienteId", "==", paciente.id)
+      .get()
+      .then((snap) => {
+        const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        lista.sort((a, b) => (b.criadoEm?.seconds || 0) - (a.criadoEm?.seconds || 0));
+        setDocs(lista);
+        setCarregando(false);
+      })
+      .catch(() => setCarregando(false));
+  }, [usuario.psiId, paciente.id]);
+
+  async function gerarLink() {
+    setGerandoLink(true);
+    try {
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        tipo: "bipolar",
+        titulo: "Rastreamento Bipolar / Borderline",
+        nomeClinica: cfg.nome || "PsiCoWorking",
+        corMarca: cfg.corPrimaria || "#6A2BD9",
+        logoUrl: cfg.logoUrl || "",
+        status: "enviado",
+        cancelado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setLinkGerado(window.location.origin + "/psi/atividade/?t=" + token);
+    } catch (e) {
+      alert("Não foi possível gerar o link: " + e.message);
+    } finally {
+      setGerandoLink(false);
+    }
+  }
+
+  function abrirWhatsApp() {
+    const primeiroNome = (paciente.nome || "").split(" ")[0];
+    const mensagem =
+      `Olá!\n\n` +
+      `Preparei um questionário clínico para você preencher sobre *${primeiroNome}*: *Rastreamento Bipolar / Borderline*.\n\n` +
+      `Leva de 8 a 12 minutos — é só abrir o link abaixo e responder com calma:\n\n` +
+      `${linkGerado}\n\n` +
+      `Qualquer dúvida, me chama por aqui.`;
+    const numero = (paciente.telefone || "").replace(/\D/g, "");
+    const url = numero
+      ? "https://wa.me/55" + numero + "?text=" + encodeURIComponent(mensagem)
+      : "https://wa.me/?text=" + encodeURIComponent(mensagem);
+    window.open(url, "_blank");
+  }
+
+  function copiarLink() {
+    navigator.clipboard.writeText(linkGerado).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
+
+  async function gerarLaudo() {
+    if (docs.length === 0) return;
+    const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+    const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+    const nomeClinica = cfg.nome || "PsiCoWorking";
+    const pacNome = paciente.nome || "Paciente";
+    const dataDoc = new Date().toLocaleDateString("pt-BR");
+
+    const escoresPorDoc = docs.map((d) => ({ ...d, escores: calcularEscoresBipolar(d) }));
+    const media = {
+      bipolarMania: escoresPorDoc.reduce((s, d) => s + d.escores.bipolarMania, 0) / docs.length,
+      bipolarDep: escoresPorDoc.reduce((s, d) => s + d.escores.bipolarDep, 0) / docs.length,
+      borderline: escoresPorDoc.reduce((s, d) => s + d.escores.borderline, 0) / docs.length,
+    };
+    const laudo = laudoDiferencialBipolar(media);
+
+    const criteriosHtml = laudo.criterios.map((c) => `
+      <div class="criterio">
+        <div class="nome">${c.label} &nbsp; <span class="${c.atende === true ? "badge-sim" : c.atende === false ? "badge-nao" : "badge-inv"}">${c.atende === true ? "Critérios presentes" : c.atende === false ? "Não atende" : "Investigar"}</span></div>
+        <div style="font-size:12px;color:#4b5563;margin-top:4px">${c.obs}</div>
+      </div>`).join("");
+
+    const atencaoHtml = laudo.atencao.length === 0
+      ? "<p style='color:#6b7280;font-size:12px'>Nenhum ponto de atenção crítico identificado pelos escores.</p>"
+      : laudo.atencao.map((a) => `<div class="atencao-item">${a}</div>`).join("");
+
+    const respostasHtml = escoresPorDoc.map((d) => `
+      <h3>${d.tipoRespondente === "paciente" ? "Próprio paciente" : (d.nomeRespondente || "Familiar") + " (" + (d.parentesco || "—") + ")"}</h3>
+      <table class="resp-table">
+        <thead><tr><th>#</th><th>Pergunta</th><th>Bloco</th><th>Resp.</th></tr></thead>
+        <tbody>
+          ${PERGUNTAS_BIPOLAR.map((p) => `<tr><td>${p.id.replace("p", "")}</td><td>${p.texto}</td><td>${p.bloco}</td><td><span class="letra" style="color:${COR_LETRA_BIPOLAR[d[p.id]] || "#6b7280"}">${d[p.id] || "—"}</span></td></tr>`).join("")}
+          ${d.obsFinais ? `<tr><td colspan="2"><strong>Observações livres</strong></td><td colspan="2">${d.obsFinais}</td></tr>` : ""}
+        </tbody>
+      </table>`).join("");
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<title>Laudo Rastreamento Bipolar/Borderline — ${pacNome}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;color:#1f2937;padding:32px;max-width:800px;margin:0 auto;font-size:13px;line-height:1.6}
+h1{font-size:20px;color:#3d006a;margin-bottom:4px}
+h2{font-size:14px;color:#7B00C4;margin:20px 0 8px;border-bottom:1px solid #ede9fe;padding-bottom:4px}
+h3{font-size:12.5px;color:#374151;margin:12px 0 6px}
+.header{border-bottom:2px solid #7B00C4;padding-bottom:16px;margin-bottom:20px}
+.sub{font-size:12px;color:#6b7280;margin-top:2px}
+.barra-wrap{margin-bottom:10px}
+.barra-bg{background:#f3f4f6;border-radius:20px;height:10px;overflow:hidden;margin-top:3px}
+.hipotese{background:#f5f3ff;border:1px solid #c4b5fd;border-radius:10px;padding:14px 18px;margin:12px 0}
+.hipotese .label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#7B00C4;margin-bottom:4px}
+.hipotese .valor{font-size:15px;font-weight:700;color:#3d006a}
+.criterio{border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;margin-bottom:8px}
+.criterio .nome{font-weight:700;font-size:13px;margin-bottom:4px}
+.badge-sim{background:#fef2f2;color:#dc2626;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-nao{background:#f0fdf4;color:#16a34a;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-inv{background:#fffbeb;color:#d97706;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700}
+.atencao-item{background:#fff7ed;border-left:3px solid #f97316;padding:8px 12px;margin-bottom:6px;border-radius:0 6px 6px 0;font-size:12px}
+.resp-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11.5px}
+.resp-table th{background:#f5f3ff;padding:6px 10px;text-align:left;font-size:10.5px;color:#7B00C4;border:1px solid #ede9fe}
+.resp-table td{padding:6px 10px;border:1px solid #e5e7eb;vertical-align:top}
+.resp-table tr:nth-child(even) td{background:#fafafa}
+.letra{font-weight:700;font-size:13px}
+.rodape{margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center}
+@media print{body{padding:16px}.no-print{display:none}}
+</style></head><body>
+<div class="no-print" style="margin-bottom:20px">
+  <button onclick="window.print()" style="background:#7B00C4;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px">Imprimir / Salvar PDF</button>
+</div>
+<div class="header">
+  <h1>Laudo Analítico de Rastreamento Clínico</h1>
+  <div class="sub">Paciente: <strong>${pacNome}</strong> · Data: ${dataDoc} · ${nomeClinica}</div>
+  <div class="sub">Respondentes: ${docs.length} (${docs.map((d) => (d.tipoRespondente === "paciente" ? "próprio paciente" : d.parentesco || "familiar")).join(", ")})</div>
+</div>
+<h2>I. Escores por Eixo (média entre respondentes)</h2>
+<div class="barra-wrap">
+  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span><strong>Eixo Bipolar — Mania/Hipomania</strong></span><span style="color:#dc2626;font-weight:700">${Math.round((media.bipolarMania / 8) * 100)}%</span></div>
+  <div class="barra-bg"><div style="width:${Math.round((media.bipolarMania / 8) * 100)}%;background:#dc2626;height:100%;border-radius:20px"></div></div>
+</div>
+<div class="barra-wrap">
+  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span><strong>Eixo Bipolar — Depressão</strong></span><span style="color:#7c3aed;font-weight:700">${Math.round((media.bipolarDep / 6) * 100)}%</span></div>
+  <div class="barra-bg"><div style="width:${Math.round((media.bipolarDep / 6) * 100)}%;background:#7c3aed;height:100%;border-radius:20px"></div></div>
+</div>
+<div class="barra-wrap">
+  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span><strong>Eixo Borderline (TPB)</strong></span><span style="color:#2563eb;font-weight:700">${Math.round((media.borderline / 18) * 100)}%</span></div>
+  <div class="barra-bg"><div style="width:${Math.round((media.borderline / 18) * 100)}%;background:#2563eb;height:100%;border-radius:20px"></div></div>
+</div>
+<h2>II. Hipótese Diagnóstica Provável</h2>
+<div class="hipotese">
+  <div class="label">Hipótese principal</div>
+  <div class="valor">${laudo.hipotese}</div>
+</div>
+<h3>Análise por Critério DSM-5</h3>
+${criteriosHtml}
+<h2>III. Pontos de Atenção para a Entrevista Clínica</h2>
+${atencaoHtml}
+<h2>IV. Respostas por Respondente</h2>
+${respostasHtml}
+<div class="rodape">Documento gerado em ${dataDoc} · Uso exclusivo para fins clínicos · Confidencial · LGPD</div>
+</body></html>`;
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+  }
+
+  return (
+    <div>
+      <button className="botao-secundario botao-voltar-perfil" onClick={aoVoltar} style={{ marginBottom: 16 }}>
+        <Icone nome="arrow-left" tamanho={15} /> Voltar para Questionários
+      </button>
+
+      <h3 style={{ marginBottom: 2 }}>Rastreamento Bipolar / Borderline</h3>
+      <p className="subtitulo-pagina" style={{ marginBottom: 20 }}>Avaliação diferencial DSM-5 (20 critérios) · Instrumento aplicado ao paciente e/ou familiares</p>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        {!linkGerado ? (
+          <button className="botao-primario" onClick={gerarLink} disabled={gerandoLink}>
+            <Icone nome="link" tamanho={15} /> {gerandoLink ? "Gerando..." : "Gerar link do questionário"}
+          </button>
+        ) : (
+          <>
+            <button className="botao-secundario" onClick={copiarLink}>
+              <Icone nome={copiado ? "check" : "link"} tamanho={14} /> {copiado ? "Copiado!" : "Copiar link"}
+            </button>
+            <button className="botao-primario" onClick={abrirWhatsApp} style={{ background: "#25D366" }}>
+              <Icone nome="message-circle" tamanho={14} /> Enviar pelo WhatsApp
+            </button>
+          </>
+        )}
+        {docs.length > 0 && (
+          <button className="botao-secundario" onClick={gerarLaudo}>
+            <Icone nome="file-text" tamanho={14} /> Gerar laudo em PDF
+          </button>
+        )}
+      </div>
+
+      {carregando && <p className="texto-vazio">Carregando...</p>}
+
+      {!carregando && docs.length === 0 && (
+        <div className="cartao-secao">
+          <p className="texto-vazio">Nenhuma resposta recebida ainda. Gere o link acima e envie ao paciente ou familiar.</p>
+        </div>
+      )}
+
+      {!carregando && docs.length > 0 && (() => {
+        const escoresPorDoc = docs.map((d) => ({ ...d, escores: calcularEscoresBipolar(d) }));
+        const media = {
+          bipolarMania: escoresPorDoc.reduce((s, d) => s + d.escores.bipolarMania, 0) / docs.length,
+          bipolarDep: escoresPorDoc.reduce((s, d) => s + d.escores.bipolarDep, 0) / docs.length,
+          borderline: escoresPorDoc.reduce((s, d) => s + d.escores.borderline, 0) / docs.length,
+        };
+        const laudo = laudoDiferencialBipolar(media);
+        return (
+          <div>
+            <div style={{ background: "#F5F3FF", border: "1px solid #C4B5FD", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--cor-marca)", marginBottom: 4 }}>Hipótese diagnóstica provável</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#3D006A", lineHeight: 1.4 }}>{laudo.hipotese}</div>
+            </div>
+
+            <div style={{ background: "#F9FAFB", border: "1px solid #E5E7EB", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Escores médios por eixo ({docs.length} respondente{docs.length !== 1 ? "s" : ""})</div>
+              <BarraEscoreBipolar label="Eixo Bipolar · Mania/Hipomania" valor={media.bipolarMania} max={8} cor="#DC2626" />
+              <BarraEscoreBipolar label="Eixo Bipolar · Depressão" valor={media.bipolarDep} max={6} cor="#7C3AED" />
+              <BarraEscoreBipolar label="Eixo Borderline (TPB)" valor={media.borderline} max={18} cor="#2563EB" />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
+              {laudo.criterios.map((c, i) => (
+                <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
+                    <CorBadgeCriterio atende={c.atende} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
+                </div>
+              ))}
+            </div>
+
+            {laudo.atencao.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Pontos de atenção para a entrevista clínica</div>
+                {laudo.atencao.map((a, i) => (
+                  <div key={i} style={{ background: "#FFF7ED", borderLeft: "3px solid #F97316", padding: "8px 12px", marginBottom: 6, borderRadius: "0 6px 6px 0", fontSize: 12 }}>{a}</div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Respostas por respondente</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {docs.map((doc) => (
+                <div key={doc.id} style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                    {doc.tipoRespondente === "paciente" ? "Próprio paciente" : (doc.nomeRespondente || "Familiar") + " · " + (doc.parentesco || "")}
+                  </div>
+                  {PERGUNTAS_BIPOLAR.map((p) => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
+                      <div style={{
+                        width: 24, height: 24, minWidth: 24, borderRadius: "50%",
+                        background: doc[p.id] ? COR_LETRA_BIPOLAR[doc[p.id]] + "22" : "#F3F4F6",
+                        border: "2px solid " + (doc[p.id] ? COR_LETRA_BIPOLAR[doc[p.id]] : "#E5E7EB"),
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700,
+                        color: doc[p.id] ? COR_LETRA_BIPOLAR[doc[p.id]] : "#9CA3AF",
+                      }}>
+                        {doc[p.id] || "—"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#374151", flex: 1 }}>{p.texto}</div>
+                      <div style={{ fontSize: 10, color: "#9CA3AF", whiteSpace: "nowrap" }}>{p.bloco}</div>
+                    </div>
+                  ))}
+                  {doc.obsFinais && (
+                    <div style={{ marginTop: 12, background: "#F9FAFB", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "#4B5563" }}>
+                      <strong>Observações:</strong> {doc.obsFinais}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 function AbaQuestionariosPaciente({ usuario, paciente }) {
   const [aberto, setAberto] = useState(null);
 
   if (aberto === "anamnese") {
     return <AbaAnamneseView usuario={usuario} paciente={paciente} aoVoltar={() => setAberto(null)} />;
+  }
+  if (aberto === "rastreamento") {
+    return <AbaRastreamentoBipolarView usuario={usuario} paciente={paciente} aoVoltar={() => setAberto(null)} />;
   }
   if (aberto && RASTREAMENTOS_ADMIN[aberto]) {
     return <AbaRastreamentoView usuario={usuario} paciente={paciente} tipo={aberto} aoVoltar={() => setAberto(null)} />;

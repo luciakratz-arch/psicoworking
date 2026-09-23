@@ -478,6 +478,7 @@ const COLECOES_ATIVIDADE_PUBLICA = [
   "clinica_anamneses",
   "clinica_rastreamento_jogos",
   "clinica_rastreamento_dependencia",
+  "clinica_rastreamento_bipolar",
 ];
 
 // A página manda a hora como { __horaDoServidor: true } porque lá não

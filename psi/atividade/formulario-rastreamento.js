@@ -174,6 +174,152 @@ const BLOCOS_RASTREAMENTO_DEPENDENCIA = [
   },
 ];
 
+// ── Instrumento: Rastreamento Bipolar / Borderline ──
+// 20 perguntas no total (p1-p15 são os 15 critérios DSM-5 originais,
+// usados no cálculo dos escores; p16-p20 são perguntas mais novas de
+// "Cognição e Humor Misto" que o modelo já coleta mas ainda não entra
+// na fórmula de pontuação — mantido assim de propósito, é assim que
+// está no modelo de referência).
+const BLOCOS_RASTREAMENTO_BIPOLAR = [
+  {
+    titulo: "Bloco 1 · Energia e Aceleração",
+    sub: "Observe se já houve períodos em que a pessoa parecia muito diferente do normal — com muita energia, aceleração ou grandiosidade.",
+    perguntas: [
+      { id: "p1", num: "1", texto: "Em algum período da vida ou de forma recorrente, você notou fases em que a pessoa avaliada passou a apresentar uma energia muito acima do normal, ficando extremamente acelerado(a), com disposição fora do comum, a ponto de parecer incansável?", opcoes: [
+        { letra: "A", texto: "Não, nunca notei nada parecido com isso." },
+        { letra: "B", texto: "Sim, por alguns dias parecia com a 'bateria 24h', mas depois voltava ao normal." },
+        { letra: "C", texto: "Sim, por uma semana ou mais — ritmo frenético de atividade, agitação intensa e pouca necessidade de descanso." },
+        { letra: "D", texto: "Sim, a ponto de perder o controle, agir de forma impulsiva perigosa ou precisar de atendimento médico." },
+      ] },
+      { id: "p2", num: "2", texto: "Como costumava ser o padrão de sono e a fala da pessoa durante esses momentos de maior agitação?", opcoes: [
+        { letra: "A", texto: "Dormia e falava normalmente, no ritmo de sempre." },
+        { letra: "B", texto: "Dizia precisar dormir bem menos (2 a 4h) e acordava descansado(a); a fala era bem rápida e atropelada." },
+        { letra: "C", texto: "Passava noites inteiras acordado(a) organizando coisas ou trabalhando sem cansaço, falando excessivamente e mudando de assunto o tempo todo." },
+      ] },
+      { id: "p3", num: "3", texto: "Houve momentos em que a pessoa avaliada demonstrava autoconfiança exagerada, achando que podia realizar coisas grandiosas ou assumindo riscos que não costumava assumir (como gastos financeiros excessivos ou projetos mirabolantes)?", opcoes: [
+        { letra: "A", texto: "Não, manteve o comportamento prudente de sempre." },
+        { letra: "B", texto: "Sim, mostrava-se muito otimista com ideias fora do comum ou projetos de grande porte." },
+        { letra: "C", texto: "Sim, tomou decisões impulsivas e arriscadas que trouxeram prejuízos ou grande preocupação para a família." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 2 · Tristeza e Depressão",
+    sub: "Agora pense no lado oposto — períodos de baixa energia, tristeza profunda ou desânimo persistente.",
+    perguntas: [
+      { id: "p4", num: "4", texto: "Por outro lado, você observou fases em que a pessoa apresentou uma tristeza profunda, desânimo persistente ou perda total do interesse por coisas que antes davam prazer?", opcoes: [
+        { letra: "A", texto: "Não, o humor manteve-se estável ou dentro das variações comuns." },
+        { letra: "B", texto: "Sim, apresentou períodos de apatia e desinteresse, mas conseguia levar a rotina adiante." },
+        { letra: "C", texto: "Sim, períodos prolongados de tristeza profunda, choro frequente, isolamento social e incapacidade de sentir prazer." },
+      ] },
+      { id: "p5", num: "5", texto: "Nesses períodos de desânimo ou baixa energia, como ficavam a disposição física, o sono, o apetite e o ânimo para as tarefas básicas?", opcoes: [
+        { letra: "A", texto: "Mantinha as atividades e os cuidados pessoais normalmente." },
+        { letra: "B", texto: "Apresentava cansaço constante, alterações moderadas no sono/apetite e lentidão para realizar tarefas." },
+        { letra: "C", texto: "Ficava praticamente sem energia para sair da cama, descuidando da higiene e da alimentação, com mudanças drásticas no sono." },
+      ] },
+      { id: "p6", num: "6", texto: "Durante essas fases de baixa energia ou tristeza, a pessoa avaliada chegou a verbalizar sentimentos de desesperança, culpa excessiva ou vontade de sumir / desistir de viver?", opcoes: [
+        { letra: "A", texto: "Nunca verbalizou nada disso." },
+        { letra: "B", texto: "Reclamava que a vida estava difícil, mas sem citar morte ou ideação suicida." },
+        { letra: "C", texto: "Falava abertamente sobre querer sumir, que a vida não tinha sentido ou mencionou pensamentos de morte." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 3 · Relacionamentos e Identidade",
+    sub: "Como a pessoa se relaciona com os outros e como lida com a ideia de abandono ou rejeição.",
+    perguntas: [
+      { id: "p7", num: "7", texto: "Como a pessoa avaliada costuma reagir quando percebe — ou imagina — que vai ser rejeitado(a), ignorado(a) ou deixado(a) sozinho(a) por alguém importante?", opcoes: [
+        { letra: "A", texto: "Reage de forma equilibrada, compreendendo que as pessoas têm seus compromissos." },
+        { letra: "B", texto: "Fica chateado(a) ou carente, mas consegue lidar após conversar ou se acalmar." },
+        { letra: "C", texto: "Tem reações extremas e desesperadas — liga repetidamente, faz ameaças, chora compulsivamente ou implora para a pessoa não ir embora." },
+      ] },
+      { id: "p8", num: "8", texto: "Você percebe que as relações afetivas ou de amizade dessa pessoa costumam ser intensas mas muito instáveis ao longo do tempo?", opcoes: [
+        { letra: "A", texto: "Não, as relações são estáveis e duradouras." },
+        { letra: "B", texto: "Há alguns desentendimentos normais de relacionamento, sem rupturas drásticas." },
+        { letra: "C", texto: "É muito comum passar rapidamente de 'amar alguém excessivamente' para 'odiar essa mesma pessoa' por motivos pequenos." },
+      ] },
+      { id: "p9", num: "9", texto: "Como é a percepção que a pessoa tem de si mesmo(a)? Parece haver uma instabilidade marcante sobre quem ela é, seus objetivos ou sua identidade?", opcoes: [
+        { letra: "A", texto: "Tem uma noção clara e estável de quem é, de seus valores e objetivos." },
+        { letra: "B", texto: "Às vezes se sente confusa(o) sobre o futuro ou escolhas, o que é comum." },
+        { letra: "C", texto: "Muda drasticamente de opinião sobre si mesma(o), planos, crenças ou aparência de tempos em tempos, parecendo não saber quem realmente é." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 4 · Impulsos, Humor e Emoções",
+    sub: "Como a pessoa controla seus impulsos, lida com a raiva e experimenta o mundo emocional no dia a dia.",
+    perguntas: [
+      { id: "p10", num: "10", texto: "A pessoa costuma apresentar comportamentos impulsivos no dia a dia (como gastos descontrolados, direção perigosa, excessos na comida ou uso desregrado de substâncias)?", opcoes: [
+        { letra: "A", texto: "Não, costuma ser uma pessoa prudente e controla bem seus impulsos." },
+        { letra: "B", texto: "Ocorre ocasionalmente de forma leve." },
+        { letra: "C", texto: "Tem episódios frequentes de impulsividade descontrolada em várias áreas, sem pensar nas consequências." },
+      ] },
+      { id: "p11", num: "11", texto: "Houve episódios de automutilação física (como cortes ou queimaduras superficiais) ou ameaças e tentativas de autoextermínio?", opcoes: [
+        { letra: "A", texto: "Nunca apresentou nenhum comportamento desse tipo." },
+        { letra: "B", texto: "Já mencionou verbalmente querer sumir sob estresse, mas sem atos práticos." },
+        { letra: "C", texto: "Apresenta ou já apresentou histórico de cortes, automutilação para aliviar sofrimento emocional ou tentativas reais de suicídio." },
+      ] },
+      { id: "p12", num: "12", texto: "Como o humor dessa pessoa costuma oscilar no dia a dia ou de uma semana para outra?", opcoes: [
+        { letra: "A", texto: "O humor é relativamente estável, variando de acordo com os fatos reais." },
+        { letra: "B", texto: "Apresenta oscilações normais do estresse cotidiano." },
+        { letra: "C", texto: "Tem mudanças de humor muito rápidas e intensas — passa de calma para irritação profunda ou desespero em poucas horas." },
+      ] },
+      { id: "p13", num: "13", texto: "A pessoa avaliada costuma relatar uma sensação persistente de vazio interior ou tédio crônico?", opcoes: [
+        { letra: "A", texto: "Não relata esse tipo de sentimento." },
+        { letra: "B", texto: "Sente-se vazia(o) ou entediada(o) esporadicamente, em fases de solidão." },
+        { letra: "C", texto: "Queixa-se com frequência de um vazio interno profundo ou um 'buraco no peito' que nada parece preencher." },
+      ] },
+      { id: "p14", num: "14", texto: "Como a pessoa lida com a raiva e a frustração nas situações cotidianas?", opcoes: [
+        { letra: "A", texto: "Consegue expressar o que sente de forma adequada e negociar quando algo a incomoda." },
+        { letra: "B", texto: "Fica irritada(o), mas consegue se conter e evitar discussões maiores." },
+        { letra: "C", texto: "Tem explosões de raiva intensas, desproporcionais ao motivo, com forte dificuldade de controlar a agressividade verbal ou física." },
+      ] },
+      { id: "p15", num: "15", texto: "Em momentos de forte pressão ou estresse, você já notou se a pessoa parece 'se desligar' da realidade, apresentar desconfianças exageradas das intenções dos outros ou um estranhamento intenso de si mesma?", opcoes: [
+        { letra: "A", texto: "Não, mantém o contato firme com a realidade mesmo sob pressão." },
+        { letra: "B", texto: "Fica apenas muito estressada(o) temporariamente." },
+        { letra: "C", texto: "Sob estresse extremo, já apresentou episódios em que parecia 'fora de si', muito desconfiada(o) (quase persecutória) ou relatando sensação de irrealidade." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Bloco 5 · Cognição e Humor Misto",
+    sub: "Estas perguntas ajudam a entender como o raciocínio, a concentração e eventuais sobreposições de humor se manifestam.",
+    perguntas: [
+      { id: "p16", num: "16", texto: "Durante os períodos de agitação ou aceleração, você notou que a pessoa avaliada parecia ter os pensamentos acelerados demais — como se as ideias se atropelassem, saltando de um assunto para outro sem conseguir parar?", opcoes: [
+        { letra: "A", texto: "Não, o raciocínio sempre pareceu organizado e no ritmo normal." },
+        { letra: "B", texto: "Sim, ficava muito dispersa(o) nas conversas, mudava de assunto com frequência mas sem parecer fora de controle." },
+        { letra: "C", texto: "Sim, os pensamentos pareciam tão acelerados que era difícil acompanhar — falava muito rápido e saltava de ideia em ideia sem concluir nenhuma." },
+      ] },
+      { id: "p17", num: "17", texto: "Nesses momentos de agitação, a pessoa demonstrava grande dificuldade de manter a atenção — qualquer barulho, movimento ou estímulo externo parecia distraí-la facilmente, mesmo quando estava tentando fazer algo importante?", opcoes: [
+        { letra: "A", texto: "Não, conseguia se concentrar normalmente mesmo em períodos de agitação." },
+        { letra: "B", texto: "Ficava um pouco mais dispersa(o) que o habitual, mas conseguia retomar o foco." },
+        { letra: "C", texto: "Sim, era impossível mantê-la focada — qualquer coisa tirava a atenção e ela não conseguia terminar nada." },
+      ] },
+      { id: "p18", num: "18", texto: "Nos períodos de tristeza ou baixa energia, você observou uma inquietação física visível — a pessoa não conseguia ficar parada, andava de um lado para outro, remexia as mãos ou os pés sem parar — ou o contrário: um estado de lentidão marcante, como se cada movimento custasse um esforço enorme?", opcoes: [
+        { letra: "A", texto: "Não, o comportamento motor estava dentro do normal." },
+        { letra: "B", texto: "Sim, ficava levemente inquieta(o) ou um pouco mais lenta(o) que o habitual." },
+        { letra: "C", texto: "Sim, de forma marcante e visível para qualquer pessoa ao redor — agitação intensa ou lentidão extrema nos movimentos e na fala." },
+      ] },
+      { id: "p19", num: "19", texto: "Durante as fases de tristeza ou baixa energia, a pessoa demonstrava dificuldade acentuada para se concentrar, tomar decisões simples do cotidiano ou lembrar de coisas que normalmente lembraria sem esforço?", opcoes: [
+        { letra: "A", texto: "Não, a memória e o raciocínio permaneciam normais." },
+        { letra: "B", texto: "Sim, reclamava de 'cabeça pesada' ou dificuldade leve para se concentrar." },
+        { letra: "C", texto: "Sim, de forma significativa — tinha dificuldade até para decisões simples e esquecia coisas rotineiras com frequência." },
+      ] },
+      { id: "p20", num: "20", texto: "Você já notou períodos em que a pessoa parecia apresentar tristeza ou choro frequente ao mesmo tempo em que estava agitada, com energia elevada, pensamentos acelerados ou pouco sono — como se estivesse 'deprimida e acelerada ao mesmo tempo'?", opcoes: [
+        { letra: "A", texto: "Não, os períodos de tristeza e os de agitação sempre ocorreram de forma separada." },
+        { letra: "B", texto: "Talvez — havia momentos em que parecia triste mas inquieta, embora não fosse o padrão principal." },
+        { letra: "C", texto: "Sim, claramente — havia episódios em que a tristeza e a agitação coexistiam de forma intensa e perturbadora ao mesmo tempo." },
+      ] },
+    ],
+  },
+  {
+    titulo: "Observações Finais",
+    sub: "Se quiser, compartilhe qualquer observação adicional sobre o comportamento ou a história da pessoa avaliada.",
+    perguntas: [],
+    obs: true,
+  },
+];
+
 // Ao adicionar um novo instrumento, é só acrescentar uma entrada aqui
 // — o motor abaixo (`FormularioRastreamento`) e o roteador em app.js
 // já funcionam pra qualquer instrumento cadastrado neste objeto.
@@ -187,6 +333,11 @@ const CONFIGS_RASTREAMENTO = {
     titulo: "Rastreamento de Dependência Química e Substâncias",
     tempoEstimado: "8 a 12 minutos",
     blocos: BLOCOS_RASTREAMENTO_DEPENDENCIA,
+  },
+  bipolar: {
+    titulo: "Rastreamento Bipolar / Borderline",
+    tempoEstimado: "8 a 12 minutos",
+    blocos: BLOCOS_RASTREAMENTO_BIPOLAR,
   },
 };
 
