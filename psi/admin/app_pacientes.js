@@ -246,8 +246,77 @@ function CamposPaciente({ form, setForm, mostrarStatus }) {
           </div>
         </div>
       )}
+      <div className="campo-largura-total titulo-secao-form" style={{ color: "#0891b2", borderBottomColor: "#bae6fd" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Icone nome="users" tamanho={13} /> Responsável / Pais — para pacientes menores de idade
+        </span>
+      </div>
+      <div className="campo-largura-total">
+        <label>Nome do Responsável <span className="opcional">(opcional)</span></label>
+        <input value={form.responsavelNome || ""} onChange={(e) => setForm({ ...form, responsavelNome: e.target.value })} placeholder="Ex: Maria da Silva Castro" />
+      </div>
+      <div>
+        <label>Parentesco / Vínculo</label>
+        <select value={form.responsavelParentesco || ""} onChange={(e) => setForm({ ...form, responsavelParentesco: e.target.value })}>
+          <option value="">Selecione</option>
+          <option>Mãe</option>
+          <option>Pai</option>
+          <option>Avó</option>
+          <option>Avô</option>
+          <option>Tia/Tio</option>
+          <option>Tutor(a) legal</option>
+          <option>Responsável institucional</option>
+          <option>Outro</option>
+        </select>
+      </div>
+      <div>
+        <label>CPF do Responsável</label>
+        <input value={form.responsavelCpf || ""} onChange={(e) => setForm({ ...form, responsavelCpf: e.target.value })} placeholder="000.000.000-00" />
+      </div>
+      <div>
+        <label>Telefone do Responsável</label>
+        <input value={form.responsavelTelefone || ""} onChange={(e) => setForm({ ...form, responsavelTelefone: e.target.value })} placeholder="(62) 9 0000-0000" />
+      </div>
+      <div>
+        <label>E-mail do Responsável</label>
+        <input type="email" value={form.responsavelEmail || ""} onChange={(e) => setForm({ ...form, responsavelEmail: e.target.value })} placeholder="email@exemplo.com" />
+      </div>
+      <div className="campo-largura-total">
+        <label>Nome do Segundo Responsável <span className="opcional">(opcional)</span></label>
+        <input value={form.responsavel2Nome || ""} onChange={(e) => setForm({ ...form, responsavel2Nome: e.target.value })} placeholder="Ex: João Castro (pai)" />
+      </div>
+      <div>
+        <label>Parentesco 2º Responsável</label>
+        <select value={form.responsavel2Parentesco || ""} onChange={(e) => setForm({ ...form, responsavel2Parentesco: e.target.value })}>
+          <option value="">Selecione</option>
+          <option>Mãe</option>
+          <option>Pai</option>
+          <option>Avó</option>
+          <option>Avô</option>
+          <option>Tia/Tio</option>
+          <option>Tutor(a) legal</option>
+          <option>Responsável institucional</option>
+          <option>Outro</option>
+        </select>
+      </div>
+      <div>
+        <label>Telefone 2º Responsável</label>
+        <input value={form.responsavel2Telefone || ""} onChange={(e) => setForm({ ...form, responsavel2Telefone: e.target.value })} placeholder="(62) 9 0000-0000" />
+      </div>
+      <div className="campo-largura-total">
+        <label>Observações sobre o responsável / contexto familiar</label>
+        <TextAreaVoz
+          className="campo-descricao"
+          rows={2}
+          value={form.responsavelObs || ""}
+          onChange={(e) => setForm({ ...form, responsavelObs: e.target.value })}
+          placeholder="Ex: Pais separados, guarda compartilhada. Mãe tem autoridade para autorizar procedimentos..."
+        />
+      </div>
       <div className="campo-largura-total titulo-secao-form">
-        🏢 Dados Ocupacionais — para documentos NR-1 e declarações
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Icone nome="briefcase" tamanho={13} /> Dados Ocupacionais — para documentos NR-1 e declarações
+        </span>
       </div>
       <div className="campo-largura-total">
         <label>Empresa Contratante <span className="opcional">(opcional)</span></label>

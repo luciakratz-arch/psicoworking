@@ -253,8 +253,110 @@ function CamposPaciente({
       status: s.valor
     })
   }, s.rotulo)))), /*#__PURE__*/React.createElement("div", {
+    className: "campo-largura-total titulo-secao-form",
+    style: {
+      color: "#0891b2",
+      borderBottomColor: "#bae6fd"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "users",
+    tamanho: 13
+  }), " Respons\xE1vel / Pais \u2014 para pacientes menores de idade")), /*#__PURE__*/React.createElement("div", {
+    className: "campo-largura-total"
+  }, /*#__PURE__*/React.createElement("label", null, "Nome do Respons\xE1vel ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional)")), /*#__PURE__*/React.createElement("input", {
+    value: form.responsavelNome || "",
+    onChange: e => setForm({
+      ...form,
+      responsavelNome: e.target.value
+    }),
+    placeholder: "Ex: Maria da Silva Castro"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Parentesco / V\xEDnculo"), /*#__PURE__*/React.createElement("select", {
+    value: form.responsavelParentesco || "",
+    onChange: e => setForm({
+      ...form,
+      responsavelParentesco: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Selecione"), /*#__PURE__*/React.createElement("option", null, "M\xE3e"), /*#__PURE__*/React.createElement("option", null, "Pai"), /*#__PURE__*/React.createElement("option", null, "Av\xF3"), /*#__PURE__*/React.createElement("option", null, "Av\xF4"), /*#__PURE__*/React.createElement("option", null, "Tia/Tio"), /*#__PURE__*/React.createElement("option", null, "Tutor(a) legal"), /*#__PURE__*/React.createElement("option", null, "Respons\xE1vel institucional"), /*#__PURE__*/React.createElement("option", null, "Outro"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "CPF do Respons\xE1vel"), /*#__PURE__*/React.createElement("input", {
+    value: form.responsavelCpf || "",
+    onChange: e => setForm({
+      ...form,
+      responsavelCpf: e.target.value
+    }),
+    placeholder: "000.000.000-00"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Telefone do Respons\xE1vel"), /*#__PURE__*/React.createElement("input", {
+    value: form.responsavelTelefone || "",
+    onChange: e => setForm({
+      ...form,
+      responsavelTelefone: e.target.value
+    }),
+    placeholder: "(62) 9 0000-0000"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "E-mail do Respons\xE1vel"), /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: form.responsavelEmail || "",
+    onChange: e => setForm({
+      ...form,
+      responsavelEmail: e.target.value
+    }),
+    placeholder: "email@exemplo.com"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "campo-largura-total"
+  }, /*#__PURE__*/React.createElement("label", null, "Nome do Segundo Respons\xE1vel ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional)")), /*#__PURE__*/React.createElement("input", {
+    value: form.responsavel2Nome || "",
+    onChange: e => setForm({
+      ...form,
+      responsavel2Nome: e.target.value
+    }),
+    placeholder: "Ex: Jo\xE3o Castro (pai)"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Parentesco 2\xBA Respons\xE1vel"), /*#__PURE__*/React.createElement("select", {
+    value: form.responsavel2Parentesco || "",
+    onChange: e => setForm({
+      ...form,
+      responsavel2Parentesco: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Selecione"), /*#__PURE__*/React.createElement("option", null, "M\xE3e"), /*#__PURE__*/React.createElement("option", null, "Pai"), /*#__PURE__*/React.createElement("option", null, "Av\xF3"), /*#__PURE__*/React.createElement("option", null, "Av\xF4"), /*#__PURE__*/React.createElement("option", null, "Tia/Tio"), /*#__PURE__*/React.createElement("option", null, "Tutor(a) legal"), /*#__PURE__*/React.createElement("option", null, "Respons\xE1vel institucional"), /*#__PURE__*/React.createElement("option", null, "Outro"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Telefone 2\xBA Respons\xE1vel"), /*#__PURE__*/React.createElement("input", {
+    value: form.responsavel2Telefone || "",
+    onChange: e => setForm({
+      ...form,
+      responsavel2Telefone: e.target.value
+    }),
+    placeholder: "(62) 9 0000-0000"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "campo-largura-total"
+  }, /*#__PURE__*/React.createElement("label", null, "Observa\xE7\xF5es sobre o respons\xE1vel / contexto familiar"), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    className: "campo-descricao",
+    rows: 2,
+    value: form.responsavelObs || "",
+    onChange: e => setForm({
+      ...form,
+      responsavelObs: e.target.value
+    }),
+    placeholder: "Ex: Pais separados, guarda compartilhada. M\xE3e tem autoridade para autorizar procedimentos..."
+  })), /*#__PURE__*/React.createElement("div", {
     className: "campo-largura-total titulo-secao-form"
-  }, "\uD83C\uDFE2 Dados Ocupacionais \u2014 para documentos NR-1 e declara\xE7\xF5es"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "briefcase",
+    tamanho: 13
+  }), " Dados Ocupacionais \u2014 para documentos NR-1 e declara\xE7\xF5es")), /*#__PURE__*/React.createElement("div", {
     className: "campo-largura-total"
   }, /*#__PURE__*/React.createElement("label", null, "Empresa Contratante ", /*#__PURE__*/React.createElement("span", {
     className: "opcional"

@@ -746,7 +746,10 @@ function FerramentaRodaVida({ usuario, paciente, recurso }) {
       .catch(() => {});
   }, [usuario.uid]);
 
-  function RadarSVG({ valores }) {
+  // Aceita uma cor por chamada, porque na tela de comparação os dois
+  // radares (antes × agora) ficam sobrepostos com cores diferentes.
+  function RadarSVG({ valores, cor }) {
+    const c = cor || "var(--cor-marca)";
     const n = AREAS.length;
     const cx = 140, cy = 140, r = 110;
     const grades = [2, 4, 6, 8, 10].map((g) => {
@@ -779,11 +782,22 @@ function FerramentaRodaVida({ usuario, paciente, recurso }) {
     return (
       <svg width="280" height="280" viewBox="0 0 280 280">
         {grades}{eixos}
-        <polygon points={pts} fill="rgba(123,0,196,0.15)" stroke="var(--cor-marca)" strokeWidth="2" />
-        {pontos.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill="var(--cor-marca)" />)}
+        <polygon points={pts} fill={c} fillOpacity="0.15" stroke={c} strokeWidth="2" />
+        {pontos.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill={c} />)}
         {labels}
       </svg>
     );
+  }
+
+  // Converte o documento salvo ({areas:[{area,valor}]}) de volta para
+  // o formato {id: valor} que os componentes usam.
+  function valoresDoDocumento(doc) {
+    const v = {};
+    (doc?.areas || []).forEach((a) => {
+      const found = AREAS.find((x) => x.label === a.area);
+      if (found) v[found.id] = a.valor;
+    });
+    return v;
   }
 
   async function salvar() {
@@ -805,6 +819,13 @@ function FerramentaRodaVida({ usuario, paciente, recurso }) {
       setSalvando(false);
     }
   }
+
+  // Compara a sessão mais recente com a anterior: dois radares lado a
+  // lado (o atual pode ainda nem ter sido salvo, então usa `vals` ao
+  // vivo) e a variação de cada área com seta pra cima/baixo.
+  const temComparativo = historico.length >= 1;
+  const anterior = historico[0];
+  const valoresAnteriores = anterior ? valoresDoDocumento(anterior) : {};
 
   return (
     <div>
@@ -828,11 +849,52 @@ function FerramentaRodaVida({ usuario, paciente, recurso }) {
       <button className="botao-primario-p" style={{ width: "100%", justifyContent: "center" }} disabled={salvando} onClick={salvar}>
         <Icone nome="save" tamanho={14} /> {msg || (salvando ? "Salvando..." : "Salvar Roda da Vida")}
       </button>
-      {historico.length > 1 && (
+
+      {temComparativo && (
+        <div style={{ marginTop: 20, padding: "14px 12px", background: "#FAF5FF", borderRadius: 12, border: "1px solid #E9D5FF" }}>
+          <div style={{ fontWeight: 700, color: "var(--cor-marca)", fontSize: 13, marginBottom: 14, textAlign: "center" }}>
+            Comparação — Antes × Agora
+          </div>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <div style={{ textAlign: "center", flex: "1 1 140px", maxWidth: 200 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 6, background: "#F3F4F6", borderRadius: 20, padding: "3px 10px", display: "inline-block" }}>
+                {anterior.data}
+              </div>
+              <RadarSVG valores={valoresAnteriores} cor="#A78BFA" />
+            </div>
+            <div style={{ textAlign: "center", flex: "1 1 140px", maxWidth: 200 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--cor-marca)", marginBottom: 6, background: "#EDE9FE", borderRadius: 20, padding: "3px 10px", display: "inline-block" }}>
+                Agora
+              </div>
+              <RadarSVG valores={vals} cor="var(--cor-marca)" />
+            </div>
+          </div>
+          {/* Variação de cada área entre a sessão anterior e a atual */}
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 4 }}>
+            {AREAS.map((a) => {
+              const vA = valoresAnteriores[a.id] || 0;
+              const vB = vals[a.id] || 0;
+              const diff = vB - vA;
+              const cor = diff > 0 ? "#059669" : diff < 0 ? "#DC2626" : "#9CA3AF";
+              const icone = diff > 0 ? "trending-up" : diff < 0 ? "trending-down" : "minus";
+              return (
+                <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, padding: "3px 6px", borderRadius: 6, background: "white" }}>
+                  <span style={{ color: "#374151", fontWeight: 600 }}>{a.label}</span>
+                  <span style={{ color: cor, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                    <Icone nome={icone} tamanho={12} /> {vA} → {vB}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {historico.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--cor-marca)", marginBottom: 8 }}>Histórico</div>
-          {historico.slice(1, 4).map((h, i) => (
-            <div key={i} style={{ fontSize: 11, color: "#6B7280", padding: "6px 10px", background: "#F9FAFB", borderRadius: 8, marginBottom: 4 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--cor-marca)", marginBottom: 8 }}>Histórico de sessões</div>
+          {historico.slice(0, 5).map((h, i) => (
+            <div key={i} style={{ fontSize: 11, color: "#6B7280", padding: "6px 10px", background: i === 0 ? "#F3E8FF" : "#F9FAFB", borderRadius: 8, marginBottom: 4 }}>
               {h.data} — {(h.areas || []).map((a) => `${a.area}: ${a.valor}`).join(" · ")}
             </div>
           ))}
