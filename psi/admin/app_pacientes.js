@@ -907,9 +907,9 @@ function AbaRastreamentoView({ usuario, paciente, tipo, aoVoltar }) {
   const [docs, setDocs] = useState([]);
   const [ajustesPorDoc, setAjustesPorDoc] = useState({});
   const ajustesDe = (d) => ajustesPorDoc[d.id] || d.ajustesClinicos || {};
-  async function ajustarDoc(d, chave, valor) {
+  async function ajustarDocLote(d, mapa) {
     const novo = { ...ajustesDe(d) };
-    if (valor === null) delete novo[chave]; else novo[chave] = valor;
+    Object.keys(mapa).forEach((k) => { if (mapa[k] === null) delete novo[k]; else novo[k] = mapa[k]; });
     setAjustesPorDoc((m) => ({ ...m, [d.id]: novo }));
     try { await db.collection("clinica_rastreamento_" + tipo).doc(d.id).update({ ajustesClinicos: novo }); }
     catch (e) { alert("Não foi possível salvar sua resposta: " + e.message); }
@@ -1107,7 +1107,7 @@ ${linhasPorDoc}
                 </div>
                 {aberto && (
                   <div style={{ borderTop: "1px solid #E5E7EB", padding: 16 }}>
-                    <div style={{ marginBottom: 12 }}><ListaCriteriosDSM5 criterios={[g.criterio]} aoAjustar={(chave, v) => ajustarDoc(doc, chave, v)} /></div>
+                    <div style={{ marginBottom: 12 }}><ListaCriteriosDSM5 criterios={[g.criterio]} aoAjustarLote={(mapa) => ajustarDocLote(doc, mapa)} /></div>
                     {config.perguntas.map((p) => (
                       <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
                         <div style={{
@@ -1253,16 +1253,16 @@ function useAjustesClinicos(colecao, doc) {
   const [ajustes, setAjustes] = useState({});
   const docId = doc?.id;
   useEffect(() => { setAjustes(doc?.ajustesClinicos || {}); }, [docId]);
-  async function ajustar(chave, valor) {
+  async function ajustarLote(mapa) {
     const novo = { ...ajustes };
-    if (valor === null) delete novo[chave]; else novo[chave] = valor;
+    Object.keys(mapa).forEach((k) => { if (mapa[k] === null) delete novo[k]; else novo[k] = mapa[k]; });
     setAjustes(novo);
     if (docId) {
       try { await db.collection(colecao).doc(docId).update({ ajustesClinicos: novo }); }
-      catch (e) { alert("Não foi possível salvar sua resposta: " + e.message); }
+      catch (e) { alert("Não foi possível salvar suas respostas: " + e.message); }
     }
   }
-  return [ajustes, ajustar];
+  return [ajustes, ajustarLote];
 }
 
 // Lista de diagnósticos com painel "Reavaliar com a entrevista": a
@@ -1279,63 +1279,90 @@ function BotaoTri({ ativo, rotulo, cor, onClick }) {
   );
 }
 
-function ListaCriteriosDSM5({ criterios, aoAjustar }) {
-  const [abertos, setAbertos] = useState({});
+function ListaCriteriosDSM5({ criterios, aoAjustarLote }) {
+  // As respostas ficam "pendentes" até a psicóloga clicar em
+  // Recalcular — só então o diagnóstico muda e tudo é salvo.
+  const [pendente, setPendente] = useState({});
+  const [aviso, setAviso] = useState("");
+  const [gravando, setGravando] = useState(false);
+  const atualDe = (chave, salvo) => (chave in pendente ? pendente[chave] : salvo);
+  function marcar(chave, salvo, valor) {
+    setAviso("");
+    setPendente((p) => ({ ...p, [chave]: atualDe(chave, salvo) === valor ? null : valor }));
+  }
+  const qtdPendente = Object.keys(pendente).length;
+  async function recalcular() {
+    setGravando(true);
+    await aoAjustarLote(pendente);
+    setPendente({});
+    setGravando(false);
+    setAviso("Diagnóstico recalculado com base nas suas respostas.");
+  }
+  const total = criterios.reduce((s, c) => s + (c.conf ? c.conf.length : 0) + (c.itens ? c.itens.length : 0), 0);
   return (
     <div>
-      {criterios.map((c, i) => {
-        const aberto = !!abertos[c.nome];
-        const temItens = c.itens && c.itens.length > 0;
-        return (
-          <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
-              <CorBadgeCriterio atende={c.atende} rotulo={c.labelStatus} />
-            </div>
-            <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
-            {temItens && (
-              <div style={{ marginTop: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setAbertos((a) => ({ ...a, [c.nome]: !aberto }))}
-                  style={{ background: "none", border: "none", color: "var(--cor-marca)", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}
-                >
-                  {aberto ? "Fechar reavaliação" : "Reavaliar com a entrevista"}
-                </button>
-                {aberto && (
-                  <div style={{ marginTop: 8, background: "#F9FAFB", borderRadius: 8, padding: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Critérios — confirme ou corrija</div>
-                    {c.itens.map((it) => (
-                      <div key={it.chave} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #F3F4F6", flexWrap: "wrap" }}>
-                        <div style={{ flex: 1, minWidth: 180, fontSize: 12, color: "#374151" }}>
-                          {it.texto}
-                          <span style={{ fontSize: 10, color: "#9CA3AF", marginLeft: 6 }}>
-                            {it.ajuste ? "definido por você" : it.automatico ? "indicado no questionário" : "não indicado no questionário"}
-                          </span>
-                        </div>
-                        <BotaoTri ativo={it.ajuste === "sim"} rotulo="Presente" cor="#DC2626" onClick={() => aoAjustar(it.chave, it.ajuste === "sim" ? null : "sim")} />
-                        <BotaoTri ativo={it.ajuste === "nao"} rotulo="Ausente" cor="#16A34A" onClick={() => aoAjustar(it.chave, it.ajuste === "nao" ? null : "nao")} />
-                      </div>
-                    ))}
-                    {c.conf && c.conf.length > 0 && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Perguntas da entrevista (requisitos do DSM-5)</div>
-                        {c.conf.map((q) => (
-                          <div key={q.chave} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #F3F4F6", flexWrap: "wrap" }}>
-                            <div style={{ flex: 1, minWidth: 180, fontSize: 12, color: "#374151" }}>{q.texto}</div>
-                            <BotaoTri ativo={q.resposta === "sim"} rotulo="Sim" cor="#16A34A" onClick={() => aoAjustar(q.chave, q.resposta === "sim" ? null : "sim")} />
-                            <BotaoTri ativo={q.resposta === "nao"} rotulo="Não" cor="#DC2626" onClick={() => aoAjustar(q.chave, q.resposta === "nao" ? null : "nao")} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+      {criterios.map((c, i) => (
+        <div key={i} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 700, fontSize: 13 }}>{c.label}</span>
+            <CorBadgeCriterio atende={c.atende} rotulo={c.labelStatus} />
           </div>
-        );
-      })}
+          <div style={{ fontSize: 12, color: "#4B5563" }}>{c.obs}</div>
+
+          {c.conf && c.conf.length > 0 && (
+            <div style={{ marginTop: 10, background: "#FFF7ED", borderLeft: "3px solid #F97316", borderRadius: "0 8px 8px 0", padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#9A3412", marginBottom: 6 }}>Perguntas para a entrevista</div>
+              {c.conf.map((q) => {
+                const v = atualDe(q.chave, q.resposta);
+                return (
+                  <div key={q.chave} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 200, fontSize: 12.5, color: "#374151" }}>{q.texto}</div>
+                    <BotaoTri ativo={v === "sim"} rotulo="Sim" cor="#16A34A" onClick={() => marcar(q.chave, q.resposta, "sim")} />
+                    <BotaoTri ativo={v === "nao"} rotulo="Não" cor="#DC2626" onClick={() => marcar(q.chave, q.resposta, "nao")} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {c.itens && c.itens.length > 0 && (
+            <div style={{ marginTop: 10, background: "#F9FAFB", borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#4B5563", marginBottom: 6 }}>Critérios — confirme ou corrija após a entrevista</div>
+              {c.itens.map((it) => {
+                const v = atualDe(it.chave, it.ajuste);
+                const presente = v === "sim" ? true : v === "nao" ? false : it.automatico;
+                return (
+                  <div key={it.chave} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #F3F4F6", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 200, fontSize: 12, color: "#374151" }}>
+                      {it.texto}
+                      <span style={{ fontSize: 10, color: presente ? "#DC2626" : "#16A34A", marginLeft: 6, fontWeight: 600 }}>
+                        {v ? (presente ? "presente (definido por você)" : "ausente (definido por você)") : presente ? "presente no questionário" : "não indicado no questionário"}
+                      </span>
+                    </div>
+                    <BotaoTri ativo={v === "sim"} rotulo="Presente" cor="#DC2626" onClick={() => marcar(it.chave, it.ajuste, "sim")} />
+                    <BotaoTri ativo={v === "nao"} rotulo="Ausente" cor="#16A34A" onClick={() => marcar(it.chave, it.ajuste, "nao")} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {total > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+          <button type="button" className="botao-primario" onClick={recalcular} disabled={gravando || qtdPendente === 0}>
+            <Icone nome="refresh-cw" tamanho={14} /> {gravando ? "Recalculando..." : "Recalcular diagnóstico"}
+          </button>
+          {qtdPendente > 0 && (
+            <>
+              <span style={{ fontSize: 12, color: "#9A3412" }}>{qtdPendente} resposta(s) ainda não aplicada(s)</span>
+              <button type="button" className="botao-secundario" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => setPendente({})}>Descartar</button>
+            </>
+          )}
+          {aviso && qtdPendente === 0 && <span style={{ fontSize: 12, color: "#16A34A", fontWeight: 600 }}>{aviso}</span>}
+        </div>
+      )}
     </div>
   );
 }
@@ -1682,7 +1709,7 @@ ${respostasHtml}
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
-              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustar={ajustar} />
+              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustarLote={ajustar} />
             </div>
 
             {laudo.atencao.length > 0 && (
@@ -2095,7 +2122,7 @@ function AbaRastreamentoAlimentarView({ usuario, paciente, aoVoltar }) {
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
-              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustar={ajustar} />
+              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustarLote={ajustar} />
             </div>
 
             {laudo.atencao.length > 0 && (
@@ -2390,7 +2417,7 @@ function AbaRastreamentoSexualView({ usuario, paciente, aoVoltar }) {
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
-              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustar={ajustar} />
+              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustarLote={ajustar} />
             </div>
 
             {laudo.atencao.length > 0 && (
@@ -2736,7 +2763,7 @@ function AbaRastreamentoNeuroView({ usuario, paciente, aoVoltar }) {
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Análise DSM-5</div>
-              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustar={ajustar} />
+              <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustarLote={ajustar} />
             </div>
 
             {laudo.atencao.length > 0 && (
