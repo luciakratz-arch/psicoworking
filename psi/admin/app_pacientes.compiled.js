@@ -1005,6 +1005,9 @@ function AbaAnamneseView({
 }) {
   const [anamnese, setAnamnese] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  const [gerandoLink, setGerandoLink] = useState(false);
+  const [linkGerado, setLinkGerado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
   useEffect(() => {
     db.collection("clinica_anamneses").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).limit(1).get().then(snap => {
       if (!snap.empty) setAnamnese({
@@ -1014,6 +1017,51 @@ function AbaAnamneseView({
       setCarregando(false);
     }).catch(() => setCarregando(false));
   }, [usuario.psiId, paciente.id]);
+
+  // Gera o link público do formulário de Anamnese, igual ao "Enviar
+  // para paciente" dos Recursos Terapêuticos — mesma coleção
+  // clinica_links_partilhados, só que com tipo "anamnese" em vez de
+  // apontar pra um item do catálogo (gerarTokenLink vem de
+  // app_recursos.js, carregado antes deste script no index.html).
+  async function gerarLinkAnamnese() {
+    setGerandoLink(true);
+    try {
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        tipo: "anamnese",
+        titulo: "Formulário de Anamnese",
+        nomeClinica: cfg.nome || "PsiCoWorking",
+        corMarca: cfg.corPrimaria || "#6A2BD9",
+        logoUrl: cfg.logoUrl || "",
+        status: "enviado",
+        cancelado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setLinkGerado(window.location.origin + "/psi/atividade/?t=" + token);
+    } catch (e) {
+      alert("Não foi possível gerar o link: " + e.message);
+    } finally {
+      setGerandoLink(false);
+    }
+  }
+  function abrirWhatsAppAnamnese() {
+    const primeiroNome = (paciente.nome || "").split(" ")[0];
+    const mensagem = `Olá, ${primeiroNome}!\n\n` + `Antes da nossa sessão, preciso que você preencha um formulário com algumas informações — leva de 10 a 20 minutos.\n\n` + `É só abrir o link abaixo no celular e responder com calma:\n\n` + `${linkGerado}\n\n` + `Qualquer dúvida, me chama por aqui.`;
+    const numero = (paciente.telefone || "").replace(/\D/g, "");
+    const url = numero ? "https://wa.me/55" + numero + "?text=" + encodeURIComponent(mensagem) : "https://wa.me/?text=" + encodeURIComponent(mensagem);
+    window.open(url, "_blank");
+  }
+  function copiarLinkAnamnese() {
+    navigator.clipboard.writeText(linkGerado).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
   const LABELS = {
     perfil: "Perfil",
     informanteTipo: "Quem respondeu",
@@ -1083,8 +1131,49 @@ function AbaAnamneseView({
   }), " Voltar para Question\xE1rios"), carregando && /*#__PURE__*/React.createElement("p", null, "Carregando..."), !carregando && !anamnese && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("p", {
-    className: "texto-vazio"
-  }, "Nenhuma anamnese encontrada para ", paciente.nome, ". Ela \xE9 preenchida pelo pr\xF3prio paciente num formul\xE1rio p\xFAblico \u2014 o Portal do Paciente do PsiCoWorking ainda n\xE3o tem essa etapa pronta, ent\xE3o por enquanto n\xE3o h\xE1 como o paciente enviar essa resposta ainda.")), !carregando && anamnese && /*#__PURE__*/React.createElement("div", {
+    className: "texto-vazio",
+    style: {
+      marginBottom: 16
+    }
+  }, "Nenhuma anamnese encontrada para ", paciente.nome, ". Ela \xE9 preenchida pelo pr\xF3prio paciente num formul\xE1rio p\xFAblico \u2014 sem precisar de login, direto pelo celular."), !linkGerado ? /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: gerarLinkAnamnese,
+    disabled: gerandoLink
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "link",
+    tamanho: 15
+  }), " ", gerandoLink ? "Gerando..." : "Gerar link do formulário") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F9FAFB",
+      border: "1px solid #E5E7EB",
+      borderRadius: 10,
+      padding: "10px 12px",
+      fontSize: 12,
+      wordBreak: "break-all",
+      marginBottom: 12
+    }
+  }, linkGerado), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: copiarLinkAnamnese
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: copiado ? "check" : "link",
+    tamanho: 14
+  }), " ", copiado ? "Copiado!" : "Copiar link"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: abrirWhatsAppAnamnese,
+    style: {
+      background: "#25D366"
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "message-circle",
+    tamanho: 14
+  }), " Enviar pelo WhatsApp")))), !carregando && anamnese && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("div", {
     className: "cabecalho-secao-lanc",
