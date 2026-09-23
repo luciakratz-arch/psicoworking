@@ -942,14 +942,432 @@ const QUESTIONARIOS_DISPONIVEIS = [{
   rotulo: "Dependência Química e Substâncias",
   icone: "triangle-alert",
   desc: "Rastreamento DSM-5 para Transtornos por Uso de Substâncias.",
-  pronto: false
+  pronto: true
 }, {
   id: "jogos",
   rotulo: "Jogos e Apostas",
   icone: "dice-5",
   desc: "Rastreamento de Gaming e Gambling Disorder (DSM-5 / CID-11).",
-  pronto: false
+  pronto: true
 }];
+
+// Dados de cada instrumento de rastreamento já portado — a lista
+// completa de perguntas (mesma ordem/texto do formulário público em
+// psi/atividade/formulario-rastreamento.js) e a fórmula de gravidade,
+// que é igual nos dois: soma de respostas B+C contra os limiares do
+// modelo original (2-3 leve, 4-5 moderada, 6+ grave).
+const RASTREAMENTOS_ADMIN = {
+  jogos: {
+    titulo: "Rastreamento de Dependência de Jogos e Apostas",
+    subtitulo: "9 critérios DSM-5 / CID-11 · Instrumento aplicado ao paciente e/ou familiares",
+    totalCriterios: 9,
+    perguntas: [{
+      id: "p1",
+      modulo: "Preocupação/Abstinência",
+      texto: "Preocupação mental excessiva com jogos"
+    }, {
+      id: "p2",
+      modulo: "Preocupação/Abstinência",
+      texto: "Sintomas de abstinência ao parar (irritabilidade, ansiedade)"
+    }, {
+      id: "p3",
+      modulo: "Tolerância/Controle",
+      texto: "Tolerância — necessidade crescente de tempo ou dinheiro"
+    }, {
+      id: "p4",
+      modulo: "Tolerância/Controle",
+      texto: "Tentativas infrutíferas de controlar ou cessar o jogo"
+    }, {
+      id: "p5",
+      modulo: "Tolerância/Controle",
+      texto: "Abandono de outros hobbies e atividades sociais"
+    }, {
+      id: "p6",
+      modulo: "Consequências",
+      texto: "Continuidade apesar de problemas graves"
+    }, {
+      id: "p7",
+      modulo: "Consequências",
+      texto: "Ocultação e mentiras sobre a extensão do hábito"
+    }, {
+      id: "p8",
+      modulo: "Consequências",
+      texto: "Uso do jogo como fuga de problemas emocionais"
+    }, {
+      id: "p9",
+      modulo: "Prejuízo Funcional",
+      texto: "Perda ou risco severo de emprego, estudos ou relacionamentos"
+    }]
+  },
+  dependencia: {
+    titulo: "Rastreamento de Dependência Química e Substâncias",
+    subtitulo: "11 critérios DSM-5 · Instrumento aplicado ao paciente e/ou familiares",
+    totalCriterios: 11,
+    perguntas: [{
+      id: "p1",
+      modulo: "Controle Prejudicado",
+      texto: "Consumo em maiores quantidades ou por mais tempo do que o pretendido"
+    }, {
+      id: "p2",
+      modulo: "Controle Prejudicado",
+      texto: "Desejo persistente ou esforços infrutíferos para controlar o uso"
+    }, {
+      id: "p3",
+      modulo: "Controle Prejudicado",
+      texto: "Despendimento excessivo de tempo com a substância"
+    }, {
+      id: "p4",
+      modulo: "Controle Prejudicado",
+      texto: "Fissura (craving) — desejo imperioso de usar"
+    }, {
+      id: "p5",
+      modulo: "Prejuízo Social",
+      texto: "Falha no cumprimento de obrigações importantes"
+    }, {
+      id: "p6",
+      modulo: "Prejuízo Social",
+      texto: "Uso contínuo apesar de problemas sociais ou interpessoais"
+    }, {
+      id: "p7",
+      modulo: "Prejuízo Social",
+      texto: "Abandono de atividades importantes por causa do uso"
+    }, {
+      id: "p8",
+      modulo: "Uso de Risco",
+      texto: "Uso em situações de perigo físico"
+    }, {
+      id: "p9",
+      modulo: "Uso de Risco",
+      texto: "Uso contínuo apesar de problemas físicos ou psicológicos"
+    }, {
+      id: "p10",
+      modulo: "Farmacológico",
+      texto: "Tolerância — necessidade de doses crescentes"
+    }, {
+      id: "p11",
+      modulo: "Farmacológico",
+      texto: "Abstinência — síndrome ao parar ou uso para evitar mal-estar"
+    }]
+  }
+};
+function gravidadeRastreamento(doc, perguntas) {
+  const C = perguntas.filter(p => doc[p.id] === "C").length;
+  const B = perguntas.filter(p => doc[p.id] === "B").length;
+  const total = C + B;
+  let rotulo, cor;
+  if (total >= 6) {
+    rotulo = "Grave (6+ critérios)";
+    cor = "#DC2626";
+  } else if (total >= 4) {
+    rotulo = "Moderada (4-5 critérios)";
+    cor = "#D97706";
+  } else if (total >= 2) {
+    rotulo = "Leve (2-3 critérios)";
+    cor = "#B45309";
+  } else {
+    rotulo = "Abaixo do limiar diagnóstico";
+    cor = "#16A34A";
+  }
+  return {
+    B,
+    C,
+    total,
+    rotulo,
+    cor
+  };
+}
+const COR_LETRA_RASTREAMENTO = {
+  A: "#16A34A",
+  B: "#D97706",
+  C: "#DC2626"
+};
+
+// Visualizador de qualquer rastreamento já portado (Jogos, Dependência
+// Química, e os próximos que forem sendo adicionados a
+// RASTREAMENTOS_ADMIN) — mesmo componente serve todos, só muda a
+// config e a coleção.
+function AbaRastreamentoView({
+  usuario,
+  paciente,
+  tipo,
+  aoVoltar
+}) {
+  const config = RASTREAMENTOS_ADMIN[tipo];
+  const [docs, setDocs] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [selecionado, setSelecionado] = useState(null);
+  const [gerandoLink, setGerandoLink] = useState(false);
+  const [linkGerado, setLinkGerado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
+  useEffect(() => {
+    db.collection("clinica_rastreamento_" + tipo).where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).get().then(snap => {
+      const lista = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+      lista.sort((a, b) => (b.criadoEm?.seconds || 0) - (a.criadoEm?.seconds || 0));
+      setDocs(lista);
+      setCarregando(false);
+    }).catch(() => setCarregando(false));
+  }, [usuario.psiId, paciente.id, tipo]);
+  async function gerarLink() {
+    setGerandoLink(true);
+    try {
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        tipo,
+        titulo: config.titulo,
+        nomeClinica: cfg.nome || "PsiCoWorking",
+        corMarca: cfg.corPrimaria || "#6A2BD9",
+        logoUrl: cfg.logoUrl || "",
+        status: "enviado",
+        cancelado: false,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setLinkGerado(window.location.origin + "/psi/atividade/?t=" + token);
+    } catch (e) {
+      alert("Não foi possível gerar o link: " + e.message);
+    } finally {
+      setGerandoLink(false);
+    }
+  }
+  function abrirWhatsApp() {
+    const primeiroNome = (paciente.nome || "").split(" ")[0];
+    const mensagem = `Olá, ${primeiroNome}!\n\n` + `Preparei um questionário clínico para você preencher: *${config.titulo}*.\n\n` + `Leva alguns minutos — é só abrir o link abaixo e responder com calma:\n\n` + `${linkGerado}\n\n` + `Qualquer dúvida, me chama por aqui.`;
+    const numero = (paciente.telefone || "").replace(/\D/g, "");
+    const url = numero ? "https://wa.me/55" + numero + "?text=" + encodeURIComponent(mensagem) : "https://wa.me/?text=" + encodeURIComponent(mensagem);
+    window.open(url, "_blank");
+  }
+  function copiarLink() {
+    navigator.clipboard.writeText(linkGerado).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
+
+  // Gera o laudo em PDF (via impressão do navegador) com a marca da
+  // própria clínica — mesmo recurso do modelo, adaptado pra não ter
+  // o nome da Dra. Lucia fixo no documento.
+  async function gerarLaudo() {
+    if (docs.length === 0) return;
+    const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+    const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+    const nomeClinica = cfg.nome || "PsiCoWorking";
+    const pacNome = paciente.nome || "Paciente";
+    const dataDoc = new Date().toLocaleDateString("pt-BR");
+    const linhasPorDoc = docs.map(doc => {
+      const g = gravidadeRastreamento(doc, config.perguntas);
+      const respondente = doc.tipoRespondente === "paciente" ? "Próprio paciente" : (doc.nomeRespondente || "Familiar") + " (" + (doc.parentesco || "—") + ")";
+      const linhasPerguntas = config.perguntas.map(p => `<tr><td>${p.id.replace("p", "")}</td><td>${p.texto}</td><td>${p.modulo}</td><td style="font-weight:700;color:${COR_LETRA_RASTREAMENTO[doc[p.id]] || "#6b7280"}">${doc[p.id] || "—"}</td></tr>`).join("");
+      const obsLinha = doc.obsFinais ? `<tr><td colspan="2"><strong>Observações</strong></td><td colspan="2">${doc.obsFinais}</td></tr>` : "";
+      return `
+        <h2>Respondente: ${respondente}</h2>
+        <div class="gravidade">Critérios preenchidos: ${g.total}/${config.totalCriterios} &nbsp;·&nbsp; ${g.rotulo}</div>
+        <p style="font-size:12px;color:#4b5563;margin-bottom:10px">Respostas C (critério pleno): <strong>${g.C}</strong> &nbsp;|&nbsp; Respostas B (parcial/subclínico): <strong>${g.B}</strong></p>
+        <table class="resp-table"><thead><tr><th>#</th><th>Critério</th><th>Módulo</th><th>Resp.</th></tr></thead><tbody>${linhasPerguntas}${obsLinha}</tbody></table>`;
+    }).join("");
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<title>Laudo ${config.titulo} — ${pacNome}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;color:#1f2937;padding:32px;max-width:800px;margin:0 auto;font-size:13px;line-height:1.6}
+h1{font-size:20px;color:#3d006a;margin-bottom:4px}
+h2{font-size:14px;color:#7B00C4;margin:20px 0 8px;border-bottom:1px solid #ede9fe;padding-bottom:4px}
+.header{border-bottom:2px solid #7B00C4;padding-bottom:16px;margin-bottom:20px}
+.sub{font-size:12px;color:#6b7280;margin-top:2px}
+.gravidade{background:#f5f3ff;border:1px solid #c4b5fd;border-radius:10px;padding:14px 18px;margin:12px 0;font-size:15px;font-weight:700;color:#3d006a}
+.resp-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11.5px}
+.resp-table th{background:#f5f3ff;padding:6px 10px;text-align:left;font-size:10.5px;color:#7B00C4;border:1px solid #ede9fe}
+.resp-table td{padding:6px 10px;border:1px solid #e5e7eb;vertical-align:top}
+.resp-table tr:nth-child(even) td{background:#fafafa}
+.rodape{margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center}
+@media print{body{padding:16px}.no-print{display:none}}
+</style></head><body>
+<div class="no-print" style="margin-bottom:20px">
+  <button onclick="window.print()" style="background:#7B00C4;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px">Imprimir / Salvar PDF</button>
+</div>
+<div class="header">
+  <h1>Laudo — ${config.titulo}</h1>
+  <div class="sub">Paciente: <strong>${pacNome}</strong> · Data: ${dataDoc} · ${nomeClinica}</div>
+  <div class="sub">Respondentes: ${docs.length} (${docs.map(d => d.tipoRespondente === "paciente" ? "próprio paciente" : d.parentesco || "familiar").join(", ")})</div>
+</div>
+${linhasPorDoc}
+<div class="rodape">Documento gerado em ${dataDoc} · Uso exclusivo para fins clínicos · Confidencial · LGPD</div>
+</body></html>`;
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario botao-voltar-perfil",
+    onClick: aoVoltar,
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 15
+  }), " Voltar para Question\xE1rios"), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      marginBottom: 2
+    }
+  }, config.titulo), /*#__PURE__*/React.createElement("p", {
+    className: "subtitulo-pagina",
+    style: {
+      marginBottom: 20
+    }
+  }, config.subtitulo), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap",
+      marginBottom: 20
+    }
+  }, !linkGerado ? /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: gerarLink,
+    disabled: gerandoLink
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "link",
+    tamanho: 15
+  }), " ", gerandoLink ? "Gerando..." : "Gerar link do questionário") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: copiarLink
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: copiado ? "check" : "link",
+    tamanho: 14
+  }), " ", copiado ? "Copiado!" : "Copiar link"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: abrirWhatsApp,
+    style: {
+      background: "#25D366"
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "message-circle",
+    tamanho: 14
+  }), " Enviar pelo WhatsApp")), docs.length > 0 && /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: gerarLaudo
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "file-text",
+    tamanho: 14
+  }), " Gerar laudo em PDF")), carregando && /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Carregando..."), !carregando && docs.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhuma resposta recebida ainda. Gere o link acima e envie ao paciente ou familiar.")), !carregando && docs.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 12
+    }
+  }, docs.map(doc => {
+    const g = gravidadeRastreamento(doc, config.perguntas);
+    const aberto = selecionado === doc.id;
+    return /*#__PURE__*/React.createElement("div", {
+      key: doc.id,
+      style: {
+        border: "1px solid #E5E7EB",
+        borderRadius: 12,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => setSelecionado(aberto ? null : doc.id),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "14px 16px",
+        cursor: "pointer",
+        background: aberto ? "#F5F3FF" : "white"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 13
+      }
+    }, doc.tipoRespondente === "paciente" ? "Próprio paciente" : (doc.nomeRespondente || "Familiar") + " · " + (doc.parentesco || "")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--texto-suave)",
+        marginTop: 2
+      }
+    }, doc.criadoEm?.seconds ? new Date(doc.criadoEm.seconds * 1000).toLocaleDateString("pt-BR") : "—")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 12,
+        color: g.cor
+      }
+    }, g.rotulo), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--texto-suave)",
+        marginTop: 2
+      }
+    }, g.total, " crit\xE9rios / ", config.totalCriterios))), aberto && /*#__PURE__*/React.createElement("div", {
+      style: {
+        borderTop: "1px solid #E5E7EB",
+        padding: 16
+      }
+    }, config.perguntas.map(p => /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "6px 0",
+        borderBottom: "1px solid #F3F4F6"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 24,
+        height: 24,
+        minWidth: 24,
+        borderRadius: "50%",
+        background: doc[p.id] ? COR_LETRA_RASTREAMENTO[doc[p.id]] + "22" : "#F3F4F6",
+        border: "2px solid " + (doc[p.id] ? COR_LETRA_RASTREAMENTO[doc[p.id]] : "#E5E7EB"),
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 10,
+        fontWeight: 700,
+        color: doc[p.id] ? COR_LETRA_RASTREAMENTO[doc[p.id]] : "#9CA3AF"
+      }
+    }, doc[p.id] || "—"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#374151",
+        flex: 1
+      }
+    }, p.texto), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#9CA3AF",
+        whiteSpace: "nowrap"
+      }
+    }, p.modulo))), doc.obsFinais && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 12,
+        background: "#F9FAFB",
+        borderRadius: 8,
+        padding: "10px 12px",
+        fontSize: 12,
+        color: "#4B5563"
+      }
+    }, /*#__PURE__*/React.createElement("strong", null, "Observa\xE7\xF5es:"), " ", doc.obsFinais)));
+  })));
+}
 function AbaQuestionariosPaciente({
   usuario,
   paciente
@@ -959,6 +1377,14 @@ function AbaQuestionariosPaciente({
     return /*#__PURE__*/React.createElement(AbaAnamneseView, {
       usuario: usuario,
       paciente: paciente,
+      aoVoltar: () => setAberto(null)
+    });
+  }
+  if (aberto && RASTREAMENTOS_ADMIN[aberto]) {
+    return /*#__PURE__*/React.createElement(AbaRastreamentoView, {
+      usuario: usuario,
+      paciente: paciente,
+      tipo: aberto,
       aoVoltar: () => setAberto(null)
     });
   }

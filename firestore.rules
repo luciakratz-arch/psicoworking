@@ -121,6 +121,17 @@ service cloud.firestore {
                            && request.resource.data.pacienteId == request.auth.uid;
     }
 
+    // Rastreamentos DSM-5 (jogos, dependência química, e os que forem
+    // sendo portados depois). Só chegam por link público — a Cloud
+    // Function salvarAtividadePublica grava com o Admin SDK, então
+    // aqui só precisa de regra de leitura/edição pra equipe da clínica.
+    match /clinica_rastreamento_jogos/{registroId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+    }
+    match /clinica_rastreamento_dependencia/{registroId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+    }
+
     match /clinica_tcc/{registroId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'

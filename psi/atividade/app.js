@@ -78,6 +78,7 @@ function AppAtividade() {
   const item = link.item || {};
   const primeiroNome = (link.pacienteNome || "").split(" ")[0];
   const ehAnamnese = link.tipo === "anamnese";
+  const ehRastreamento = typeof CONFIGS_RASTREAMENTO !== "undefined" && !!CONFIGS_RASTREAMENTO[link.tipo];
 
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
   const blocos = Array.isArray(item.blocos) ? item.blocos : [];
@@ -89,18 +90,20 @@ function AppAtividade() {
         {link.logoUrl
           ? <img src={link.logoUrl} alt={link.nomeClinica || ""} />
           : <div style={{ fontWeight: 700, fontSize: 15 }}>{link.nomeClinica || "PsiCoWorking"}</div>}
-        <div style={{ fontSize: 12.5, opacity: 0.85 }}>{ehAnamnese ? "Formulário de Anamnese" : "Atividade terapêutica"}</div>
+        <div style={{ fontSize: 12.5, opacity: 0.85 }}>{ehAnamnese || ehRastreamento ? "Formulário clínico" : "Atividade terapêutica"}</div>
       </div>
 
       <div className="envelope-atividade">
         {primeiroNome && (
           <p style={{ fontSize: 14.5, marginBottom: 14 }}>
-            Olá, <strong>{primeiroNome}</strong>. {ehAnamnese ? "Preencha o formulário abaixo com calma." : "Esta atividade foi preparada para você."}
+            Olá, <strong>{primeiroNome}</strong>. {ehAnamnese || ehRastreamento ? "Preencha o formulário abaixo com calma." : "Esta atividade foi preparada para você."}
           </p>
         )}
 
         {ehAnamnese ? (
           <FormularioAnamnese link={link} />
+        ) : ehRastreamento ? (
+          <FormularioRastreamento link={link} />
         ) : (
           <div className="cartao">
             <h2 style={{ margin: "0 0 6px" }}>{item.titulo || item.nome}</h2>
