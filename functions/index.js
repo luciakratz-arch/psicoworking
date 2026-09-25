@@ -192,6 +192,86 @@ async function criarPacienteEConta({ psiId, status, dadosPaciente, criadoPor }) 
 }
 
 // ─────────────────────────────────────────────────────────────
+// 2c) CADASTRO DE PSICÓLOGA — só Admin Matriz pode chamar.
+//     Cria conta Firebase Auth + carimbo psi + perfil público.
+//     Retorna o link de definição de senha pra Admin Matriz
+//     enviar pra ela por WhatsApp/e-mail.
+// ─────────────────────────────────────────────────────────────
+exports.cadastrarPsicologa = onCall(async (request) => {
+  const chamador = request.auth;
+  if (!chamador || chamador.token.role !== "admin_matriz") {
+    throw new HttpsError("permission-denied", "Só a Admin Matriz pode cadastrar psicólogas.");
+  }
+
+  const { nome, email, crp, cidade, titulo } = request.data || {};
+  if (!nome || !email) {
+    throw new HttpsError("invalid-argument", "Nome e e-mail são obrigatórios.");
+  }
+
+  const usuarioCriado = await auth.createUser({ email, displayName: nome });
+  const uid = usuarioCriado.uid;
+
+  await auth.setCustomUserClaims(uid, { psi_id: uid, role: "psi" });
+
+  await db.collection("psi_profiles").doc(uid).set({
+    nome,
+    email,
+    crp: crp || "",
+    cidade: cidade || "",
+    titulo: titulo || "Psicóloga",
+    ativo: true,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await db.collection("psi_config").doc(uid).set({
+    nome,
+    corPrimaria: "#6A2BD9",
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  const linkDefinirSenha = await auth.generatePasswordResetLink(email);
+
+  await db.collection("clinica_audit_log").add({
+    acao: "cadastrar_psicologa",
+    alvoUid: uid,
+    email,
+    executadoPor: chamador.uid,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { ok: true, uid, linkDefinirSenha };
+});
+
+// ─────────────────────────────────────────────────────────────
+// 2d) ATIVAR / DESATIVAR CLÍNICA — só Admin Matriz.
+//     Bloqueia o login da psicóloga no Firebase Auth e marca
+//     psi_profiles.ativo para a listagem do painel refletir.
+// ─────────────────────────────────────────────────────────────
+exports.ativarDesativarClinica = onCall(async (request) => {
+  const chamador = request.auth;
+  if (!chamador || chamador.token.role !== "admin_matriz") {
+    throw new HttpsError("permission-denied", "Só a Admin Matriz pode ativar ou desativar clínicas.");
+  }
+
+  const { psiId, ativo } = request.data || {};
+  if (!psiId || typeof ativo !== "boolean") {
+    throw new HttpsError("invalid-argument", "psiId e ativo (boolean) são obrigatórios.");
+  }
+
+  await auth.updateUser(psiId, { disabled: !ativo });
+  await db.collection("psi_profiles").doc(psiId).update({ ativo });
+
+  await db.collection("clinica_audit_log").add({
+    acao: ativo ? "ativar_clinica" : "desativar_clinica",
+    alvoUid: psiId,
+    executadoPor: chamador.uid,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { ok: true };
+});
+
+// ─────────────────────────────────────────────────────────────
 // 3) Auditoria de segurança extra
 // ─────────────────────────────────────────────────────────────
 exports.auditarCriacaoPaciente = onDocumentCreated(

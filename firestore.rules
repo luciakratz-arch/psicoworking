@@ -329,17 +329,20 @@ service cloud.firestore {
     // PsiCoWorking, igual um "catálogo"). Qualquer pessoa logada lê
     // (paciente também, agora que o Portal do Paciente existe) — só
     // a equipe da clínica edita o catálogo.
+    // Catálogo compartilhado: qualquer pessoa logada lê (paciente também),
+    // mas só a Admin Matriz edita — o catálogo é editorial da plataforma,
+    // não é conteúdo de uma clínica só.
     match /recursos_terapeuticos/{id} {
       allow read: if estaLogado();
-      allow write: if ehEquipeDeAlgumaClinica();
+      allow write: if ehAdminMatriz();
     }
     match /fabulas_terapeuticas/{id} {
       allow read: if estaLogado();
-      allow write: if ehEquipeDeAlgumaClinica();
+      allow write: if ehAdminMatriz();
     }
     match /psicoeducacao_conteudos/{id} {
       allow read: if estaLogado();
-      allow write: if ehEquipeDeAlgumaClinica();
+      allow write: if ehAdminMatriz();
     }
 
     // ── Reflexões escritas pelo paciente ao final de uma fábula ──
