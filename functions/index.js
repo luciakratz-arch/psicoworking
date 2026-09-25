@@ -719,3 +719,49 @@ exports.verificarAniversarios = onSchedule(
     console.log("Aniversariantes de hoje:", aniversariantes.map((p) => p.nome).join(", "));
   }
 );
+
+// ─────────────────────────────────────────────────────────────
+// BACKUP DIÁRIO DO FIRESTORE
+// Roda todo dia às 03:00 (horário de Brasília) e exporta todo o
+// banco pra um bucket do Cloud Storage, numa pasta com a data.
+// Requer que o bucket "psicoworking-backups" exista no Cloud
+// Storage (criar manualmente no console, região southamerica-east1).
+// A conta de serviço padrão já tem permissão via papel "Editor".
+// ─────────────────────────────────────────────────────────────
+exports.backupFirestoreDiario = onSchedule(
+  {
+    schedule: "0 3 * * *",
+    timeZone: "America/Sao_Paulo",
+    region: "southamerica-east1",
+  },
+  async () => {
+    const google = obterGoogle();
+    const authClient = await new google.auth.GoogleAuth({
+      scopes: ["https://www.googleapis.com/auth/datastore"],
+    }).getClient();
+
+    const projectId = "psicoworking";
+    const data = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const destino = `gs://psicoworking-backups/${data}`;
+
+    const token = await authClient.getAccessToken();
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default):exportDocuments`;
+
+    const resposta = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${typeof token === "string" ? token : token.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ outputUriPrefix: destino }),
+    });
+
+    if (!resposta.ok) {
+      const erro = await resposta.text();
+      throw new Error(`Backup falhou (${resposta.status}): ${erro}`);
+    }
+
+    const resultado = await resposta.json();
+    console.log(`Backup iniciado com sucesso: ${resultado.name} → ${destino}`);
+  }
+);
