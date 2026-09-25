@@ -2,7 +2,7 @@
   "name": "psicoworking-functions",
   "description": "Funções de nuvem (Cloud Functions) do PsiCoWorking — parte responsável por identidade e proteção de dados sensíveis",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "scripts": {
