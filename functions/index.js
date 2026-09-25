@@ -45,7 +45,7 @@ const BOOTSTRAP_SECRET = defineSecret("BOOTSTRAP_SECRET");
 exports.bootstrapAdminMatriz = onRequest(
   { region: "southamerica-east1", secrets: [BOOTSTRAP_SECRET] },
   async (req, res) => {
-    if (req.query.segredo !== BOOTSTRAP_SECRET.value()) {
+    if ((req.query.segredo || "").trim() !== BOOTSTRAP_SECRET.value().trim()) {
       res.status(403).send("Nao autorizado.");
       return;
     }
@@ -62,7 +62,7 @@ exports.bootstrapAdminMatriz = onRequest(
       res.send(
         "<h2>Admin Matriz configurado!</h2>" +
         "<p>UID: " + usuario.uid + "</p>" +
-        "<p>Clique no link abaixo para definir sua senha e depois apague esta function:</p>" +
+        "<p>Clique no link abaixo para definir sua senha:</p>" +
         "<a href='" + linkSenha + "'>" + linkSenha + "</a>"
       );
     } catch (err) {
