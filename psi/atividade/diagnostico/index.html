@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Questionário Clínico</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; background: #F9FAFB; color: #111827; min-height: 100vh; }
+    .container { max-width: 640px; margin: 0 auto; padding: 24px 16px 80px; }
+    .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    h2 { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: #111827; }
+    .subtitulo { font-size: 13px; color: #6B7280; line-height: 1.5; }
+    .questao { margin-bottom: 18px; }
+    .questao-texto { font-size: 13px; color: #374151; margin-bottom: 10px; line-height: 1.5; }
+    .opcoes { display: flex; gap: 8px; flex-wrap: wrap; }
+    .opcao-btn { flex: 1; min-width: 80px; padding: 9px 6px; border-radius: 10px; border: 2px solid #E5E7EB; background: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; color: #374151; text-align: center; }
+    .opcao-btn.ativo-N { border-color: #6B7280; background: #F3F4F6; color: #374151; }
+    .opcao-btn.ativo-B { border-color: #D97706; background: #FFFBEB; color: #92400E; }
+    .opcao-btn.ativo-C { border-color: #16A34A; background: #F0FDF4; color: #166534; }
+    .progresso-bar { height: 6px; background: #E5E7EB; border-radius: 3px; margin-bottom: 6px; overflow: hidden; }
+    .progresso-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+    .btn-primario { display: inline-flex; align-items: center; gap: 8px; background: #6A2BD9; color: white; border: none; border-radius: 10px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-primario:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-secundario { display: inline-flex; align-items: center; gap: 8px; background: #F3F4F6; color: #374151; border: none; border-radius: 10px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .modulo-header { display: flex; align-items: center; gap: 10; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #F3F4F6; }
+    .modulo-num { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
+    .divider { border: none; border-top: 1px solid #F3F4F6; margin: 16px 0; }
+    .aviso { padding: 12px 16px; border-radius: 10px; font-size: 12.5px; line-height: 1.5; margin-bottom: 16px; }
+    textarea { width: 100%; border: 1px solid #D1D5DB; border-radius: 10px; padding: 10px 12px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 80px; color: #374151; }
+    textarea:focus { outline: none; border-color: #6A2BD9; }
+    .nav-botoes { display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; margin-top: 20px; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #E5E7EB; border-top-color: #6A2BD9; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 40px auto; display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .centro { text-align: center; padding: 40px 20px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCJx1RwX5-FM2wcUqzeC_CYAUdkmTKU2u4",
+      authDomain: "psicoworking.firebaseapp.com",
+      projectId: "psicoworking",
+      storageBucket: "psicoworking.firebasestorage.app",
+      messagingSenderId: "176262015536",
+      appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
+    };
+    const appDiag = firebase.initializeApp(firebaseConfig, "psicoworking-diag");
+    const db = appDiag.firestore();
+  </script>
+
+  <script type="text/babel">
+    // ── Banco de perguntas por módulo (escala N/B/C) ──────────────────
+    // N = Não / Nunca    B = Às vezes / Parcialmente    C = Sim / Confirmado
+    const BANCO_PERGUNTAS = {
+      tdm: {
+        rotulo: "Depressão Maior (TDM)",
+        instrucao: "As questões abaixo se referem às últimas 2 semanas. Responda com honestidade.",
+        perguntas: [
+          "Você se sente triste, vazio(a) ou sem esperança na maior parte do dia?",
+          "Perdeu o interesse ou o prazer em atividades que antes gostava?",
+          "Houve mudança significativa no seu peso ou apetite (sem dieta)?",
+          "Tem dificuldade para dormir ou dorme demais?",
+          "Sente-se agitado(a) ou lento(a) a ponto de outras pessoas perceberem?",
+          "Sente-se sem energia ou muito cansado(a) quase todos os dias?",
+          "Sente-se inútil ou se culpa excessivamente por coisas?",
+          "Tem dificuldade para se concentrar, pensar ou tomar decisões?",
+          "Tem tido pensamentos de morte ou de se machucar?",
+        ],
+      },
+      distimia: {
+        rotulo: "Depressão Persistente (Distimia)",
+        instrucao: "Pense nos últimos 2 anos. Esses sintomas aparecem na maior parte dos dias?",
+        perguntas: [
+          "Você fica com o humor deprimido na maior parte do dia, na maioria dos dias?",
+          "Tem pouco apetite ou come demais de forma crônica?",
+          "Tem dificuldade persistente para dormir ou dorme demais?",
+          "Sente-se sem energia ou fatigado(a) de forma constante?",
+          "Tem baixa autoestima — sente-se incapaz ou sem valor com frequência?",
+          "Tem dificuldade crônica de concentração ou de tomar decisões?",
+          "Sente desesperança persistente em relação ao futuro?",
+        ],
+      },
+      ciclotimia: {
+        rotulo: "Ciclotimia",
+        instrucao: "Pense nos últimos 2 anos. Esses padrões de humor se aplicam a você?",
+        perguntas: [
+          "Você tem períodos de humor elevado, expansivo ou irritável (sem chegar a mania completa)?",
+          "Você tem períodos de humor deprimido (sem chegar a depressão maior completa)?",
+          "Esses ciclos de humor se alternam há pelo menos 2 anos?",
+          "Você raramente fica 2 meses seguidos com humor estável?",
+          "Esses altos e baixos de humor afetam sua vida pessoal ou profissional?",
+        ],
+      },
+      bipolar_I: {
+        rotulo: "Transtorno Bipolar tipo I",
+        instrucao: "Pense em períodos em que seu humor estava visivelmente diferente do normal (elevado, expansivo ou irritável). Durante esses períodos:",
+        perguntas: [
+          "Seu humor estava anormalmente elevado, expansivo ou irritável?",
+          "Seu nível de atividade e energia estava muito aumentado?",
+          "Você tinha grandiosidade ou autoestima muito inflada?",
+          "Você precisava de muito menos sono e ainda assim se sentia descansado(a)?",
+          "Você falava mais do que o habitual ou sentia pressão para continuar falando?",
+          "Seus pensamentos disparavam ou você tinha fuga de ideias?",
+          "Você tomou decisões impulsivas com consequências graves (gastos, sexo, negócios)?",
+        ],
+      },
+      bipolar_II: {
+        rotulo: "Transtorno Bipolar tipo II",
+        instrucao: "Pense em períodos mais curtos de humor elevado (hipomanía) intercalados com depressão.",
+        perguntas: [
+          "Você tem períodos de pelo menos 4 dias com humor visivelmente mais elevado ou irritável?",
+          "Nesses períodos você tem mais energia, precisa dormir menos e é mais produtivo(a)?",
+          "Você também tem períodos de humor deprimido que duram semanas?",
+          "Esses dois tipos de humor se alternam ao longo da vida?",
+          "Durante os períodos de elevação, outras pessoas notam mudança no seu comportamento?",
+        ],
+      },
+      tag: {
+        rotulo: "Ansiedade Generalizada (TAG)",
+        instrucao: "Pense nos últimos 6 meses. Esses sintomas ocorrem na maioria dos dias?",
+        perguntas: [
+          "Você se preocupa excessivamente com vários assuntos diferentes (trabalho, saúde, família, etc.)?",
+          "Você tem dificuldade de controlar essas preocupações — elas simplesmente não param?",
+          "Você se sente inquieto(a) ou com os nervos à flor da pele?",
+          "Você fica cansado(a) com facilidade?",
+          "Você tem dificuldade de concentração ou a mente fica em branco?",
+          "Você fica irritável com frequência?",
+          "Você sente tensão ou dores musculares persistentes?",
+          "Você tem dificuldade para dormir ou o sono é agitado e não restaurador?",
+        ],
+      },
+      panico: {
+        rotulo: "Transtorno do Pânico",
+        instrucao: "Você já teve ataques de ansiedade intensa repentina? Durante esses ataques, você sente (ou sentiu):",
+        perguntas: [
+          "Palpitações ou coração acelerado?",
+          "Suor intenso?",
+          "Tremores ou sacudidas?",
+          "Falta de ar ou sensação de sufocamento?",
+          "Sensação de asfixia ou garganta fechada?",
+          "Dor ou desconforto no peito?",
+          "Náusea ou mal-estar no estômago?",
+          "Tontura, desequilíbrio ou quase desmaiar?",
+          "Formigamentos ou dormência?",
+          "Sensação de estar separado(a) de si mesmo(a) ou do ambiente?",
+          "Medo de perder o controle ou 'enlouquecer'?",
+          "Medo de morrer durante o episódio?",
+          "Após um ataque, você ficou preocupado(a) com novos ataques ou mudou seu comportamento para evitá-los?",
+        ],
+      },
+      fobia_social: {
+        rotulo: "Ansiedade Social (Fobia Social)",
+        instrucao: "Pense em situações sociais — estar com outras pessoas, ser observado(a) ou ter que falar em público.",
+        perguntas: [
+          "Você sente ansiedade ou medo intenso em situações sociais?",
+          "Você teme agir de modo que será humilhante ou constrangedor?",
+          "Situações sociais quase sempre provocam ansiedade em você?",
+          "Você evita situações sociais ou as suporta com grande sofrimento?",
+          "Esse medo é desproporcional à ameaça real da situação?",
+          "Esse medo prejudica sua vida profissional, social ou acadêmica?",
+        ],
+      },
+      toc: {
+        rotulo: "TOC — Transtorno Obsessivo-Compulsivo",
+        instrucao: "Pense em pensamentos, impulsos ou rituais que interferem no seu dia a dia.",
+        perguntas: [
+          "Você tem pensamentos, imagens ou impulsos indesejados e recorrentes que causam ansiedade (obsessões)?",
+          "Você faz rituais ou comportamentos repetitivos que sente obrigação de executar (compulsões)?",
+          "Esses rituais visam reduzir a ansiedade das obsessões?",
+          "As obsessões ou compulsões consomem mais de 1 hora por dia?",
+          "Elas causam sofrimento significativo ou prejudicam sua rotina?",
+          "Você sente que algo 'ficou incompleto' se não realizar o ritual?",
+        ],
+      },
+      tept: {
+        rotulo: "TEPT — Estresse Pós-Traumático",
+        instrucao: "Pense em um evento traumático que você viveu ou testemunhou (acidente, violência, abuso, desastre, etc.).",
+        perguntas: [
+          "Você foi exposto(a) a evento traumático que envolveu morte, lesão grave ou violência sexual?",
+          "Você tem memórias intrusivas e angustiantes do trauma (flashbacks ou imagens que 'invadem' sua mente)?",
+          "Você tem pesadelos recorrentes relacionados ao trauma?",
+          "Você sente sofrimento intenso ao ser lembrado(a) do evento (por lugares, datas, cheiros, etc.)?",
+          "Você faz esforços para evitar pensamentos, sentimentos ou situações ligadas ao trauma?",
+          "Você tem crenças negativas sobre si mesmo(a) ou o mundo que surgiram após o trauma?",
+          "Você se sente emocionalmente entorpecido(a) — dificuldade de sentir emoções positivas?",
+          "Você fica irritável, tem explosões de raiva sem motivo aparente?",
+          "Você está sempre em alerta, como se um perigo fosse acontecer a qualquer momento?",
+          "Você reage de forma exagerada a sons ou movimentos repentinos?",
+        ],
+      },
+      tept_complexo: {
+        rotulo: "TEPT Complexo (CID-11)",
+        instrucao: "Além dos sintomas de TEPT, o TEPT Complexo inclui dificuldades adicionais. Elas se aplicam a você?",
+        perguntas: [
+          "Você tem grande dificuldade em regular emoções — explosões, entorpecimento ou sensações de dissociação?",
+          "Você tem sentimentos profundos e persistentes de vergonha, culpa ou inutilidade sobre si mesmo(a)?",
+          "Você tem dificuldade em manter relacionamentos próximos ou sente-se fundamentalmente diferente dos outros?",
+          "Esses padrões estão ligados a trauma prolongado ou repetitivo (abuso, cativeiro, violência crônica)?",
+        ],
+      },
+      dissociativo: {
+        rotulo: "Transtorno Dissociativo",
+        instrucao: "Pense em experiências em que você se sentiu 'separado(a)' de si mesmo(a) ou da realidade.",
+        perguntas: [
+          "Você se sente como se estivesse fora do próprio corpo, observando a si mesmo(a) de longe (despersonalização)?",
+          "Você sente que o mundo ao redor não é real ou parece distante, como em um sonho (desrealização)?",
+          "Você tem períodos em que não consegue lembrar de eventos ou informações pessoais importantes (amnésia)?",
+          "Essas experiências causam sofrimento ou prejuízo significativo na sua vida?",
+          "Essas experiências não estão relacionadas ao uso de substâncias ou outra condição médica?",
+        ],
+      },
+      adaptacao: {
+        rotulo: "Transtorno de Adaptação",
+        instrucao: "Pense em uma situação estressante recente (perda de emprego, separação, doença, etc.).",
+        perguntas: [
+          "Seus sintomas emocionais ou comportamentais surgiram claramente em resposta a um estressor identificável?",
+          "Esses sintomas são desproporcionais à gravidade do estressor?",
+          "Você sente humor deprimido, ansiedade ou desesperança relacionados a essa situação?",
+          "Esses sintomas prejudicam seu trabalho, escola ou relacionamentos?",
+          "Os sintomas surgiram nos últimos 3 meses após o estressor?",
+        ],
+      },
+      borderline: {
+        rotulo: "TP Borderline",
+        instrucao: "Esses padrões se aplicam de forma persistente à sua vida, em diferentes situações?",
+        perguntas: [
+          "Você faz esforços frenéticos para evitar abandonos, mesmo que imaginados?",
+          "Seus relacionamentos são instáveis e intensos — você idealiza e desvaloriza as pessoas?",
+          "Sua imagem de si mesmo(a) é instável — você muda muito a percepção de quem você é?",
+          "Você age de forma impulsiva em áreas que podem ser prejudiciais (gastos, sexo, substâncias, comida, direção)?",
+          "Você tem comportamentos suicidas recorrentes, ameaças ou se machuca?",
+          "Seu humor muda drasticamente em poucas horas (ansiedade, irritação, depressão)?",
+          "Você sente um vazio crônico e persistente?",
+          "Você tem raiva intensa e inapropriada, difícil de controlar?",
+          "Quando estressado(a), você tem pensamentos paranoides ou episódios dissociativos?",
+        ],
+      },
+      histrionico: {
+        rotulo: "TP Histriônico",
+        instrucao: "Esses padrões se aplicam de forma persistente à sua vida?",
+        perguntas: [
+          "Você se sente desconfortável quando não é o centro das atenções?",
+          "Você frequentemente se comporta de forma inapropriadamente sedutora ou provocadora?",
+          "Sua expressão emocional muda rapidamente e parece superficial?",
+          "Você usa com frequência sua aparência física para chamar atenção?",
+          "Seu estilo de fala é vago, impressionista e carente de detalhes?",
+          "Você se comporta de forma dramática ou teatral, com expressão exagerada de emoções?",
+          "Você é facilmente influenciado(a) por outras pessoas ou pelas circunstâncias?",
+          "Você considera relacionamentos mais íntimos do que realmente são?",
+        ],
+      },
+      narcisista: {
+        rotulo: "TP Narcisista",
+        instrucao: "Esses padrões se aplicam de forma persistente à sua vida?",
+        perguntas: [
+          "Você tem um senso grandioso de importância própria — acredita ser mais especial do que os outros?",
+          "Você se preocupa com fantasias de sucesso ilimitado, poder, brilhantismo ou beleza?",
+          "Você acredita que só pode ser compreendido(a) por pessoas igualmente especiais ou de alto status?",
+          "Você precisa de admiração excessiva das pessoas ao redor?",
+          "Você tem senso de privilégio — espera tratamento favorável automático?",
+          "Você se aproveita de outros para atingir seus objetivos?",
+          "Você tem dificuldade de reconhecer ou se importar com os sentimentos alheios?",
+          "Você frequentemente sente inveja dos outros ou acredita que te invejam?",
+          "Você tem comportamentos arrogantes ou atitudes altivas?",
+        ],
+      },
+      antissocial: {
+        rotulo: "TP Antissocial",
+        instrucao: "Esses padrões se aplicam a você desde antes dos 15 anos e continuam na vida adulta?",
+        perguntas: [
+          "Você frequentemente descumpre normas sociais ou comete atos que seriam causa de prisão?",
+          "Você mente, usa codinomes ou manipula pessoas para obter vantagem?",
+          "Você age de forma impulsiva, sem planejar com antecedência?",
+          "Você tem histórico de irritabilidade ou agressividade — brigas ou agressões repetidas?",
+          "Você tem desconsideração pela segurança própria ou alheia?",
+          "Você tem dificuldade de manter emprego ou honrar obrigações financeiras de forma consistente?",
+          "Você raramente sente remorso por ter machucado ou prejudicado alguém?",
+        ],
+      },
+      tdah_des: {
+        rotulo: "TDAH — Predominantemente Desatento",
+        instrucao: "Esses sintomas ocorrem frequentemente, em mais de um ambiente (casa, trabalho, escola)?",
+        perguntas: [
+          "Você não presta atenção a detalhes ou comete erros por descuido?",
+          "Você tem dificuldade de manter a atenção em tarefas ou atividades prolongadas?",
+          "Você parece não escutar quando alguém fala diretamente com você?",
+          "Você não segue instruções até o fim ou não termina tarefas?",
+          "Você tem dificuldade em organizar tarefas ou atividades?",
+          "Você evita ou reluta em tarefas que exigem esforço mental sustentado?",
+          "Você perde coisas necessárias para tarefas (chaves, documentos, óculos, celular)?",
+          "Você se distrai facilmente com estímulos externos (barulho, movimento, etc.)?",
+          "Você é esquecido(a) em atividades do dia a dia?",
+        ],
+      },
+      tdah_hip: {
+        rotulo: "TDAH — Hiperativo/Impulsivo",
+        instrucao: "Esses sintomas ocorrem frequentemente, em mais de um ambiente?",
+        perguntas: [
+          "Você remexe as mãos ou pés, ou se contorce no assento?",
+          "Você sai do lugar em situações em que seria esperado ficar sentado(a)?",
+          "Você se sente inquieto(a) por dentro (em adultos, sensação de nervosismo constante)?",
+          "Você tem dificuldade de realizar atividades de lazer calmamente?",
+          "Você frequentemente age como se estivesse 'a mil', movido(a) por um motor?",
+          "Você fala excessivamente?",
+          "Você deixa escapar respostas antes de terminar de ouvir as perguntas?",
+          "Você tem dificuldade de aguardar sua vez (filas, conversas, jogos)?",
+          "Você interrompe ou se mete em conversas ou atividades dos outros?",
+        ],
+      },
+      tea: {
+        rotulo: "TEA — Transtorno do Espectro Autista",
+        instrucao: "Esses padrões estão presentes desde a infância e afetam diferentes áreas da vida?",
+        perguntas: [
+          "Você tem dificuldade com reciprocidade socioemocional — não inicia ou mantém conversas naturalmente?",
+          "Você tem dificuldades com comunicação não-verbal (pouco contato visual, expressão facial limitada)?",
+          "Você tem dificuldade em desenvolver e manter relacionamentos com colegas?",
+          "Você tem interesses altamente restritos e fixos — fica obcecado(a) por tópicos específicos?",
+          "Você tem comportamentos ou falas repetitivas (movimentos repetidos, frases automáticas)?",
+          "Você insiste em rotinas e tem reação intensa a mudanças?",
+          "Você tem hipersensibilidade ou hipossensibilidade sensorial (barulho, textura, luz)?",
+        ],
+      },
+      tod: {
+        rotulo: "TOD — Transtorno Opositivo-Desafiador",
+        instrucao: "Esses padrões ocorrem com frequência, há pelo menos 6 meses?",
+        perguntas: [
+          "Você perde o controle emocional com frequência (crises de raiva)?",
+          "Você fica sensível ou se irrita facilmente com os outros?",
+          "Você fica com raiva e ressente-se das pessoas com frequência?",
+          "Você discute frequentemente com adultos ou figuras de autoridade?",
+          "Você recusa-se ou desafia cumprimento de regras ou pedidos com frequência?",
+          "Você perturba ou chateia os outros deliberadamente?",
+          "Você culpa os outros pelos seus erros ou mau comportamento?",
+          "Você age de forma vingativa de maneira significativa?",
+        ],
+      },
+      substancias: {
+        rotulo: "Dependência Química / Substâncias",
+        instrucao: "Pense no uso de álcool, drogas ou medicamentos além do prescrito.",
+        perguntas: [
+          "Você consome em maiores quantidades ou por mais tempo do que pretendia?",
+          "Você tem desejo persistente de controlar o uso, mas não consegue?",
+          "Você gasta muito tempo obtendo, usando ou se recuperando da substância?",
+          "Você sente desejo intenso (fissura) de usar a substância?",
+          "O uso prejudica suas obrigações no trabalho, escola ou família?",
+          "Você continua usando mesmo com problemas sociais ou interpessoais causados pela substância?",
+          "Você abandonou atividades importantes por causa do uso?",
+          "Você usa em situações em que é fisicamente arriscado?",
+          "Você continua usando apesar de problemas físicos ou psicológicos causados pela substância?",
+          "Você precisa de doses cada vez maiores para sentir o mesmo efeito (tolerância)?",
+          "Você sente mal-estar físico ou psicológico ao parar ou reduzir o uso (abstinência)?",
+        ],
+      },
+      gaming: {
+        rotulo: "Transtorno de Jogos Digitais (Gaming)",
+        instrucao: "Pense no uso de videogames ou jogos online nos últimos 12 meses.",
+        perguntas: [
+          "Você pensa nos jogos mesmo quando não está jogando?",
+          "Você sente irritação ou tristeza quando não pode jogar?",
+          "Você precisa jogar cada vez mais para sentir o mesmo prazer?",
+          "Você tentou controlar o tempo de jogo e não conseguiu?",
+          "Você perdeu interesse em outros hobbies por causa dos jogos?",
+          "Você continua jogando mesmo sabendo dos problemas que causa?",
+          "Você mente para família ou amigos sobre quanto joga?",
+          "Você usa os jogos para escapar de problemas ou sentimentos ruins?",
+          "Você prejudicou relacionamentos, emprego ou estudos por causa dos jogos?",
+        ],
+      },
+      gambling: {
+        rotulo: "Transtorno de Apostas (Gambling)",
+        instrucao: "Pense no comportamento de apostar dinheiro nos últimos 12 meses.",
+        perguntas: [
+          "Você precisa apostar valores cada vez maiores para sentir a mesma emoção?",
+          "Você fica irritado(a) ou ansioso(a) quando tenta parar de apostar?",
+          "Você já tentou controlar ou parar de apostar sem sucesso?",
+          "Você pensa em apostas com frequência (formas de ganhar, relembrar apostas passadas)?",
+          "Você aposta quando se sente angustiado(a), culpado(a) ou ansioso(a)?",
+          "Após perder dinheiro, você volta para tentar recuperar ('correr atrás')?",
+          "Você mente sobre suas apostas para pessoas próximas?",
+          "Você perdeu um relacionamento, emprego ou oportunidade importante por causa das apostas?",
+          "Você depende de outras pessoas para dinheiro causado por dívidas das apostas?",
+        ],
+      },
+      anorexia: {
+        rotulo: "Anorexia Nervosa",
+        instrucao: "Pense em sua relação com o peso, a comida e o seu corpo.",
+        perguntas: [
+          "Você restringe muito a quantidade que come, resultando em peso corporal muito baixo?",
+          "Você tem medo intenso de engordar ou toma medidas para evitar ganhar peso?",
+          "Você vê seu corpo de forma distorcida — se vê gordo(a) mesmo com peso baixo?",
+          "Você não reconhece a seriedade do seu baixo peso?",
+          "Seu peso ou formato corporal influencia muito na forma como você se avalia?",
+        ],
+      },
+      bulimia: {
+        rotulo: "Bulimia / TCA (Transtorno de Compulsão Alimentar)",
+        instrucao: "Pense em episódios de comer exageradamente e em comportamentos com o peso.",
+        perguntas: [
+          "Você tem episódios recorrentes de comer exageradamente em curto período — muito mais do que a maioria das pessoas?",
+          "Você sente que perde o controle sobre o que come durante esses episódios?",
+          "Após esses episódios, você faz comportamentos para compensar (vomitar, tomar laxante, jejuar, se exercitar em excesso)?",
+          "Sua autoestima é muito influenciada pelo seu peso e formato corporal?",
+          "Você sente vergonha ou culpa intensa após esses episódios?",
+        ],
+      },
+    };
+
+    const { useState, useEffect, useRef } = React;
+
+    function FormDiagnostico() {
+      const [fase, setFase] = useState("carregando"); // carregando | erro | intro | form | obrigado
+      const [cfg, setCfg] = useState(null);
+      const [token, setToken] = useState("");
+      const [respostas, setRespostas] = useState({});
+      const [moduloAtual, setModuloAtual] = useState(0);
+      const [obsFinais, setObsFinais] = useState("");
+      const [enviando, setEnviando] = useState(false);
+      const [msgErro, setMsgErro] = useState("");
+      const topoRef = useRef(null);
+
+      useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const t = params.get("token");
+        if (!t) { setMsgErro("Link inválido — token ausente."); setFase("erro"); return; }
+        setToken(t);
+        db.collection("clinica_rastreamento_tokens").doc(t).get()
+          .then((snap) => {
+            if (!snap.exists) { setMsgErro("Link inválido ou expirado."); setFase("erro"); return; }
+            const data = snap.data();
+            if (data.usado) { setMsgErro("Este questionário já foi respondido."); setFase("erro"); return; }
+            const validade = data.validade?.seconds ? new Date(data.validade.seconds * 1000) : null;
+            if (validade && validade < new Date()) { setMsgErro("Este link expirou. Solicite um novo à sua psicóloga."); setFase("erro"); return; }
+            setCfg(data);
+            setFase("intro");
+          })
+          .catch(() => { setMsgErro("Erro ao carregar o questionário. Tente novamente."); setFase("erro"); });
+      }, []);
+
+      function scrollTopo() {
+        if (topoRef.current) topoRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+
+      function responder(chave, valor) {
+        setRespostas((prev) => {
+          const atual = prev[chave];
+          if (atual === valor) {
+            const { [chave]: _, ...resto } = prev;
+            return resto;
+          }
+          return { ...prev, [chave]: valor };
+        });
+      }
+
+      const modulos = (cfg?.hipoteses || []).filter((id) => BANCO_PERGUNTAS[id]);
+      const moduloInfo = modulos[moduloAtual] ? BANCO_PERGUNTAS[modulos[moduloAtual]] : null;
+      const perguntasModulo = moduloInfo?.perguntas || [];
+      const chavesModulo = perguntasModulo.map((_, i) => modulos[moduloAtual] + "_" + i);
+      const totalRespondidas = chavesModulo.filter((k) => respostas[k]).length;
+      const progresso = perguntasModulo.length > 0 ? totalRespondidas / perguntasModulo.length : 0;
+
+      async function enviar() {
+        setEnviando(true);
+        try {
+          const docRespostas = {};
+          modulos.forEach((hipId) => {
+            const ps = BANCO_PERGUNTAS[hipId]?.perguntas || [];
+            ps.forEach((_, i) => {
+              const k = hipId + "_" + i;
+              if (respostas[k]) docRespostas[k] = respostas[k];
+            });
+          });
+          await db.collection("clinica_rastreamento_diagnostico").add({
+            psi_id: cfg.psi_id,
+            pacienteId: cfg.pacienteId,
+            pacienteNome: cfg.pacienteNome || "",
+            grupoId: cfg.grupoId,
+            grupoTitulo: cfg.grupoTitulo || "",
+            hipoteses: modulos,
+            token,
+            respostas: docRespostas,
+            obsFinais: obsFinais.trim(),
+            criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+          await db.collection("clinica_rastreamento_tokens").doc(token).update({ usado: true });
+          setFase("obrigado");
+        } catch (e) {
+          alert("Erro ao enviar. Tente novamente.\n" + e.message);
+        } finally {
+          setEnviando(false);
+        }
+      }
+
+      if (fase === "carregando") {
+        return (
+          <div className="container">
+            <div className="centro">
+              <div className="spinner"></div>
+              <p className="subtitulo">Carregando questionário...</p>
+            </div>
+          </div>
+        );
+      }
+
+      if (fase === "erro") {
+        return (
+          <div className="container">
+            <div className="card centro">
+              <h1 style={{ fontSize: 18, marginBottom: 10 }}>Link não disponível</h1>
+              <p className="subtitulo">{msgErro}</p>
+            </div>
+          </div>
+        );
+      }
+
+      if (fase === "obrigado") {
+        return (
+          <div className="container">
+            <div className="card centro">
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#F0FDF4", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28, color: "#16A34A" }}>&#10003;</div>
+              <h1 style={{ fontSize: 20, marginBottom: 10 }}>Respostas enviadas!</h1>
+              <p className="subtitulo">
+                Obrigado por responder com honestidade. Suas respostas já estão disponíveis para a sua psicóloga.
+              </p>
+            </div>
+          </div>
+        );
+      }
+
+      if (fase === "intro") {
+        const primeiroNome = (cfg.pacienteNome || "").split(" ")[0] || "Olá";
+        return (
+          <div className="container">
+            <div className="card">
+              <h1>Questionário Clínico</h1>
+              <p className="subtitulo" style={{ marginBottom: 20 }}>
+                Olá, <strong>{primeiroNome}</strong>! Sua psicóloga preparou um questionário clínico personalizado para você.
+              </p>
+              <div style={{ background: "#F5F3FF", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
+                <p style={{ fontSize: 12.5, color: "#4B5563", lineHeight: 1.6 }}>
+                  Este questionário é <strong>confidencial</strong> — as respostas vão diretamente para o prontuário clínico.<br />
+                  Responda com honestidade. Não há respostas certas ou erradas.
+                  <br /><br />
+                  <strong>Como responder:</strong><br />
+                  <strong style={{ color: "#374151" }}>N</strong> = Não / Nunca<br />
+                  <strong style={{ color: "#92400E" }}>B</strong> = Às vezes / Parcialmente<br />
+                  <strong style={{ color: "#166534" }}>C</strong> = Sim / Claramente
+                </p>
+              </div>
+              <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 20 }}>
+                Módulos: <strong style={{ color: "#111827" }}>{modulos.map((id) => BANCO_PERGUNTAS[id]?.rotulo || id).join(", ")}</strong>
+              </div>
+              <button className="btn-primario" onClick={() => setFase("form")}>
+                Começar questionário
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // fase === "form"
+      const hipId = modulos[moduloAtual];
+      const isUltimoModulo = moduloAtual === modulos.length - 1;
+
+      function avancarModulo() {
+        if (isUltimoModulo) {
+          setFase("resumo");
+        } else {
+          setModuloAtual((m) => m + 1);
+          scrollTopo();
+        }
+      }
+
+      if (fase === "resumo") {
+        return (
+          <div className="container" ref={topoRef}>
+            <div className="card">
+              <h2 style={{ marginBottom: 6 }}>Observações finais (opcional)</h2>
+              <p className="subtitulo" style={{ marginBottom: 16 }}>
+                Há algo que você queira acrescentar ou que considera importante a sua psicóloga saber?
+              </p>
+              <textarea
+                value={obsFinais}
+                onChange={(e) => setObsFinais(e.target.value)}
+                placeholder="Escreva aqui (opcional)..."
+              />
+              <div className="nav-botoes" style={{ marginTop: 20 }}>
+                <button className="btn-secundario" onClick={() => { setFase("form"); setModuloAtual(modulos.length - 1); }}>
+                  Voltar
+                </button>
+                <button className="btn-primario" onClick={enviar} disabled={enviando}>
+                  {enviando ? "Enviando..." : "Enviar respostas"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="container" ref={topoRef}>
+          {/* Progresso geral */}
+          <div style={{ marginBottom: 16, fontSize: 12, color: "#6B7280" }}>
+            Módulo {moduloAtual + 1} de {modulos.length}: <strong style={{ color: "#111827" }}>{moduloInfo?.rotulo}</strong>
+            <div className="progresso-bar" style={{ marginTop: 6 }}>
+              <div
+                className="progresso-fill"
+                style={{ width: ((moduloAtual / modulos.length) * 100) + "%", background: "#6A2BD9" }}
+              />
+            </div>
+          </div>
+
+          <div className="card">
+            {/* Header do módulo */}
+            <div className="modulo-header">
+              <span className="modulo-num" style={{ background: "#F5F3FF", color: "#6A2BD9" }}>
+                {moduloAtual + 1}/{modulos.length}
+              </span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{moduloInfo?.rotulo}</div>
+                {moduloInfo?.instrucao && (
+                  <div style={{ fontSize: 12, color: "#6B7280", marginTop: 3, lineHeight: 1.4 }}>{moduloInfo.instrucao}</div>
+                )}
+              </div>
+            </div>
+
+            {/* Progresso do módulo */}
+            <div style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 14, textAlign: "right" }}>
+              {totalRespondidas}/{perguntasModulo.length} respondidas
+              <div className="progresso-bar" style={{ marginTop: 4 }}>
+                <div className="progresso-fill" style={{ width: (progresso * 100) + "%", background: "#16A34A" }} />
+              </div>
+            </div>
+
+            {/* Perguntas */}
+            {perguntasModulo.map((texto, i) => {
+              const chave = hipId + "_" + i;
+              const val = respostas[chave];
+              return (
+                <div key={chave} className="questao">
+                  <div className="questao-texto">{i + 1}. {texto}</div>
+                  <div className="opcoes">
+                    {["N", "B", "C"].map((op) => (
+                      <button
+                        key={op}
+                        type="button"
+                        className={"opcao-btn" + (val === op ? " ativo-" + op : "")}
+                        onClick={() => responder(chave, op)}
+                      >
+                        {op === "N" ? "N — Não" : op === "B" ? "B — Às vezes" : "C — Sim"}
+                      </button>
+                    ))}
+                  </div>
+                  {i < perguntasModulo.length - 1 && <hr className="divider" />}
+                </div>
+              );
+            })}
+
+            <div className="nav-botoes">
+              <button
+                className="btn-secundario"
+                onClick={() => { if (moduloAtual > 0) { setModuloAtual((m) => m - 1); scrollTopo(); } else setFase("intro"); }}
+              >
+                Voltar
+              </button>
+              <button className="btn-primario" onClick={avancarModulo}>
+                {isUltimoModulo ? "Finalizar" : "Próximo módulo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<FormDiagnostico />);
+  </script>
+</body>
+</html>

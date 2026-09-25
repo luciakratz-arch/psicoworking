@@ -256,6 +256,30 @@ service cloud.firestore {
       allow update, delete: if ehEquipeDaClinica(resource.data.psi_id);
     }
 
+    // ── Tokens de rastreamento diagnóstico (7 Grupos DSM-5) ─────────
+    // O paciente lê o token (sem login) para carregar a configuração do
+    // questionário. A equipe cria. O paciente só pode marcar como "usado".
+    match /clinica_rastreamento_tokens/{token} {
+      allow get: if true;
+      allow list: if ehEquipeDaClinica(resource.data.psi_id);
+      allow create: if ehEquipeDeAlgumaClinica()
+                    && request.resource.data.psi_id == carimboClinica();
+      allow update: if ehEquipeDaClinica(resource.data.psi_id)
+                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usado'])
+                        && request.resource.data.usado == true);
+      allow delete: if ehEquipeDaClinica(resource.data.psi_id);
+    }
+
+    // ── Respostas do questionário diagnóstico (7 Grupos DSM-5) ──────
+    // O paciente cria sem login; validamos que o token existe e que o
+    // psi_id da resposta bate com o psi_id do token (cross-doc lookup).
+    match /clinica_rastreamento_diagnostico/{registroId} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id);
+      allow create: if request.resource.data.token is string
+                    && exists(/databases/$(database)/documents/clinica_rastreamento_tokens/$(request.resource.data.token))
+                    && get(/databases/$(database)/documents/clinica_rastreamento_tokens/$(request.resource.data.token)).data.psi_id == request.resource.data.psi_id;
+    }
+
     match /clinica_agenda/{eventoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));

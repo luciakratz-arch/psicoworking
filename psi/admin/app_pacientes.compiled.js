@@ -956,6 +956,146 @@ const QUESTIONARIOS_DISPONIVEIS = [{
   pronto: true
 }];
 
+// ─── 7 Grupos Diagnósticos DSM-5 ──────────────────────────────────
+// Cada grupo agrupa hipóteses diagnósticas. A psicóloga seleciona as
+// hipóteses relevantes por paciente e gera um link de rastreamento
+// personalizado (token em clinica_rastreamento_tokens).
+const GRUPOS_DIAGNOSTICOS = [{
+  id: "G1",
+  icone: "bar-chart",
+  titulo: "Transtornos do Humor",
+  descricao: "Depressão, bipolar e ciclotimia — avaliação do eixo do humor",
+  cor: "#4F46E5",
+  corBg: "#EEF2FF",
+  hipoteses: [{
+    id: "tdm",
+    rotulo: "Depressão Maior (TDM)"
+  }, {
+    id: "distimia",
+    rotulo: "Depressão Persistente (Distimia)"
+  }, {
+    id: "ciclotimia",
+    rotulo: "Ciclotimia"
+  }, {
+    id: "bipolar_I",
+    rotulo: "Transtorno Bipolar tipo I (Mania)"
+  }, {
+    id: "bipolar_II",
+    rotulo: "Transtorno Bipolar tipo II (Hipomania + Depressão)"
+  }]
+}, {
+  id: "G2",
+  icone: "wind",
+  titulo: "Transtornos de Ansiedade",
+  descricao: "Ansiedade generalizada, pânico e ansiedade social",
+  cor: "#0D9488",
+  corBg: "#F0FDFA",
+  hipoteses: [{
+    id: "tag",
+    rotulo: "Ansiedade Generalizada (TAG)"
+  }, {
+    id: "panico",
+    rotulo: "Transtorno do Pânico"
+  }, {
+    id: "fobia_social",
+    rotulo: "Ansiedade Social (Fobia Social)"
+  }]
+}, {
+  id: "G3",
+  icone: "rotate-cw",
+  titulo: "TOC e Transtornos Relacionados",
+  descricao: "Obsessões, compulsões e comportamentos repetitivos",
+  cor: "#D97706",
+  corBg: "#FFFBEB",
+  hipoteses: [{
+    id: "toc",
+    rotulo: "TOC — Transtorno Obsessivo-Compulsivo"
+  }]
+}, {
+  id: "G4",
+  icone: "zap",
+  titulo: "Trauma e Estressores",
+  descricao: "TEPT, TEPT Complexo, dissociativo e adaptação",
+  cor: "#DC2626",
+  corBg: "#FEF2F2",
+  hipoteses: [{
+    id: "tept",
+    rotulo: "TEPT — Estresse Pós-Traumático"
+  }, {
+    id: "tept_complexo",
+    rotulo: "TEPT Complexo (CID-11)"
+  }, {
+    id: "dissociativo",
+    rotulo: "Transtorno Dissociativo"
+  }, {
+    id: "adaptacao",
+    rotulo: "Transtorno de Adaptação"
+  }]
+}, {
+  id: "G5",
+  icone: "user",
+  titulo: "Transtornos de Personalidade",
+  descricao: "Padrões persistentes de experiência e comportamento desadaptativos",
+  cor: "#BE185D",
+  corBg: "#FDF2F8",
+  hipoteses: [{
+    id: "borderline",
+    rotulo: "TP Borderline"
+  }, {
+    id: "histrionico",
+    rotulo: "TP Histriônico"
+  }, {
+    id: "narcisista",
+    rotulo: "TP Narcisista"
+  }, {
+    id: "antissocial",
+    rotulo: "TP Antissocial"
+  }]
+}, {
+  id: "G6",
+  icone: "cpu",
+  titulo: "Neurodesenvolvimento",
+  descricao: "TDAH, TEA, TOD e outros transtornos do desenvolvimento",
+  cor: "#7C3AED",
+  corBg: "#F5F3FF",
+  hipoteses: [{
+    id: "tdah_des",
+    rotulo: "TDAH — Predominantemente Desatento"
+  }, {
+    id: "tdah_hip",
+    rotulo: "TDAH — Hiperativo/Impulsivo"
+  }, {
+    id: "tea",
+    rotulo: "TEA — Transtorno do Espectro Autista"
+  }, {
+    id: "tod",
+    rotulo: "TOD — Transtorno Opositivo-Desafiador"
+  }]
+}, {
+  id: "G7",
+  icone: "layers",
+  titulo: "Comportamentos Aditivos e Alimentares",
+  descricao: "Dependência química, jogos e transtornos alimentares",
+  cor: "#059669",
+  corBg: "#ECFDF5",
+  hipoteses: [{
+    id: "substancias",
+    rotulo: "Dependência Química / Substâncias"
+  }, {
+    id: "gaming",
+    rotulo: "Transtorno de Jogos Digitais (Gaming)"
+  }, {
+    id: "gambling",
+    rotulo: "Transtorno de Apostas (Gambling)"
+  }, {
+    id: "anorexia",
+    rotulo: "Anorexia Nervosa"
+  }, {
+    id: "bulimia",
+    rotulo: "Bulimia / TCA"
+  }]
+}];
+
 // Dados de cada instrumento de rastreamento já portado — a lista
 // completa de perguntas (mesma ordem/texto do formulário público em
 // psi/atividade/formulario-rastreamento.js) e a fórmula de gravidade,
@@ -1880,6 +2020,146 @@ function ListaCriteriosDSM5({
     }
   }, aviso)));
 }
+function PontosAtencaoRespondiveis({
+  atencao,
+  ajustes,
+  aoAjustarLote
+}) {
+  const [pendente, setPendente] = useState({});
+  const [gravando, setGravando] = useState(false);
+  const [aviso, setAviso] = useState("");
+  if (!atencao || atencao.length === 0) return null;
+  function ch(i) {
+    return "atencao_" + i;
+  }
+  function atualDe(i) {
+    const k = ch(i);
+    return k in pendente ? pendente[k] : ajustes[k] || null;
+  }
+  function marcar(i, valor) {
+    setAviso("");
+    const k = ch(i);
+    setPendente(p => ({
+      ...p,
+      [k]: atualDe(i) === valor ? null : valor
+    }));
+  }
+  const qtdPendente = Object.keys(pendente).length;
+  async function registrar() {
+    setGravando(true);
+    await aoAjustarLote(pendente);
+    setPendente({});
+    setGravando(false);
+    setAviso("Respostas da entrevista registradas.");
+  }
+  const confirmados = atencao.filter((_, i) => atualDe(i) === "sim").length;
+  const naoConf = atencao.filter((_, i) => atualDe(i) === "nao").length;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10,
+      flexWrap: "wrap",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13
+    }
+  }, "Pontos de aten\xE7\xE3o para a entrevista cl\xEDnica"), (confirmados > 0 || naoConf > 0) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11
+    }
+  }, confirmados > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#16A34A",
+      fontWeight: 600,
+      marginRight: 8
+    }
+  }, confirmados, " confirmado(s)"), naoConf > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#DC2626",
+      fontWeight: 600
+    }
+  }, naoConf, " n\xE3o confirmado(s)"))), atencao.map((texto, i) => {
+    const v = atualDe(i);
+    const bg = v === "sim" ? "#F0FDF4" : v === "nao" ? "#FEF2F2" : "#FFF7ED";
+    const borda = v === "sim" ? "#16A34A" : v === "nao" ? "#DC2626" : "#F97316";
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        background: bg,
+        borderLeft: "3px solid " + borda,
+        padding: "10px 12px",
+        marginBottom: 6,
+        borderRadius: "0 6px 6px 0"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#374151",
+        marginBottom: 8
+      }
+    }, texto), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement(BotaoTri, {
+      ativo: v === "sim",
+      rotulo: "Confirmado",
+      cor: "#16A34A",
+      onClick: () => marcar(i, "sim")
+    }), /*#__PURE__*/React.createElement(BotaoTri, {
+      ativo: v === "nao",
+      rotulo: "N\xE3o confirmado",
+      cor: "#DC2626",
+      onClick: () => marcar(i, "nao")
+    })));
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    onClick: registrar,
+    disabled: gravando || qtdPendente === 0
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "check-circle",
+    tamanho: 14
+  }), " ", gravando ? "Salvando..." : "Registrar respostas da entrevista"), qtdPendente > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#9A3412"
+    }
+  }, qtdPendente, " resposta(s) ainda n\xE3o salva(s)"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    style: {
+      fontSize: 12,
+      padding: "6px 12px"
+    },
+    onClick: () => setPendente({})
+  }, "Descartar")), aviso && qtdPendente === 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#16A34A",
+      fontWeight: 600
+    }
+  }, aviso)));
+}
 
 // Diagnóstico diferencial a partir do respondente mais recente
 // (docs[0]) — critérios contados um a um e nomeados, não mais por
@@ -2354,27 +2634,11 @@ ${respostasHtml}
     }, "An\xE1lise DSM-5"), /*#__PURE__*/React.createElement(ListaCriteriosDSM5, {
       criterios: laudo.criterios,
       aoAjustarLote: ajustar
-    })), laudo.atencao.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: 16
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontWeight: 600,
-        fontSize: 13,
-        marginBottom: 10
-      }
-    }, "Pontos de aten\xE7\xE3o para a entrevista cl\xEDnica"), laudo.atencao.map((a, i) => /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        background: "#FFF7ED",
-        borderLeft: "3px solid #F97316",
-        padding: "8px 12px",
-        marginBottom: 6,
-        borderRadius: "0 6px 6px 0",
-        fontSize: 12
-      }
-    }, a))), /*#__PURE__*/React.createElement("div", {
+    })), /*#__PURE__*/React.createElement(PontosAtencaoRespondiveis, {
+      atencao: laudo.atencao,
+      ajustes: ajustes,
+      aoAjustarLote: ajustar
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         fontWeight: 600,
         fontSize: 13,
@@ -2937,27 +3201,11 @@ function AbaRastreamentoAlimentarView({
     }, "An\xE1lise DSM-5"), /*#__PURE__*/React.createElement(ListaCriteriosDSM5, {
       criterios: laudo.criterios,
       aoAjustarLote: ajustar
-    })), laudo.atencao.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: 16
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontWeight: 600,
-        fontSize: 13,
-        marginBottom: 10
-      }
-    }, "Pontos de aten\xE7\xE3o para a entrevista cl\xEDnica"), laudo.atencao.map((a, i) => /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        background: "#FFF7ED",
-        borderLeft: "3px solid #F97316",
-        padding: "8px 12px",
-        marginBottom: 6,
-        borderRadius: "0 6px 6px 0",
-        fontSize: 12
-      }
-    }, a))), /*#__PURE__*/React.createElement("div", {
+    })), /*#__PURE__*/React.createElement(PontosAtencaoRespondiveis, {
+      atencao: laudo.atencao,
+      ajustes: ajustes,
+      aoAjustarLote: ajustar
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         fontWeight: 600,
         fontSize: 13,
@@ -3437,27 +3685,11 @@ function AbaRastreamentoSexualView({
     }, "An\xE1lise DSM-5"), /*#__PURE__*/React.createElement(ListaCriteriosDSM5, {
       criterios: laudo.criterios,
       aoAjustarLote: ajustar
-    })), laudo.atencao.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: 16
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontWeight: 600,
-        fontSize: 13,
-        marginBottom: 10
-      }
-    }, "Pontos de aten\xE7\xE3o para a entrevista cl\xEDnica"), laudo.atencao.map((a, i) => /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        background: "#FFF7ED",
-        borderLeft: "3px solid #F97316",
-        padding: "8px 12px",
-        marginBottom: 6,
-        borderRadius: "0 6px 6px 0",
-        fontSize: 12
-      }
-    }, a))), /*#__PURE__*/React.createElement("div", {
+    })), /*#__PURE__*/React.createElement(PontosAtencaoRespondiveis, {
+      atencao: laudo.atencao,
+      ajustes: ajustes,
+      aoAjustarLote: ajustar
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         fontWeight: 600,
         fontSize: 13,
@@ -3940,27 +4172,11 @@ function AbaRastreamentoNeuroView({
     }, "An\xE1lise DSM-5"), /*#__PURE__*/React.createElement(ListaCriteriosDSM5, {
       criterios: laudo.criterios,
       aoAjustarLote: ajustar
-    })), laudo.atencao.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginBottom: 16
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontWeight: 600,
-        fontSize: 13,
-        marginBottom: 10
-      }
-    }, "Pontos de aten\xE7\xE3o para a entrevista cl\xEDnica"), laudo.atencao.map((a, i) => /*#__PURE__*/React.createElement("div", {
-      key: i,
-      style: {
-        background: "#FFF7ED",
-        borderLeft: "3px solid #F97316",
-        padding: "8px 12px",
-        marginBottom: 6,
-        borderRadius: "0 6px 6px 0",
-        fontSize: 12
-      }
-    }, a))), /*#__PURE__*/React.createElement("div", {
+    })), /*#__PURE__*/React.createElement(PontosAtencaoRespondiveis, {
+      atencao: laudo.atencao,
+      ajustes: ajustes,
+      aoAjustarLote: ajustar
+    }), /*#__PURE__*/React.createElement("div", {
       style: {
         fontWeight: 600,
         fontSize: 13,
@@ -4033,12 +4249,367 @@ function AbaRastreamentoNeuroView({
     }, /*#__PURE__*/React.createElement("strong", null, "Observa\xE7\xF5es:"), " ", doc.obsFinais)))));
   })());
 }
+
+// ─── Painel de Grupo Diagnóstico ──────────────────────────────────
+// Exibe hipóteses selecionáveis, gera token e lista respostas.
+function PainelGrupoDiagnostico({
+  usuario,
+  paciente,
+  grupo,
+  onVoltar
+}) {
+  const [hipSel, setHipSel] = useState([]);
+  const [gerando, setGerando] = useState(false);
+  const [link, setLink] = useState(null);
+  const [copiado, setCopiado] = useState(false);
+  const [respostas, setRespostas] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [aberto, setAberto] = useState(null);
+  useEffect(() => {
+    if (!paciente?.id) return;
+    db.collection("clinica_rastreamento_diagnostico").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).where("grupoId", "==", grupo.id).get().then(snap => {
+      const lista = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })).sort((a, b) => (b.criadoEm?.seconds || 0) - (a.criadoEm?.seconds || 0));
+      setRespostas(lista);
+      setCarregando(false);
+    }).catch(() => setCarregando(false));
+  }, [usuario.psiId, paciente.id, grupo.id]);
+  function toggleHip(id) {
+    setHipSel(prev => prev.includes(id) ? prev.filter(h => h !== id) : [...prev, id]);
+  }
+  async function gerarLink() {
+    if (hipSel.length === 0) return;
+    setGerando(true);
+    try {
+      const token = "diag_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+      await db.collection("clinica_rastreamento_tokens").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        grupoId: grupo.id,
+        grupoTitulo: grupo.titulo,
+        hipoteses: hipSel,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        validade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        usado: false
+      });
+      setLink(window.location.origin + "/psi/atividade/diagnostico/?token=" + token);
+    } catch (e) {
+      alert("Erro ao gerar link: " + e.message);
+    } finally {
+      setGerando(false);
+    }
+  }
+  function copiar() {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
+  function enviarWhatsApp() {
+    const primeiroNome = (paciente.nome || "").split(" ")[0];
+    const msg = `Olá, ${primeiroNome}!\n\n` + `Preparei um questionário clínico personalizado para você preencher.\n\n` + `É rápido, leva cerca de 10 minutos. Responda com calma e honestidade:\n\n${link}\n\n` + `Qualquer dúvida, me chama por aqui.`;
+    const numero = (paciente.telefone || "").replace(/\D/g, "");
+    window.open((numero ? "https://wa.me/55" + numero : "https://wa.me/") + "?text=" + encodeURIComponent(msg), "_blank");
+  }
+  function calcularEscores(doc) {
+    if (!doc.respostas) return {};
+    const escores = {};
+    (doc.hipoteses || []).forEach(hipId => {
+      const pares = Object.entries(doc.respostas).filter(([k]) => k.startsWith(hipId + "_"));
+      if (pares.length === 0) return;
+      const pts = pares.reduce((s, [, v]) => s + (v === "C" ? 2 : v === "B" ? 1 : 0), 0);
+      escores[hipId] = Math.round(pts / (pares.length * 2) * 100);
+    });
+    return escores;
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onVoltar,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      background: "none",
+      border: "none",
+      color: grupo.cor,
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer",
+      marginBottom: 20,
+      padding: 0
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "arrow-left",
+    tamanho: 15
+  }), " Voltar para Question\xE1rios"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      background: grupo.corBg,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: grupo.cor
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: grupo.icone,
+    tamanho: 22
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 16,
+      color: "#111827"
+    }
+  }, grupo.titulo), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6B7280"
+    }
+  }, grupo.descricao))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: grupo.corBg,
+      border: "1px solid " + grupo.cor + "33",
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13,
+      color: grupo.cor,
+      marginBottom: 12
+    }
+  }, "Selecione as hip\xF3teses a incluir no question\xE1rio"), grupo.hipoteses.map(h => /*#__PURE__*/React.createElement("label", {
+    key: h.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 10,
+      cursor: "pointer",
+      userSelect: "none"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: hipSel.includes(h.id),
+    onChange: () => toggleHip(h.id),
+    style: {
+      width: 16,
+      height: 16,
+      accentColor: grupo.cor
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#374151"
+    }
+  }, h.rotulo))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    style: {
+      background: grupo.cor
+    },
+    disabled: hipSel.length === 0 || gerando,
+    onClick: gerarLink
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "link",
+    tamanho: 14
+  }), gerando ? "Gerando..." : "Gerar link do questionário"))), link && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F0FDF4",
+      border: "1px solid #86EFAC",
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 24
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 12,
+      color: "#166534",
+      marginBottom: 8
+    }
+  }, "Link gerado \u2014 v\xE1lido por 30 dias"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    readOnly: true,
+    value: link,
+    style: {
+      flex: 1,
+      minWidth: 200,
+      fontSize: 11,
+      padding: "8px 10px",
+      border: "1px solid #86EFAC",
+      borderRadius: 8,
+      background: "white",
+      color: "#374151"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    style: {
+      fontSize: 12
+    },
+    onClick: copiar
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: copiado ? "check" : "copy",
+    tamanho: 13
+  }), " ", copiado ? "Copiado!" : "Copiar"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    style: {
+      background: "#25D366",
+      fontSize: 12
+    },
+    onClick: enviarWhatsApp
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "message-circle",
+    tamanho: 13
+  }), " WhatsApp"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 14,
+      color: "#111827",
+      marginBottom: 12
+    }
+  }, "Respostas recebidas", respostas.length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 400,
+      color: "#6B7280",
+      marginLeft: 6
+    }
+  }, "(", respostas.length, ")")), carregando ? /*#__PURE__*/React.createElement(Spinner, null) : respostas.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "texto-vazio",
+    style: {
+      padding: "24px 0"
+    }
+  }, "Nenhuma resposta recebida ainda.") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, respostas.map(doc => {
+    const escores = calcularEscores(doc);
+    const isOpen = aberto === doc.id;
+    const hips = (doc.hipoteses || []).map(id => grupo.hipoteses.find(h => h.id === id)?.rotulo || id);
+    const data = doc.criadoEm?.seconds ? new Date(doc.criadoEm.seconds * 1000).toLocaleDateString("pt-BR") : "—";
+    return /*#__PURE__*/React.createElement("div", {
+      key: doc.id,
+      style: {
+        border: "1px solid #E5E7EB",
+        borderRadius: 12,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => setAberto(isOpen ? null : doc.id),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "12px 16px",
+        cursor: "pointer",
+        background: isOpen ? grupo.corBg : "white"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: 13,
+        color: "#111827"
+      }
+    }, data), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#6B7280",
+        marginTop: 2
+      }
+    }, hips.join(" · "))), /*#__PURE__*/React.createElement(Icone, {
+      nome: isOpen ? "chevron-up" : "chevron-down",
+      tamanho: 16
+    })), isOpen && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "12px 16px",
+        borderTop: "1px solid #F3F4F6"
+      }
+    }, (doc.hipoteses || []).map(hipId => {
+      const hip = grupo.hipoteses.find(h => h.id === hipId);
+      const escore = escores[hipId];
+      const cor = escore >= 60 ? "#DC2626" : escore >= 30 ? "#D97706" : "#16A34A";
+      return /*#__PURE__*/React.createElement("div", {
+        key: hipId,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "8px 0",
+          borderBottom: "1px solid #F3F4F6"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 13,
+          color: "#374151"
+        }
+      }, hip?.rotulo || hipId), escore !== undefined ? /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 700,
+          color: cor
+        }
+      }, escore, "% concord\xE2ncia") : /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: "#9CA3AF"
+        }
+      }, "sem dados"));
+    }), doc.obsFinais && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        padding: 10,
+        background: "#F9FAFB",
+        borderRadius: 8,
+        fontSize: 12,
+        color: "#374151"
+      }
+    }, /*#__PURE__*/React.createElement("strong", null, "Obs:"), " ", doc.obsFinais)));
+  })));
+}
 function AbaQuestionariosPaciente({
   usuario,
   paciente
 }) {
   const [aberto, setAberto] = useState(null);
   const [enviandoId, setEnviandoId] = useState(null);
+  if (aberto?.tipo === "grupo") {
+    const grupo = GRUPOS_DIAGNOSTICOS.find(g => g.id === aberto.id);
+    if (grupo) return /*#__PURE__*/React.createElement(PainelGrupoDiagnostico, {
+      usuario: usuario,
+      paciente: paciente,
+      grupo: grupo,
+      onVoltar: () => setAberto(null)
+    });
+  }
   if (aberto === "anamnese") {
     return /*#__PURE__*/React.createElement(AbaAnamneseView, {
       usuario: usuario,
@@ -4116,12 +4687,93 @@ function AbaQuestionariosPaciente({
       setEnviandoId(null);
     }
   }
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 28
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15,
+      color: "#111827",
+      marginBottom: 4
+    }
+  }, "7 Grupos Diagn\xF3sticos DSM-5"), /*#__PURE__*/React.createElement("p", {
     className: "subtitulo-pagina",
     style: {
       marginBottom: 16
     }
-  }, "Visualize as respostas ou envie o question\xE1rio ao paciente pelo WhatsApp."), /*#__PURE__*/React.createElement("div", {
+  }, "Selecione um grupo, escolha as hip\xF3teses e gere um link de rastreamento personalizado para o paciente."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))",
+      gap: 12
+    }
+  }, GRUPOS_DIAGNOSTICOS.map(grupo => /*#__PURE__*/React.createElement("div", {
+    key: grupo.id,
+    className: "cartao-recurso",
+    style: {
+      cursor: "pointer",
+      borderTop: "3px solid " + grupo.cor,
+      paddingTop: 14
+    },
+    onClick: () => setAberto({
+      tipo: "grupo",
+      id: grupo.id
+    })
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: grupo.cor
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: grupo.icone,
+    tamanho: 20
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: "#111827",
+      lineHeight: 1.3
+    }
+  }, grupo.titulo)), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11.5,
+      color: "#6B7280",
+      marginBottom: 10,
+      lineHeight: 1.45
+    }
+  }, grupo.descricao), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: grupo.cor,
+      fontWeight: 600
+    }
+  }, grupo.hipoteses.length, " hip\xF3teses dispon\xEDveis"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px solid #E5E7EB",
+      paddingTop: 20,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15,
+      color: "#111827",
+      marginBottom: 4
+    }
+  }, "Question\xE1rios Individuais"), /*#__PURE__*/React.createElement("p", {
+    className: "subtitulo-pagina",
+    style: {
+      marginBottom: 16
+    }
+  }, "Visualize as respostas ou envie o question\xE1rio ao paciente pelo WhatsApp.")), /*#__PURE__*/React.createElement("div", {
     className: "grade-cartoes-recursos"
   }, QUESTIONARIOS_DISPONIVEIS.map(q => /*#__PURE__*/React.createElement("div", {
     key: q.id,

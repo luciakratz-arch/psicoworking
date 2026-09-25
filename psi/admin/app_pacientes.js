@@ -803,6 +803,88 @@ const QUESTIONARIOS_DISPONIVEIS = [
   { id: "jogos", rotulo: "Jogos e Apostas", icone: "dice-5", desc: "Rastreamento de Gaming e Gambling Disorder (DSM-5 / CID-11).", pronto: true },
 ];
 
+// ─── 7 Grupos Diagnósticos DSM-5 ──────────────────────────────────
+// Cada grupo agrupa hipóteses diagnósticas. A psicóloga seleciona as
+// hipóteses relevantes por paciente e gera um link de rastreamento
+// personalizado (token em clinica_rastreamento_tokens).
+const GRUPOS_DIAGNOSTICOS = [
+  {
+    id: "G1", icone: "bar-chart", titulo: "Transtornos do Humor",
+    descricao: "Depressão, bipolar e ciclotimia — avaliação do eixo do humor",
+    cor: "#4F46E5", corBg: "#EEF2FF",
+    hipoteses: [
+      { id: "tdm",        rotulo: "Depressão Maior (TDM)" },
+      { id: "distimia",   rotulo: "Depressão Persistente (Distimia)" },
+      { id: "ciclotimia", rotulo: "Ciclotimia" },
+      { id: "bipolar_I",  rotulo: "Transtorno Bipolar tipo I (Mania)" },
+      { id: "bipolar_II", rotulo: "Transtorno Bipolar tipo II (Hipomania + Depressão)" },
+    ],
+  },
+  {
+    id: "G2", icone: "wind", titulo: "Transtornos de Ansiedade",
+    descricao: "Ansiedade generalizada, pânico e ansiedade social",
+    cor: "#0D9488", corBg: "#F0FDFA",
+    hipoteses: [
+      { id: "tag",          rotulo: "Ansiedade Generalizada (TAG)" },
+      { id: "panico",       rotulo: "Transtorno do Pânico" },
+      { id: "fobia_social", rotulo: "Ansiedade Social (Fobia Social)" },
+    ],
+  },
+  {
+    id: "G3", icone: "rotate-cw", titulo: "TOC e Transtornos Relacionados",
+    descricao: "Obsessões, compulsões e comportamentos repetitivos",
+    cor: "#D97706", corBg: "#FFFBEB",
+    hipoteses: [
+      { id: "toc", rotulo: "TOC — Transtorno Obsessivo-Compulsivo" },
+    ],
+  },
+  {
+    id: "G4", icone: "zap", titulo: "Trauma e Estressores",
+    descricao: "TEPT, TEPT Complexo, dissociativo e adaptação",
+    cor: "#DC2626", corBg: "#FEF2F2",
+    hipoteses: [
+      { id: "tept",          rotulo: "TEPT — Estresse Pós-Traumático" },
+      { id: "tept_complexo", rotulo: "TEPT Complexo (CID-11)" },
+      { id: "dissociativo",  rotulo: "Transtorno Dissociativo" },
+      { id: "adaptacao",     rotulo: "Transtorno de Adaptação" },
+    ],
+  },
+  {
+    id: "G5", icone: "user", titulo: "Transtornos de Personalidade",
+    descricao: "Padrões persistentes de experiência e comportamento desadaptativos",
+    cor: "#BE185D", corBg: "#FDF2F8",
+    hipoteses: [
+      { id: "borderline",  rotulo: "TP Borderline" },
+      { id: "histrionico", rotulo: "TP Histriônico" },
+      { id: "narcisista",  rotulo: "TP Narcisista" },
+      { id: "antissocial", rotulo: "TP Antissocial" },
+    ],
+  },
+  {
+    id: "G6", icone: "cpu", titulo: "Neurodesenvolvimento",
+    descricao: "TDAH, TEA, TOD e outros transtornos do desenvolvimento",
+    cor: "#7C3AED", corBg: "#F5F3FF",
+    hipoteses: [
+      { id: "tdah_des", rotulo: "TDAH — Predominantemente Desatento" },
+      { id: "tdah_hip", rotulo: "TDAH — Hiperativo/Impulsivo" },
+      { id: "tea",      rotulo: "TEA — Transtorno do Espectro Autista" },
+      { id: "tod",      rotulo: "TOD — Transtorno Opositivo-Desafiador" },
+    ],
+  },
+  {
+    id: "G7", icone: "layers", titulo: "Comportamentos Aditivos e Alimentares",
+    descricao: "Dependência química, jogos e transtornos alimentares",
+    cor: "#059669", corBg: "#ECFDF5",
+    hipoteses: [
+      { id: "substancias", rotulo: "Dependência Química / Substâncias" },
+      { id: "gaming",      rotulo: "Transtorno de Jogos Digitais (Gaming)" },
+      { id: "gambling",    rotulo: "Transtorno de Apostas (Gambling)" },
+      { id: "anorexia",    rotulo: "Anorexia Nervosa" },
+      { id: "bulimia",     rotulo: "Bulimia / TCA" },
+    ],
+  },
+];
+
 // Dados de cada instrumento de rastreamento já portado — a lista
 // completa de perguntas (mesma ordem/texto do formulário público em
 // psi/atividade/formulario-rastreamento.js) e a fórmula de gravidade,
@@ -1367,6 +1449,69 @@ function ListaCriteriosDSM5({ criterios, aoAjustarLote }) {
   );
 }
 
+function PontosAtencaoRespondiveis({ atencao, ajustes, aoAjustarLote }) {
+  const [pendente, setPendente] = useState({});
+  const [gravando, setGravando] = useState(false);
+  const [aviso, setAviso] = useState("");
+  if (!atencao || atencao.length === 0) return null;
+  function ch(i) { return "atencao_" + i; }
+  function atualDe(i) { const k = ch(i); return k in pendente ? pendente[k] : (ajustes[k] || null); }
+  function marcar(i, valor) {
+    setAviso("");
+    const k = ch(i);
+    setPendente((p) => ({ ...p, [k]: atualDe(i) === valor ? null : valor }));
+  }
+  const qtdPendente = Object.keys(pendente).length;
+  async function registrar() {
+    setGravando(true);
+    await aoAjustarLote(pendente);
+    setPendente({});
+    setGravando(false);
+    setAviso("Respostas da entrevista registradas.");
+  }
+  const confirmados = atencao.filter((_, i) => atualDe(i) === "sim").length;
+  const naoConf = atencao.filter((_, i) => atualDe(i) === "nao").length;
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontWeight: 600, fontSize: 13 }}>Pontos de atenção para a entrevista clínica</div>
+        {(confirmados > 0 || naoConf > 0) && (
+          <div style={{ fontSize: 11 }}>
+            {confirmados > 0 && <span style={{ color: "#16A34A", fontWeight: 600, marginRight: 8 }}>{confirmados} confirmado(s)</span>}
+            {naoConf > 0 && <span style={{ color: "#DC2626", fontWeight: 600 }}>{naoConf} não confirmado(s)</span>}
+          </div>
+        )}
+      </div>
+      {atencao.map((texto, i) => {
+        const v = atualDe(i);
+        const bg = v === "sim" ? "#F0FDF4" : v === "nao" ? "#FEF2F2" : "#FFF7ED";
+        const borda = v === "sim" ? "#16A34A" : v === "nao" ? "#DC2626" : "#F97316";
+        return (
+          <div key={i} style={{ background: bg, borderLeft: "3px solid " + borda, padding: "10px 12px", marginBottom: 6, borderRadius: "0 6px 6px 0" }}>
+            <div style={{ fontSize: 12, color: "#374151", marginBottom: 8 }}>{texto}</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <BotaoTri ativo={v === "sim"} rotulo="Confirmado" cor="#16A34A" onClick={() => marcar(i, "sim")} />
+              <BotaoTri ativo={v === "nao"} rotulo="Não confirmado" cor="#DC2626" onClick={() => marcar(i, "nao")} />
+            </div>
+          </div>
+        );
+      })}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+        <button type="button" className="botao-primario" onClick={registrar} disabled={gravando || qtdPendente === 0}>
+          <Icone nome="check-circle" tamanho={14} /> {gravando ? "Salvando..." : "Registrar respostas da entrevista"}
+        </button>
+        {qtdPendente > 0 && (
+          <>
+            <span style={{ fontSize: 12, color: "#9A3412" }}>{qtdPendente} resposta(s) ainda não salva(s)</span>
+            <button type="button" className="botao-secundario" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => setPendente({})}>Descartar</button>
+          </>
+        )}
+        {aviso && qtdPendente === 0 && <span style={{ fontSize: 12, color: "#16A34A", fontWeight: 600 }}>{aviso}</span>}
+      </div>
+    </div>
+  );
+}
+
 // Diagnóstico diferencial a partir do respondente mais recente
 // (docs[0]) — critérios contados um a um e nomeados, não mais por
 // percentual. O eixo Borderline usa as 9 perguntas p7-p15 na MESMA
@@ -1712,14 +1857,7 @@ ${respostasHtml}
               <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustarLote={ajustar} />
             </div>
 
-            {laudo.atencao.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Pontos de atenção para a entrevista clínica</div>
-                {laudo.atencao.map((a, i) => (
-                  <div key={i} style={{ background: "#FFF7ED", borderLeft: "3px solid #F97316", padding: "8px 12px", marginBottom: 6, borderRadius: "0 6px 6px 0", fontSize: 12 }}>{a}</div>
-                ))}
-              </div>
-            )}
+            <PontosAtencaoRespondiveis atencao={laudo.atencao} ajustes={ajustes} aoAjustarLote={ajustar} />
 
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Respostas por respondente</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2125,14 +2263,7 @@ function AbaRastreamentoAlimentarView({ usuario, paciente, aoVoltar }) {
               <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustarLote={ajustar} />
             </div>
 
-            {laudo.atencao.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Pontos de atenção para a entrevista clínica</div>
-                {laudo.atencao.map((a, i) => (
-                  <div key={i} style={{ background: "#FFF7ED", borderLeft: "3px solid #F97316", padding: "8px 12px", marginBottom: 6, borderRadius: "0 6px 6px 0", fontSize: 12 }}>{a}</div>
-                ))}
-              </div>
-            )}
+            <PontosAtencaoRespondiveis atencao={laudo.atencao} ajustes={ajustes} aoAjustarLote={ajustar} />
 
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Respostas por respondente</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2420,14 +2551,7 @@ function AbaRastreamentoSexualView({ usuario, paciente, aoVoltar }) {
               <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustarLote={ajustar} />
             </div>
 
-            {laudo.atencao.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Pontos de atenção para a entrevista clínica</div>
-                {laudo.atencao.map((a, i) => (
-                  <div key={i} style={{ background: "#FFF7ED", borderLeft: "3px solid #F97316", padding: "8px 12px", marginBottom: 6, borderRadius: "0 6px 6px 0", fontSize: 12 }}>{a}</div>
-                ))}
-              </div>
-            )}
+            <PontosAtencaoRespondiveis atencao={laudo.atencao} ajustes={ajustes} aoAjustarLote={ajustar} />
 
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Respostas do paciente</div>
             <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 16 }}>
@@ -2766,14 +2890,7 @@ function AbaRastreamentoNeuroView({ usuario, paciente, aoVoltar }) {
               <ListaCriteriosDSM5 criterios={laudo.criterios} aoAjustarLote={ajustar} />
             </div>
 
-            {laudo.atencao.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Pontos de atenção para a entrevista clínica</div>
-                {laudo.atencao.map((a, i) => (
-                  <div key={i} style={{ background: "#FFF7ED", borderLeft: "3px solid #F97316", padding: "8px 12px", marginBottom: 6, borderRadius: "0 6px 6px 0", fontSize: 12 }}>{a}</div>
-                ))}
-              </div>
-            )}
+            <PontosAtencaoRespondiveis atencao={laudo.atencao} ajustes={ajustes} aoAjustarLote={ajustar} />
 
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Respostas por respondente</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2812,10 +2929,235 @@ function AbaRastreamentoNeuroView({ usuario, paciente, aoVoltar }) {
   );
 }
 
+// ─── Painel de Grupo Diagnóstico ──────────────────────────────────
+// Exibe hipóteses selecionáveis, gera token e lista respostas.
+function PainelGrupoDiagnostico({ usuario, paciente, grupo, onVoltar }) {
+  const [hipSel, setHipSel] = useState([]);
+  const [gerando, setGerando] = useState(false);
+  const [link, setLink] = useState(null);
+  const [copiado, setCopiado] = useState(false);
+  const [respostas, setRespostas] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [aberto, setAberto] = useState(null);
+
+  useEffect(() => {
+    if (!paciente?.id) return;
+    db.collection("clinica_rastreamento_diagnostico")
+      .where("psi_id", "==", usuario.psiId)
+      .where("pacienteId", "==", paciente.id)
+      .where("grupoId", "==", grupo.id)
+      .get()
+      .then((snap) => {
+        const lista = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.criadoEm?.seconds || 0) - (a.criadoEm?.seconds || 0));
+        setRespostas(lista);
+        setCarregando(false);
+      })
+      .catch(() => setCarregando(false));
+  }, [usuario.psiId, paciente.id, grupo.id]);
+
+  function toggleHip(id) {
+    setHipSel((prev) => prev.includes(id) ? prev.filter((h) => h !== id) : [...prev, id]);
+  }
+
+  async function gerarLink() {
+    if (hipSel.length === 0) return;
+    setGerando(true);
+    try {
+      const token = "diag_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+      await db.collection("clinica_rastreamento_tokens").doc(token).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome || "",
+        grupoId: grupo.id,
+        grupoTitulo: grupo.titulo,
+        hipoteses: hipSel,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        validade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        usado: false,
+      });
+      setLink(window.location.origin + "/psi/atividade/diagnostico/?token=" + token);
+    } catch (e) {
+      alert("Erro ao gerar link: " + e.message);
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  function copiar() {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
+
+  function enviarWhatsApp() {
+    const primeiroNome = (paciente.nome || "").split(" ")[0];
+    const msg =
+      `Olá, ${primeiroNome}!\n\n` +
+      `Preparei um questionário clínico personalizado para você preencher.\n\n` +
+      `É rápido, leva cerca de 10 minutos. Responda com calma e honestidade:\n\n${link}\n\n` +
+      `Qualquer dúvida, me chama por aqui.`;
+    const numero = (paciente.telefone || "").replace(/\D/g, "");
+    window.open(
+      (numero ? "https://wa.me/55" + numero : "https://wa.me/") + "?text=" + encodeURIComponent(msg),
+      "_blank"
+    );
+  }
+
+  function calcularEscores(doc) {
+    if (!doc.respostas) return {};
+    const escores = {};
+    (doc.hipoteses || []).forEach((hipId) => {
+      const pares = Object.entries(doc.respostas).filter(([k]) => k.startsWith(hipId + "_"));
+      if (pares.length === 0) return;
+      const pts = pares.reduce((s, [, v]) => s + (v === "C" ? 2 : v === "B" ? 1 : 0), 0);
+      escores[hipId] = Math.round((pts / (pares.length * 2)) * 100);
+    });
+    return escores;
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onVoltar}
+        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: grupo.cor, fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 20, padding: 0 }}
+      >
+        <Icone nome="arrow-left" tamanho={15} /> Voltar para Questionários
+      </button>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: grupo.corBg, display: "flex", alignItems: "center", justifyContent: "center", color: grupo.cor }}>
+          <Icone nome={grupo.icone} tamanho={22} />
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "#111827" }}>{grupo.titulo}</div>
+          <div style={{ fontSize: 12, color: "#6B7280" }}>{grupo.descricao}</div>
+        </div>
+      </div>
+
+      <div style={{ background: grupo.corBg, border: "1px solid " + grupo.cor + "33", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, color: grupo.cor, marginBottom: 12 }}>
+          Selecione as hipóteses a incluir no questionário
+        </div>
+        {grupo.hipoteses.map((h) => (
+          <label key={h.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, cursor: "pointer", userSelect: "none" }}>
+            <input
+              type="checkbox"
+              checked={hipSel.includes(h.id)}
+              onChange={() => toggleHip(h.id)}
+              style={{ width: 16, height: 16, accentColor: grupo.cor }}
+            />
+            <span style={{ fontSize: 13, color: "#374151" }}>{h.rotulo}</span>
+          </label>
+        ))}
+        <div style={{ marginTop: 14 }}>
+          <button
+            type="button"
+            className="botao-primario"
+            style={{ background: grupo.cor }}
+            disabled={hipSel.length === 0 || gerando}
+            onClick={gerarLink}
+          >
+            <Icone nome="link" tamanho={14} />
+            {gerando ? "Gerando..." : "Gerar link do questionário"}
+          </button>
+        </div>
+      </div>
+
+      {link && (
+        <div style={{ background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 12, padding: 14, marginBottom: 24 }}>
+          <div style={{ fontWeight: 600, fontSize: 12, color: "#166534", marginBottom: 8 }}>Link gerado — válido por 30 dias</div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              readOnly
+              value={link}
+              style={{ flex: 1, minWidth: 200, fontSize: 11, padding: "8px 10px", border: "1px solid #86EFAC", borderRadius: 8, background: "white", color: "#374151" }}
+            />
+            <button type="button" className="botao-secundario" style={{ fontSize: 12 }} onClick={copiar}>
+              <Icone nome={copiado ? "check" : "copy"} tamanho={13} /> {copiado ? "Copiado!" : "Copiar"}
+            </button>
+            <button type="button" className="botao-primario" style={{ background: "#25D366", fontSize: 12 }} onClick={enviarWhatsApp}>
+              <Icone nome="message-circle" tamanho={13} /> WhatsApp
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ fontWeight: 600, fontSize: 14, color: "#111827", marginBottom: 12 }}>
+        Respostas recebidas{respostas.length > 0 && <span style={{ fontSize: 12, fontWeight: 400, color: "#6B7280", marginLeft: 6 }}>({respostas.length})</span>}
+      </div>
+
+      {carregando ? (
+        <Spinner />
+      ) : respostas.length === 0 ? (
+        <div className="texto-vazio" style={{ padding: "24px 0" }}>Nenhuma resposta recebida ainda.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {respostas.map((doc) => {
+            const escores = calcularEscores(doc);
+            const isOpen = aberto === doc.id;
+            const hips = (doc.hipoteses || []).map(
+              (id) => grupo.hipoteses.find((h) => h.id === id)?.rotulo || id
+            );
+            const data = doc.criadoEm?.seconds
+              ? new Date(doc.criadoEm.seconds * 1000).toLocaleDateString("pt-BR")
+              : "—";
+            return (
+              <div key={doc.id} style={{ border: "1px solid #E5E7EB", borderRadius: 12, overflow: "hidden" }}>
+                <div
+                  onClick={() => setAberto(isOpen ? null : doc.id)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", cursor: "pointer", background: isOpen ? grupo.corBg : "white" }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{data}</div>
+                    <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>{hips.join(" · ")}</div>
+                  </div>
+                  <Icone nome={isOpen ? "chevron-up" : "chevron-down"} tamanho={16} />
+                </div>
+                {isOpen && (
+                  <div style={{ padding: "12px 16px", borderTop: "1px solid #F3F4F6" }}>
+                    {(doc.hipoteses || []).map((hipId) => {
+                      const hip = grupo.hipoteses.find((h) => h.id === hipId);
+                      const escore = escores[hipId];
+                      const cor = escore >= 60 ? "#DC2626" : escore >= 30 ? "#D97706" : "#16A34A";
+                      return (
+                        <div key={hipId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F3F4F6" }}>
+                          <span style={{ fontSize: 13, color: "#374151" }}>{hip?.rotulo || hipId}</span>
+                          {escore !== undefined ? (
+                            <span style={{ fontSize: 12, fontWeight: 700, color: cor }}>{escore}% concordância</span>
+                          ) : (
+                            <span style={{ fontSize: 12, color: "#9CA3AF" }}>sem dados</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {doc.obsFinais && (
+                      <div style={{ marginTop: 10, padding: 10, background: "#F9FAFB", borderRadius: 8, fontSize: 12, color: "#374151" }}>
+                        <strong>Obs:</strong> {doc.obsFinais}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AbaQuestionariosPaciente({ usuario, paciente }) {
   const [aberto, setAberto] = useState(null);
   const [enviandoId, setEnviandoId] = useState(null);
 
+  if (aberto?.tipo === "grupo") {
+    const grupo = GRUPOS_DIAGNOSTICOS.find((g) => g.id === aberto.id);
+    if (grupo) return <PainelGrupoDiagnostico usuario={usuario} paciente={paciente} grupo={grupo} onVoltar={() => setAberto(null)} />;
+  }
   if (aberto === "anamnese") {
     return <AbaAnamneseView usuario={usuario} paciente={paciente} aoVoltar={() => setAberto(null)} />;
   }
@@ -2878,7 +3220,34 @@ function AbaQuestionariosPaciente({ usuario, paciente }) {
 
   return (
     <div>
-      <p className="subtitulo-pagina" style={{ marginBottom: 16 }}>Visualize as respostas ou envie o questionário ao paciente pelo WhatsApp.</p>
+      {/* ── 7 Grupos Diagnósticos DSM-5 ── */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 4 }}>7 Grupos Diagnósticos DSM-5</div>
+        <p className="subtitulo-pagina" style={{ marginBottom: 16 }}>Selecione um grupo, escolha as hipóteses e gere um link de rastreamento personalizado para o paciente.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))", gap: 12 }}>
+          {GRUPOS_DIAGNOSTICOS.map((grupo) => (
+            <div
+              key={grupo.id}
+              className="cartao-recurso"
+              style={{ cursor: "pointer", borderTop: "3px solid " + grupo.cor, paddingTop: 14 }}
+              onClick={() => setAberto({ tipo: "grupo", id: grupo.id })}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <span style={{ color: grupo.cor }}><Icone nome={grupo.icone} tamanho={20} /></span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: "#111827", lineHeight: 1.3 }}>{grupo.titulo}</span>
+              </div>
+              <p style={{ fontSize: 11.5, color: "#6B7280", marginBottom: 10, lineHeight: 1.45 }}>{grupo.descricao}</p>
+              <span style={{ fontSize: 11, color: grupo.cor, fontWeight: 600 }}>{grupo.hipoteses.length} hipóteses disponíveis</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Questionários individuais (legado) ── */}
+      <div style={{ borderTop: "1px solid #E5E7EB", paddingTop: 20, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 4 }}>Questionários Individuais</div>
+        <p className="subtitulo-pagina" style={{ marginBottom: 16 }}>Visualize as respostas ou envie o questionário ao paciente pelo WhatsApp.</p>
+      </div>
       <div className="grade-cartoes-recursos">
         {QUESTIONARIOS_DISPONIVEIS.map((q) => (
           <div key={q.id} className="cartao-recurso" style={{ opacity: q.pronto ? 1 : 0.6 }}>
