@@ -40,15 +40,18 @@ const BOOTSTRAP_SECRET = defineSecret("BOOTSTRAP_SECRET");
 // ─────────────────────────────────────────────────────────────
 // 0) BOOTSTRAP — cria a conta Admin Matriz (uso único).
 //    APAGAR ESTA FUNÇÃO depois de rodar uma vez.
-//    URL: /bootstrapAdminMatriz?segredo=psicow-adm-2026
+//    Requer documento _bootstrap/token {ativo:true} no Firestore.
 // ─────────────────────────────────────────────────────────────
 exports.bootstrapAdminMatriz = onRequest(
-  { region: "southamerica-east1", secrets: [BOOTSTRAP_SECRET] },
+  { region: "southamerica-east1" },
   async (req, res) => {
-    if ((req.query.segredo || "").trim() !== BOOTSTRAP_SECRET.value().trim()) {
-      res.status(403).send("Nao autorizado.");
+    const tokenRef = db.collection("_bootstrap").doc("token");
+    const tokenDoc = await tokenRef.get();
+    if (!tokenDoc.exists || tokenDoc.data().ativo !== true) {
+      res.status(403).send("Token nao encontrado ou ja utilizado.");
       return;
     }
+    await tokenRef.delete();
     const EMAIL = "contato@luciakratz.com.br";
     try {
       let usuario;
