@@ -268,6 +268,68 @@ function ModalAniversario({ nome, nomeClinica, corMarca, onClose }) {
   );
 }
 
+// ─── Tela de Consentimento LGPD ──────────────────────────────────
+const VERSAO_LGPD = "1.0";
+
+function TelaConsentimento({ usuario, paciente, aoAceitar }) {
+  const [aceitando, setAceitando] = useState(false);
+
+  async function aceitar() {
+    setAceitando(true);
+    try {
+      await db.collection("clinica_consentimentos").doc(usuario.uid).set({
+        uid: usuario.uid,
+        psi_id: usuario.psiId,
+        pacienteNome: paciente?.nome || "",
+        versao: VERSAO_LGPD,
+        dataAceite: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      aoAceitar();
+    } catch (e) {
+      alert("Não foi possível registrar o aceite. Tente novamente.");
+    } finally {
+      setAceitando(false);
+    }
+  }
+
+  return (
+    <div className="tela-central-p">
+      <div className="cartao-login" style={{ maxWidth: 480, padding: 32 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <Icone nome="shield" tamanho={22} style={{ color: "var(--cor-marca-p)" }} />
+          <strong style={{ fontSize: 17 }}>Privacidade e consentimento</strong>
+        </div>
+        <p style={{ fontSize: 13, color: "#374151", lineHeight: 1.65, marginBottom: 16 }}>
+          Antes de continuar, precisamos do seu consentimento para guardar e processar seus dados clínicos.
+        </p>
+        <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "14px 16px", marginBottom: 20, fontSize: 12.5, color: "#4B5563", lineHeight: 1.7 }}>
+          <strong style={{ display: "block", marginBottom: 8, color: "#111827" }}>O que coletamos e para quê:</strong>
+          <p style={{ marginBottom: 6 }}>Dados de saúde mental registrados nas sessões, formulários e ferramentas desta plataforma — exclusivamente para apoio ao acompanhamento terapêutico.</p>
+          <p style={{ marginBottom: 6 }}>Seus dados ficam armazenados com segurança e só podem ser acessados pela sua psicóloga e por você.</p>
+          <p>Base legal: <strong>consentimento</strong> (LGPD art. 11, inciso I — dado de saúde).</p>
+        </div>
+        <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 20 }}>
+          Para mais detalhes, leia a{" "}
+          <a href="/privacidade/" target="_blank" style={{ color: "var(--cor-marca-p)", fontWeight: 600 }}>
+            Política de Privacidade
+          </a>.
+          Você pode solicitar a exportação ou exclusão dos seus dados a qualquer momento em <strong>Minha Conta</strong>.
+        </p>
+        <button className="botao-primario-p" onClick={aceitar} disabled={aceitando} style={{ width: "100%" }}>
+          <Icone nome="check-circle" tamanho={15} /> {aceitando ? "Registrando..." : "Li e aceito"}
+        </button>
+        <button
+          className="botao-secundario-p"
+          style={{ width: "100%", marginTop: 10 }}
+          onClick={logout}
+        >
+          Não aceitar e sair
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const { usuario, carregando } = useUsuarioLogado();
   const [tela, setTela] = useState("painel");
@@ -277,6 +339,7 @@ function App() {
   const [recursoAberto, setRecursoAberto] = useState(null);
   const [mostrarAniversario, setMostrarAniversario] = useState(false);
   const aniversarioChecado = useRef(false);
+  const [consentiuLGPD, setConsentiuLGPD] = useState(null); // null=verificando, false=não, true=sim
 
   useEffect(() => {
     if (!usuario || usuario.role !== "paciente") return;
@@ -309,11 +372,30 @@ function App() {
     }
   }, [usuario]);
 
+  // Verifica se o paciente já consentiu com a versão atual da política.
+  useEffect(() => {
+    if (!usuario || usuario.role !== "paciente") return;
+    db.collection("clinica_consentimentos").doc(usuario.uid).get()
+      .then((snap) => {
+        const versaoOk = snap.exists && snap.data().versao === VERSAO_LGPD;
+        setConsentiuLGPD(versaoOk);
+      })
+      .catch(() => setConsentiuLGPD(false));
+  }, [usuario]);
+
   if (carregando) {
     return <div className="tela-central-p"><p>Carregando...</p></div>;
   }
 
   if (!usuario) return <TelaLogin configClinica={configPreLogin} />;
+
+  if (consentiuLGPD === null && usuario.role === "paciente") {
+    return <div className="tela-central-p"><p>Carregando...</p></div>;
+  }
+
+  if (!consentiuLGPD && usuario.role === "paciente") {
+    return <TelaConsentimento usuario={usuario} paciente={paciente} aoAceitar={() => setConsentiuLGPD(true)} />;
+  }
 
   if (usuario.role !== "paciente") {
     return (
@@ -947,6 +1029,10 @@ function TelaMinhaConta({ usuario, paciente }) {
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [erroFoto, setErroFoto] = useState("");
   const inputFotoRef = useRef(null);
+  const [exportando, setExportando] = useState(false);
+  const [confirmacaoExclusao, setConfirmacaoExclusao] = useState("");
+  const [solicitandoExclusao, setSolicitandoExclusao] = useState(false);
+  const [msgPrivacidade, setMsgPrivacidade] = useState("");
 
   const iniciaisPaciente = (paciente?.nome || "?").trim().split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
@@ -956,6 +1042,63 @@ function TelaMinhaConta({ usuario, paciente }) {
       setMsg("Enviamos um link para " + usuario.email + " pra você definir uma senha nova.");
     } catch (e) {
       setMsg("Não foi possível enviar: " + e.message);
+    }
+  }
+
+  async function exportarDados() {
+    setExportando(true);
+    try {
+      const uid = usuario.uid;
+      const psi = usuario.psiId;
+      const colecoes = [
+        "clinica_sessoes", "clinica_metas", "clinica_humor", "clinica_diario",
+        "clinica_gestao_ansiedade", "clinica_tcc", "clinica_reflexoes", "clinica_anamneses",
+        "clinica_rastreamento_bipolar", "clinica_rastreamento_neuro",
+        "clinica_rastreamento_alimentar", "clinica_rastreamento_sexual",
+        "clinica_rastreamento_dependencia", "clinica_rastreamento_jogos",
+        "clinica_rastreamento_diagnostico",
+      ];
+      const resultado = { paciente: paciente || {}, dados: {} };
+      await Promise.all(colecoes.map(async (col) => {
+        const snap = await db.collection(col)
+          .where("psi_id", "==", psi)
+          .where("pacienteId", "==", uid)
+          .get();
+        resultado.dados[col] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }));
+      const blob = new Blob([JSON.stringify(resultado, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "meus-dados-psicoworking.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("Não foi possível exportar: " + e.message);
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  async function solicitarExclusao() {
+    if (confirmacaoExclusao !== "CONFIRMAR") return;
+    setSolicitandoExclusao(true);
+    try {
+      await db.collection("clinica_solicitacoes_lgpd").doc(usuario.uid + "_" + Date.now()).set({
+        uid: usuario.uid,
+        psi_id: usuario.psiId,
+        pacienteNome: paciente?.nome || "",
+        pacienteEmail: usuario.email || "",
+        tipo: "exclusao",
+        status: "pendente",
+        solicitadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setMsgPrivacidade("Solicitação enviada. Sua psicóloga será notificada e entrará em contato.");
+      setConfirmacaoExclusao("");
+    } catch (e) {
+      setMsgPrivacidade("Erro ao enviar solicitação: " + e.message);
+    } finally {
+      setSolicitandoExclusao(false);
     }
   }
 
@@ -1019,6 +1162,53 @@ function TelaMinhaConta({ usuario, paciente }) {
         <Icone nome="key" tamanho={14} /> Alterar minha senha
       </button>
       {msg && <p className="erro-p" style={{ background: "#DCFCE7", color: "#166534" }}>{msg}</p>}
+
+      {/* ── Privacidade e LGPD ── */}
+      <div style={{ borderTop: "1px solid #E5E7EB", marginTop: 24, paddingTop: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <Icone nome="shield" tamanho={16} />
+          <strong style={{ fontSize: 14 }}>Privacidade e seus dados</strong>
+        </div>
+        <p style={{ fontSize: 12.5, color: "#6B7280", marginBottom: 14, lineHeight: 1.6 }}>
+          Você tem direito à exportação e exclusão dos seus dados conforme a LGPD (Lei 13.709/2018).{" "}
+          <a href="/privacidade/" target="_blank" style={{ color: "var(--cor-marca-p)", fontWeight: 600 }}>
+            Ver Política de Privacidade
+          </a>.
+        </p>
+
+        <button className="botao-secundario-p" onClick={exportarDados} disabled={exportando} style={{ marginBottom: 16 }}>
+          <Icone nome="download" tamanho={14} /> {exportando ? "Gerando arquivo..." : "Baixar meus dados (JSON)"}
+        </button>
+
+        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "14px 16px" }}>
+          <p style={{ fontSize: 12.5, color: "#991B1B", fontWeight: 600, marginBottom: 8 }}>Solicitar exclusão dos meus dados</p>
+          <p style={{ fontSize: 12, color: "#4B5563", marginBottom: 12, lineHeight: 1.6 }}>
+            Atenção: conforme o CFP (Resolução 001/2009), dados de prontuário devem ser mantidos por no mínimo 5 anos. A exclusão poderá ser parcial.
+          </p>
+          <label style={{ fontSize: 12, color: "#374151", display: "block", marginBottom: 6 }}>
+            Digite <strong>CONFIRMAR</strong> para continuar:
+          </label>
+          <input
+            value={confirmacaoExclusao}
+            onChange={(e) => setConfirmacaoExclusao(e.target.value)}
+            placeholder="CONFIRMAR"
+            style={{ marginBottom: 10, fontSize: 13 }}
+          />
+          <button
+            className="botao-primario-p"
+            style={{ background: "#DC2626" }}
+            disabled={confirmacaoExclusao !== "CONFIRMAR" || solicitandoExclusao}
+            onClick={solicitarExclusao}
+          >
+            <Icone nome="trash-2" tamanho={14} /> {solicitandoExclusao ? "Enviando..." : "Solicitar exclusão"}
+          </button>
+        </div>
+        {msgPrivacidade && (
+          <p style={{ marginTop: 10, fontSize: 12.5, color: "#166534", background: "#F0FDF4", padding: "8px 12px", borderRadius: 8 }}>
+            {msgPrivacidade}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

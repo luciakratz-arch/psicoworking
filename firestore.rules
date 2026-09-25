@@ -280,6 +280,24 @@ service cloud.firestore {
                     && get(/databases/$(database)/documents/clinica_rastreamento_tokens/$(request.resource.data.token)).data.psi_id == request.resource.data.psi_id;
     }
 
+    // ── Consentimentos LGPD ─────────────────────────────────────
+    // O id do documento é o uid do paciente. O paciente lê e grava
+    // o próprio consentimento; a equipe da clínica só lê.
+    match /clinica_consentimentos/{uid} {
+      allow read, write: if estaLogado() && request.auth.uid == uid;
+      allow read: if ehEquipeDaClinica(resource.data.psi_id);
+    }
+
+    // ── Solicitações de direitos LGPD (exclusão, portabilidade) ──
+    // O paciente cria a própria solicitação; a equipe lê e processa.
+    match /clinica_solicitacoes_lgpd/{solicitacaoId} {
+      allow create: if estaLogado() && carimboPapel() == 'paciente'
+                    && request.resource.data.psi_id == carimboClinica()
+                    && request.resource.data.uid == request.auth.uid;
+      allow read: if estaLogado() && resource.data.uid == request.auth.uid;
+      allow read, update: if ehEquipeDaClinica(resource.data.psi_id);
+    }
+
     match /clinica_agenda/{eventoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
