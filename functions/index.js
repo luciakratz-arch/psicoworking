@@ -10,7 +10,7 @@
 //       psicóloga, sem o token do Google jamais tocar o navegador.
 // ═══════════════════════════════════════════════════════════════
 
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
@@ -35,6 +35,41 @@ const auth = admin.auth();
 const GOOGLE_CLIENT_ID = defineSecret("GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET = defineSecret("GOOGLE_CLIENT_SECRET");
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+const BOOTSTRAP_SECRET = defineSecret("BOOTSTRAP_SECRET");
+
+// ─────────────────────────────────────────────────────────────
+// 0) BOOTSTRAP — cria a conta Admin Matriz (uso único).
+//    APAGAR ESTA FUNÇÃO depois de rodar uma vez.
+//    URL: /bootstrapAdminMatriz?segredo=psicow-adm-2026
+// ─────────────────────────────────────────────────────────────
+exports.bootstrapAdminMatriz = onRequest(
+  { region: "southamerica-east1", secrets: [BOOTSTRAP_SECRET] },
+  async (req, res) => {
+    if (req.query.segredo !== BOOTSTRAP_SECRET.value()) {
+      res.status(403).send("Nao autorizado.");
+      return;
+    }
+    const EMAIL = "contato@luciakratz.com.br";
+    try {
+      let usuario;
+      try {
+        usuario = await auth.getUserByEmail(EMAIL);
+      } catch {
+        usuario = await auth.createUser({ email: EMAIL, displayName: "Admin Matriz" });
+      }
+      await auth.setCustomUserClaims(usuario.uid, { role: "admin_matriz" });
+      const linkSenha = await auth.generatePasswordResetLink(EMAIL);
+      res.send(
+        "<h2>Admin Matriz configurado!</h2>" +
+        "<p>UID: " + usuario.uid + "</p>" +
+        "<p>Clique no link abaixo para definir sua senha e depois apague esta function:</p>" +
+        "<a href='" + linkSenha + "'>" + linkSenha + "</a>"
+      );
+    } catch (err) {
+      res.status(500).send("Erro: " + err.message);
+    }
+  }
+);
 
 // ─────────────────────────────────────────────────────────────
 // 1) CARIMBO DE IDENTIDADE (custom claims)
