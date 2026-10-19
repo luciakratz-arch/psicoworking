@@ -19,16 +19,16 @@
 const { useState, useEffect, useRef } = React;
 
 function Icone({ nome, tamanho = 16 }) {
-  // Sem array de dependências, isso rodava a cada re-render de CADA
-  // ícone da tela — e window.lucide.createIcons() escaneia o
-  // documento inteiro toda vez que é chamado, deixando qualquer tela
-  // com muitos ícones (Recursos Terapêuticos, blocos interativos)
-  // pesada a cada digitação. Só precisa rodar de novo se o nome do
-  // ícone mudar.
+  const ref = useRef(null);
+  // React gerencia o <span>; lucide gerencia o conteúdo interno.
+  // Se usarmos <i> como nó React direto, o lucide substitui o <i> por
+  // <svg> fora do controle do React e o removeChild quebra na desmontagem.
   useEffect(() => {
-    if (window.lucide) window.lucide.createIcons();
-  }, [nome]);
-  return <i data-lucide={nome} className="icone-lucide" style={{ width: tamanho, height: tamanho }}></i>;
+    if (!ref.current || !window.lucide) return;
+    ref.current.innerHTML = `<i data-lucide="${nome}" class="icone-lucide" style="width:${tamanho}px;height:${tamanho}px"></i>`;
+    window.lucide.createIcons();
+  }, [nome, tamanho]);
+  return <span ref={ref} style={{ display: "inline-flex", width: tamanho, height: tamanho, flexShrink: 0 }} />;
 }
 
 // Campo de texto com ditado por voz — mesmo componente usado em todo
@@ -2096,6 +2096,7 @@ function LeitorFabula({ usuario, paciente, recurso }) {
   if (paginas.length === 0) return null;
   const pagina = paginas[idx];
   const textoPagina = typeof pagina === "string" ? pagina : pagina?.texto || "";
+  const ehImagem = /\.(jpg|jpeg|png|webp|gif)$/i.test(textoPagina);
   const pct = Math.round(((idx + 1) / paginas.length) * 100);
   const concluido = idx === paginas.length - 1;
 
@@ -2127,8 +2128,12 @@ function LeitorFabula({ usuario, paciente, recurso }) {
         <span style={{ fontSize: 12, color: "var(--cor-marca)", fontWeight: 700, flexShrink: 0 }}>{idx + 1}/{paginas.length}</span>
       </div>
 
-      <div style={{ background: "linear-gradient(145deg, #4c0094, var(--cor-marca, #7B00C4))", borderRadius: 20, padding: "32px 26px", minHeight: 170, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ fontSize: 18, color: "white", lineHeight: 1.9, textAlign: "center", fontStyle: "italic", margin: 0 }}>{textoPagina}</p>
+      <div style={{ background: "linear-gradient(145deg, #4c0094, var(--cor-marca, #7B00C4))", borderRadius: 20, padding: ehImagem ? 6 : "32px 26px", minHeight: ehImagem ? 0 : 170, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {ehImagem ? (
+          <img src={textoPagina} alt={"Painel " + (idx + 1)} style={{ width: "100%", display: "block", borderRadius: 15 }} />
+        ) : (
+          <p style={{ fontSize: 18, color: "white", lineHeight: 1.9, textAlign: "center", fontStyle: "italic", margin: 0 }}>{textoPagina}</p>
+        )}
       </div>
 
       {concluido && recurso.moral && (

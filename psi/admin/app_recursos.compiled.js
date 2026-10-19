@@ -429,6 +429,199 @@ const ICONE_POR_TIPO = {
   fabula: "book-open",
   psicoeducacao: "brain"
 };
+const BASE_IMAGENS = "https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/admin/imagens/";
+function slugify(titulo) {
+  return titulo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+function MigradorCarousel({
+  fabulas,
+  aoFechar
+}) {
+  const fabsTexto = (fabulas || []).filter(f => f.tipo !== "carousel");
+  const [fabId, setFabId] = useState(fabsTexto[0]?.id || "");
+  const [pasta, setPasta] = useState("");
+  const [qtd, setQtd] = useState(6);
+  const [prefixo, setPrefixo] = useState("painel");
+  const [ext, setExt] = useState("png");
+  const [salvando, setSalvando] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const fabSel = fabsTexto.find(f => f.id === fabId);
+  useEffect(() => {
+    if (fabSel) setPasta(slugify(fabSel.titulo || ""));
+  }, [fabId]);
+  const urls = Array.from({
+    length: Number(qtd) || 0
+  }, (_, i) => `${BASE_IMAGENS}${pasta}/${prefixo}${i + 1}.${ext}`);
+  async function salvar() {
+    if (!fabId || !pasta || urls.length === 0) return;
+    setSalvando(true);
+    setMsg(null);
+    try {
+      await db.collection("fabulas_terapeuticas").doc(fabId).update({
+        tipo: "carousel",
+        paginas: urls
+      });
+      setMsg("Convertida com sucesso!");
+      setFabId(fabsTexto.filter(f => f.id !== fabId)[0]?.id || "");
+    } catch (e) {
+      setMsg("Erro: " + e.message);
+    }
+    setSalvando(false);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-conteudo",
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxWidth: 520
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-cabecalho"
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      margin: 0
+    }
+  }, "Converter F\xE1bula para Carousel"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-fechar",
+    onClick: aoFechar
+  }, "\xD7")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "20px 24px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 14
+    }
+  }, fabsTexto.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "var(--cor-sucesso)"
+    }
+  }, "Todas as f\xE1bulas j\xE1 est\xE3o em formato carousel!") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "F\xE1bula"), /*#__PURE__*/React.createElement("select", {
+    value: fabId,
+    onChange: e => setFabId(e.target.value),
+    style: {
+      width: "100%",
+      marginTop: 4,
+      padding: "8px 10px",
+      borderRadius: 8,
+      border: "1px solid var(--borda)",
+      fontSize: 14
+    }
+  }, fabsTexto.map(f => /*#__PURE__*/React.createElement("option", {
+    key: f.id,
+    value: f.id
+  }, f.titulo || f.id)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 80px 100px 80px",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "Pasta no GitHub"), /*#__PURE__*/React.createElement("input", {
+    value: pasta,
+    onChange: e => setPasta(e.target.value),
+    placeholder: "ex: cadeira-de-balanco",
+    style: {
+      width: "100%",
+      marginTop: 4,
+      padding: "8px 10px",
+      borderRadius: 8,
+      border: "1px solid var(--borda)",
+      fontSize: 13,
+      boxSizing: "border-box"
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "Qtd"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: 1,
+    max: 30,
+    value: qtd,
+    onChange: e => setQtd(e.target.value),
+    style: {
+      width: "100%",
+      marginTop: 4,
+      padding: "8px 10px",
+      borderRadius: 8,
+      border: "1px solid var(--borda)",
+      fontSize: 13,
+      boxSizing: "border-box"
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "Prefixo"), /*#__PURE__*/React.createElement("input", {
+    value: prefixo,
+    onChange: e => setPrefixo(e.target.value),
+    placeholder: "painel",
+    style: {
+      width: "100%",
+      marginTop: 4,
+      padding: "8px 10px",
+      borderRadius: 8,
+      border: "1px solid var(--borda)",
+      fontSize: 13,
+      boxSizing: "border-box"
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600
+    }
+  }, "Ext."), /*#__PURE__*/React.createElement("select", {
+    value: ext,
+    onChange: e => setExt(e.target.value),
+    style: {
+      width: "100%",
+      marginTop: 4,
+      padding: "8px 10px",
+      borderRadius: 8,
+      border: "1px solid var(--borda)",
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("option", null, "png"), /*#__PURE__*/React.createElement("option", null, "jpg")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--fundo-card)",
+      borderRadius: 8,
+      padding: "10px 12px",
+      fontSize: 12,
+      color: "var(--texto-secundario)",
+      maxHeight: 100,
+      overflowY: "auto"
+    }
+  }, urls.map((u, i) => /*#__PURE__*/React.createElement("div", {
+    key: i
+  }, u))), msg && /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 13,
+      color: msg.startsWith("Erro") ? "var(--cor-erro)" : "var(--cor-sucesso)",
+      fontWeight: 600
+    }
+  }, msg), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: salvar,
+    disabled: salvando || !pasta || urls.length === 0,
+    style: {
+      justifyContent: "center"
+    }
+  }, salvando ? "Salvando..." : "Converter esta fábula")))));
+}
 function TelaRecursos({
   usuario
 }) {
@@ -446,6 +639,9 @@ function TelaRecursos({
   const [enviarItem, setEnviarItem] = useState(null);
   const [visualizando, setVisualizando] = useState(null);
   const [buscaIA, setBuscaIA] = useState(false);
+  const [migrando, setMigrando] = useState(false);
+  const [msgMigracao, setMsgMigracao] = useState(null);
+  const [mostrarMigrador, setMostrarMigrador] = useState(false);
   const abaAtual = ABAS_RECURSOS.find(a => a.id === aba);
   const itens = itensPorColecao[abaAtual.colecao] || [];
   useEffect(() => {
@@ -465,6 +661,44 @@ function TelaRecursos({
     setAba(id);
     setFiltroCateg("todos");
     setBusca("");
+  }
+  async function migrarParaCarousel() {
+    const BASE = "https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/admin/imagens/";
+    const MAPA = [{
+      busca: "Cadeira",
+      novoTitulo: "A Cadeira de Balanço",
+      paginas: [BASE + "cadeira-de-balanco/painel1.png", BASE + "cadeira-de-balanco/painel2.png", BASE + "cadeira-de-balanco/painel3.png", BASE + "cadeira-de-balanco/painel4.png", BASE + "cadeira-de-balanco/painel5.png", BASE + "cadeira-de-balanco/painel6.png"]
+    }, {
+      busca: "Detetive",
+      novoTitulo: null,
+      paginas: [BASE + "detetive-crimes-imaginarios/imagens1.png", BASE + "detetive-crimes-imaginarios/imagens2.png", BASE + "detetive-crimes-imaginarios/imagens3.png", BASE + "detetive-crimes-imaginarios/imagens4.png", BASE + "detetive-crimes-imaginarios/imagens5.png", BASE + "detetive-crimes-imaginarios/imagens6.png", BASE + "detetive-crimes-imaginarios/imagens7.png", BASE + "detetive-crimes-imaginarios/imagens8.png", BASE + "detetive-crimes-imaginarios/imagens9.png"]
+    }, {
+      busca: "Escorpi",
+      novoTitulo: null,
+      paginas: [BASE + "escorpiao-sapo/painel1.jpg", BASE + "escorpiao-sapo/painel2.jpg", BASE + "escorpiao-sapo/painel3.jpg", BASE + "escorpiao-sapo/painel4.jpg", BASE + "escorpiao-sapo/painel5.jpg", BASE + "escorpiao-sapo/painel6.jpg", BASE + "escorpiao-sapo/painel7.jpg", BASE + "escorpiao-sapo/painel8.jpg"]
+    }];
+    setMigrando(true);
+    setMsgMigracao("Atualizando...");
+    try {
+      const snap = await db.collection("fabulas_terapeuticas").get();
+      let count = 0;
+      for (const doc of snap.docs) {
+        const titulo = doc.data().titulo || "";
+        const m = MAPA.find(x => titulo.includes(x.busca));
+        if (!m) continue;
+        const upd = {
+          tipo: "carousel",
+          paginas: m.paginas
+        };
+        if (m.novoTitulo) upd.titulo = m.novoTitulo;
+        await doc.ref.update(upd);
+        count++;
+      }
+      setMsgMigracao(count > 0 ? `${count} fábulas convertidas para carousel!` : "Nenhuma fábula encontrada.");
+    } catch (e) {
+      setMsgMigracao("Erro: " + e.message);
+    }
+    setMigrando(false);
   }
   const itensDaAba = itens.filter(it => {
     // "avaliacao" (Anamnese, Entrevista Clínica, Rastreamentos DSM-5...)
@@ -503,9 +737,20 @@ function TelaRecursos({
   }, "Cat\xE1logo de ferramentas, f\xE1bulas e psicoeduca\xE7\xE3o \u2014 compartilhado com toda a plataforma")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 8
+      gap: 8,
+      alignItems: "center",
+      flexWrap: "wrap"
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, aba === "fabulas" && /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: () => setMostrarMigrador(true),
+    style: {
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "image",
+    tamanho: 15
+  }), " Converter para Carousel"), /*#__PURE__*/React.createElement("button", {
     className: "botao-secundario",
     onClick: () => setBuscaIA(true)
   }, /*#__PURE__*/React.createElement(Icone, {
@@ -646,6 +891,9 @@ function TelaRecursos({
       setBuscaIA(false);
       setVisualizando(item);
     }
+  }), mostrarMigrador && /*#__PURE__*/React.createElement(MigradorCarousel, {
+    fabulas: itensPorColecao["fabulas_terapeuticas"],
+    aoFechar: () => setMostrarMigrador(false)
   }));
 }
 
@@ -2000,12 +2248,14 @@ function WizardNovaFabula({
     titulo: item.titulo || "",
     icone: item.icone || "book-open",
     moral: item.moral || "",
-    categoria: item.categoria || "macro_ansiedade"
+    categoria: item.categoria || "macro_ansiedade",
+    tipo: item.tipo || "texto"
   } : {
     titulo: "",
     icone: "book-open",
     moral: "",
-    categoria: "macro_ansiedade"
+    categoria: "macro_ansiedade",
+    tipo: "texto"
   });
   const [paginas, setPaginas] = useState(Array.isArray(item?.paginas) && item.paginas.length > 0 ? item.paginas : [""]);
   const [perguntas, setPerguntas] = useState(Array.isArray(item?.perguntas) && item.perguntas.length > 0 ? [...item.perguntas, "", "", ""].slice(0, Math.max(3, item.perguntas.length)) : ["", "", ""]);
@@ -2036,6 +2286,7 @@ function WizardNovaFabula({
         icone: form.icone || "book-open",
         moral: form.moral.trim(),
         categoria: form.categoria,
+        tipo: form.tipo || "texto",
         paginas: paginas.filter(p => p.trim()),
         perguntas: perguntas.filter(p => p.trim())
       };
@@ -2142,7 +2393,29 @@ function WizardNovaFabula({
       moral: e.target.value
     }),
     placeholder: "Ex: \"A crise que parece fim pode ser come\xE7o.\""
-  }), erro && /*#__PURE__*/React.createElement("p", {
+  }), /*#__PURE__*/React.createElement("label", null, "Formato"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, [{
+    id: "texto",
+    label: "Texto"
+  }, {
+    id: "carousel",
+    label: "Carousel de imagens"
+  }].map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.id,
+    type: "button",
+    onClick: () => setForm({
+      ...form,
+      tipo: t.id
+    }),
+    className: "pill-status" + (form.tipo === t.id ? " pill-status-ativa" : ""),
+    style: {
+      "--cor-pill": "var(--cor-marca)"
+    }
+  }, t.label))), erro && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
   }, erro), /*#__PURE__*/React.createElement("div", {
     className: "acoes-modal"
@@ -2235,12 +2508,12 @@ function WizardNovaFabula({
   }, "Pr\xF3ximo ", /*#__PURE__*/React.createElement(Icone, {
     nome: "arrow-right",
     tamanho: 14
-  })))), passo === 3 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, "P\xE1ginas da f\xE1bula"), /*#__PURE__*/React.createElement("p", {
+  })))), passo === 3 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, form.tipo === "carousel" ? "Imagens do carousel" : "Páginas da fábula"), /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio",
     style: {
       marginTop: 0
     }
-  }, "Cada p\xE1gina \xE9 um bloco de texto. O paciente avan\xE7a p\xE1gina por p\xE1gina."), paginas.map((p, i) => /*#__PURE__*/React.createElement("div", {
+  }, form.tipo === "carousel" ? "Cole a URL de cada imagem PNG hospedada no GitHub Pages." : "Cada página é um bloco de texto. O paciente avança página por página."), paginas.map((p, i) => /*#__PURE__*/React.createElement("div", {
     key: i,
     style: {
       marginBottom: 12
@@ -2255,14 +2528,18 @@ function WizardNovaFabula({
     style: {
       margin: 0
     }
-  }, "P\xE1gina ", i + 1), paginas.length > 1 && /*#__PURE__*/React.createElement("button", {
+  }, form.tipo === "carousel" ? `Imagem ${i + 1}` : `Página ${i + 1}`), paginas.length > 1 && /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "botao-icone botao-icone-perigo",
     onClick: () => remPagina(i)
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "x",
     tamanho: 14
-  }))), /*#__PURE__*/React.createElement(TextAreaVoz, {
+  }))), form.tipo === "carousel" ? /*#__PURE__*/React.createElement("input", {
+    value: p,
+    onChange: e => setPagina(i, e.target.value),
+    placeholder: "https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/admin/imagens/nome-da-fabula/painel1.png"
+  }) : /*#__PURE__*/React.createElement(TextAreaVoz, {
     className: "campo-descricao",
     rows: 4,
     value: p,
@@ -2279,7 +2556,7 @@ function WizardNovaFabula({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "plus",
     tamanho: 14
-  }), " Adicionar p\xE1gina"), erro && /*#__PURE__*/React.createElement("p", {
+  }), " ", form.tipo === "carousel" ? "Adicionar imagem" : "Adicionar página"), erro && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
   }, erro), /*#__PURE__*/React.createElement("div", {
     className: "acoes-modal",
@@ -2352,12 +2629,7 @@ function WizardNovaFabula({
   }), " ", salvando ? "Salvando..." : "Salvar Fábula"))))));
 }
 
-// ─── Busca por sintoma (IA) ──────────────────────────────────────
-// A chamada de verdade pra IA vive na Cloud Function buscarPorSintoma
-// (functions/index.js) — a chave da Anthropic nunca fica no
-// navegador. Aqui só manda a queixa + a lista de itens já cadastrados
-// e cruza a resposta com os itens reais pelo título (protege contra
-// a IA inventar um título que não existe na biblioteca).
+// ─── Busca por sintoma (palavras-chave local) ────────────────────
 function BuscaPorSintoma({
   itens,
   aoFechar,
@@ -2368,32 +2640,41 @@ function BuscaPorSintoma({
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState("");
-  async function buscar() {
+  function buscar() {
     if (!sintoma.trim()) return;
     setBuscando(true);
     setErro("");
     setResultado(null);
-    try {
-      const chamar = functions.httpsCallable("buscarPorSintoma");
-      const itensSimplificados = itens.map(it => ({
-        titulo: it.titulo || it.nome,
-        categoria: it.categoria,
-        descricao: it.descricao
-      }));
-      const resposta = await chamar({
-        sintoma,
-        itens: itensSimplificados
-      });
-      const recomendados = (resposta.data?.recomendacoes || []).map(r => ({
-        ...r,
-        item: itens.find(x => (x.titulo || x.nome || "").toLowerCase() === (r.titulo || "").toLowerCase())
-      })).filter(r => r.item).sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-      setResultado(recomendados);
-    } catch (e) {
-      setErro(e.message || "Erro ao consultar a IA. Tente novamente.");
-    } finally {
-      setBuscando(false);
-    }
+    setTimeout(() => {
+      try {
+        function norm(t) {
+          return (t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9\s]/g, " ");
+        }
+        const palavras = norm(sintoma).split(/\s+/).filter(p => p.length >= 3);
+        if (palavras.length === 0) {
+          setResultado([]);
+          setBuscando(false);
+          return;
+        }
+        const scored = itens.map(it => {
+          const corpus = norm([it.titulo, it.nome, it.descricao, it.objetivo, it.categoria, Array.isArray(it.tags) ? it.tags.join(" ") : ""].join(" "));
+          const pontos = palavras.filter(p => corpus.includes(p)).length;
+          return {
+            item: it,
+            pontos
+          };
+        }).filter(r => r.pontos > 0).sort((a, b) => b.pontos - a.pontos).slice(0, 6);
+        setResultado(scored.map((r, i) => ({
+          item: r.item,
+          ordem: i + 1,
+          motivo: r.item.descricao || r.item.objetivo || "Recurso terapêutico relacionado à busca"
+        })));
+      } catch (e) {
+        setErro("Erro na busca. Tente novamente.");
+      } finally {
+        setBuscando(false);
+      }
+    }, 200);
   }
   return /*#__PURE__*/React.createElement("div", {
     className: "sobreposicao",
@@ -2414,7 +2695,7 @@ function BuscaPorSintoma({
     style: {
       marginTop: 0
     }
-  }, "Descreva a queixa da paciente \u2014 a IA sugere as op\xE7\xF5es mais indicadas dentro do que j\xE1 est\xE1 cadastrado nesta biblioteca."), /*#__PURE__*/React.createElement(TextAreaVoz, {
+  }, "Descreva a queixa da paciente \u2014 o sistema busca automaticamente os recursos mais relacionados nesta biblioteca."), /*#__PURE__*/React.createElement(TextAreaVoz, {
     className: "campo-descricao",
     rows: 2,
     value: sintoma,
@@ -4878,6 +5159,7 @@ function PreviewFabula({
   if (paginas.length === 0) return null;
   const pagina = paginas[idx];
   const textoPagina = typeof pagina === "string" ? pagina : pagina?.texto || "";
+  const ehImagem = /\.(jpg|jpeg|png|webp|gif)$/i.test(textoPagina);
   const pct = Math.round((idx + 1) / paginas.length * 100);
   const concluido = idx === paginas.length - 1;
   return /*#__PURE__*/React.createElement("div", {
@@ -4918,14 +5200,23 @@ function PreviewFabula({
     style: {
       background: "linear-gradient(145deg, var(--cor-marca-escura), var(--cor-marca))",
       borderRadius: 20,
-      padding: "32px 26px",
-      minHeight: 170,
+      padding: ehImagem ? 6 : "32px 26px",
+      minHeight: ehImagem ? 0 : 170,
       marginBottom: 18,
       display: "flex",
       alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
+      overflow: "hidden"
     }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, ehImagem ? /*#__PURE__*/React.createElement("img", {
+    src: textoPagina,
+    alt: "Painel " + (idx + 1),
+    style: {
+      width: "100%",
+      display: "block",
+      borderRadius: 15
+    }
+  }) : /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 18,
       color: "white",

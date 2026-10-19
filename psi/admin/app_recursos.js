@@ -230,6 +230,116 @@ function BarraFiltroCategoria({ itens, filtro, setFiltro }) {
 
 const ICONE_POR_TIPO = { ferramenta: "wrench", fabula: "book-open", psicoeducacao: "brain" };
 
+const BASE_IMAGENS = "https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/admin/imagens/";
+
+function slugify(titulo) {
+  return titulo.toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function MigradorCarousel({ fabulas, aoFechar }) {
+  const fabsTexto = (fabulas || []).filter((f) => f.tipo !== "carousel");
+  const [fabId, setFabId] = useState(fabsTexto[0]?.id || "");
+  const [pasta, setPasta] = useState("");
+  const [qtd, setQtd] = useState(6);
+  const [prefixo, setPrefixo] = useState("painel");
+  const [ext, setExt] = useState("png");
+  const [salvando, setSalvando] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const fabSel = fabsTexto.find((f) => f.id === fabId);
+
+  useEffect(() => {
+    if (fabSel) setPasta(slugify(fabSel.titulo || ""));
+  }, [fabId]);
+
+  const urls = Array.from({ length: Number(qtd) || 0 }, (_, i) =>
+    `${BASE_IMAGENS}${pasta}/${prefixo}${i + 1}.${ext}`
+  );
+
+  async function salvar() {
+    if (!fabId || !pasta || urls.length === 0) return;
+    setSalvando(true);
+    setMsg(null);
+    try {
+      await db.collection("fabulas_terapeuticas").doc(fabId).update({
+        tipo: "carousel",
+        paginas: urls,
+      });
+      setMsg("Convertida com sucesso!");
+      setFabId(fabsTexto.filter((f) => f.id !== fabId)[0]?.id || "");
+    } catch (e) {
+      setMsg("Erro: " + e.message);
+    }
+    setSalvando(false);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={aoFechar}>
+      <div className="modal-conteudo" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="modal-cabecalho">
+          <h3 style={{ margin: 0 }}>Converter Fábula para Carousel</h3>
+          <button className="botao-fechar" onClick={aoFechar}>×</button>
+        </div>
+        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {fabsTexto.length === 0 ? (
+            <p style={{ color: "var(--cor-sucesso)" }}>Todas as fábulas já estão em formato carousel!</p>
+          ) : (
+            <>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600 }}>Fábula</label>
+                <select value={fabId} onChange={(e) => setFabId(e.target.value)}
+                  style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--borda)", fontSize: 14 }}>
+                  {fabsTexto.map((f) => (
+                    <option key={f.id} value={f.id}>{f.titulo || f.id}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 100px 80px", gap: 8 }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600 }}>Pasta no GitHub</label>
+                  <input value={pasta} onChange={(e) => setPasta(e.target.value)}
+                    placeholder="ex: cadeira-de-balanco"
+                    style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--borda)", fontSize: 13, boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600 }}>Qtd</label>
+                  <input type="number" min={1} max={30} value={qtd} onChange={(e) => setQtd(e.target.value)}
+                    style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--borda)", fontSize: 13, boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600 }}>Prefixo</label>
+                  <input value={prefixo} onChange={(e) => setPrefixo(e.target.value)}
+                    placeholder="painel"
+                    style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--borda)", fontSize: 13, boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600 }}>Ext.</label>
+                  <select value={ext} onChange={(e) => setExt(e.target.value)}
+                    style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--borda)", fontSize: 13 }}>
+                    <option>png</option>
+                    <option>jpg</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ background: "var(--fundo-card)", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "var(--texto-secundario)", maxHeight: 100, overflowY: "auto" }}>
+                {urls.map((u, i) => <div key={i}>{u}</div>)}
+              </div>
+              {msg && <p style={{ margin: 0, fontSize: 13, color: msg.startsWith("Erro") ? "var(--cor-erro)" : "var(--cor-sucesso)", fontWeight: 600 }}>{msg}</p>}
+              <button className="botao-primario" onClick={salvar} disabled={salvando || !pasta || urls.length === 0}
+                style={{ justifyContent: "center" }}>
+                {salvando ? "Salvando..." : "Converter esta fábula"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TelaRecursos({ usuario }) {
   const [aba, setAba] = useState("ferramentas");
   const [itensPorColecao, setItensPorColecao] = useState({
@@ -245,6 +355,9 @@ function TelaRecursos({ usuario }) {
   const [enviarItem, setEnviarItem] = useState(null);
   const [visualizando, setVisualizando] = useState(null);
   const [buscaIA, setBuscaIA] = useState(false);
+  const [migrando, setMigrando] = useState(false);
+  const [msgMigracao, setMsgMigracao] = useState(null);
+  const [mostrarMigrador, setMostrarMigrador] = useState(false);
 
   const abaAtual = ABAS_RECURSOS.find((a) => a.id === aba);
   const itens = itensPorColecao[abaAtual.colecao] || [];
@@ -266,6 +379,49 @@ function TelaRecursos({ usuario }) {
     setAba(id);
     setFiltroCateg("todos");
     setBusca("");
+  }
+
+  async function migrarParaCarousel() {
+    const BASE = "https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/admin/imagens/";
+    const MAPA = [
+      { busca: "Cadeira", novoTitulo: "A Cadeira de Balanço", paginas: [
+        BASE+"cadeira-de-balanco/painel1.png", BASE+"cadeira-de-balanco/painel2.png",
+        BASE+"cadeira-de-balanco/painel3.png", BASE+"cadeira-de-balanco/painel4.png",
+        BASE+"cadeira-de-balanco/painel5.png", BASE+"cadeira-de-balanco/painel6.png",
+      ]},
+      { busca: "Detetive", novoTitulo: null, paginas: [
+        BASE+"detetive-crimes-imaginarios/imagens1.png", BASE+"detetive-crimes-imaginarios/imagens2.png",
+        BASE+"detetive-crimes-imaginarios/imagens3.png", BASE+"detetive-crimes-imaginarios/imagens4.png",
+        BASE+"detetive-crimes-imaginarios/imagens5.png", BASE+"detetive-crimes-imaginarios/imagens6.png",
+        BASE+"detetive-crimes-imaginarios/imagens7.png", BASE+"detetive-crimes-imaginarios/imagens8.png",
+        BASE+"detetive-crimes-imaginarios/imagens9.png",
+      ]},
+      { busca: "Escorpi", novoTitulo: null, paginas: [
+        BASE+"escorpiao-sapo/painel1.jpg", BASE+"escorpiao-sapo/painel2.jpg",
+        BASE+"escorpiao-sapo/painel3.jpg", BASE+"escorpiao-sapo/painel4.jpg",
+        BASE+"escorpiao-sapo/painel5.jpg", BASE+"escorpiao-sapo/painel6.jpg",
+        BASE+"escorpiao-sapo/painel7.jpg", BASE+"escorpiao-sapo/painel8.jpg",
+      ]},
+    ];
+    setMigrando(true);
+    setMsgMigracao("Atualizando...");
+    try {
+      const snap = await db.collection("fabulas_terapeuticas").get();
+      let count = 0;
+      for (const doc of snap.docs) {
+        const titulo = doc.data().titulo || "";
+        const m = MAPA.find((x) => titulo.includes(x.busca));
+        if (!m) continue;
+        const upd = { tipo: "carousel", paginas: m.paginas };
+        if (m.novoTitulo) upd.titulo = m.novoTitulo;
+        await doc.ref.update(upd);
+        count++;
+      }
+      setMsgMigracao(count > 0 ? `${count} fábulas convertidas para carousel!` : "Nenhuma fábula encontrada.");
+    } catch (e) {
+      setMsgMigracao("Erro: " + e.message);
+    }
+    setMigrando(false);
   }
 
   const itensDaAba = itens.filter((it) => {
@@ -308,7 +464,12 @@ function TelaRecursos({ usuario }) {
           <h2>Recursos Terapêuticos</h2>
           <p className="subtitulo-pagina">Catálogo de ferramentas, fábulas e psicoeducação — compartilhado com toda a plataforma</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {aba === "fabulas" && (
+            <button className="botao-secundario" onClick={() => setMostrarMigrador(true)} style={{ fontSize: 13 }}>
+              <Icone nome="image" tamanho={15} /> Converter para Carousel
+            </button>
+          )}
           <button className="botao-secundario" onClick={() => setBuscaIA(true)}>
             <Icone nome="sparkles" tamanho={16} /> Busca por sintoma
           </button>
@@ -423,6 +584,12 @@ function TelaRecursos({ usuario }) {
 
       {buscaIA && (
         <BuscaPorSintoma itens={itensDaAba} tipo={abaAtual.tipo} aoFechar={() => setBuscaIA(false)} aoEnviar={(item) => { setBuscaIA(false); setEnviarItem(item); }} aoVisualizar={(item) => { setBuscaIA(false); setVisualizando(item); }} />
+      )}
+      {mostrarMigrador && (
+        <MigradorCarousel
+          fabulas={itensPorColecao["fabulas_terapeuticas"]}
+          aoFechar={() => setMostrarMigrador(false)}
+        />
       )}
     </div>
   );
@@ -992,8 +1159,8 @@ function WizardNovaFabula({ item, aoFechar }) {
   const [passo, setPasso] = useState(1);
   const [form, setForm] = useState(
     item
-      ? { titulo: item.titulo || "", icone: item.icone || "book-open", moral: item.moral || "", categoria: item.categoria || "macro_ansiedade" }
-      : { titulo: "", icone: "book-open", moral: "", categoria: "macro_ansiedade" }
+      ? { titulo: item.titulo || "", icone: item.icone || "book-open", moral: item.moral || "", categoria: item.categoria || "macro_ansiedade", tipo: item.tipo || "texto" }
+      : { titulo: "", icone: "book-open", moral: "", categoria: "macro_ansiedade", tipo: "texto" }
   );
   const [paginas, setPaginas] = useState(Array.isArray(item?.paginas) && item.paginas.length > 0 ? item.paginas : [""]);
   const [perguntas, setPerguntas] = useState(Array.isArray(item?.perguntas) && item.perguntas.length > 0 ? [...item.perguntas, "", "", ""].slice(0, Math.max(3, item.perguntas.length)) : ["", "", ""]);
@@ -1021,6 +1188,7 @@ function WizardNovaFabula({ item, aoFechar }) {
         icone: form.icone || "book-open",
         moral: form.moral.trim(),
         categoria: form.categoria,
+        tipo: form.tipo || "texto",
         paginas: paginas.filter((p) => p.trim()),
         perguntas: perguntas.filter((p) => p.trim()),
       };
@@ -1073,6 +1241,18 @@ function WizardNovaFabula({ item, aoFechar }) {
               <label>Moral / Mensagem central</label>
               <input value={form.moral} onChange={(e) => setForm({ ...form, moral: e.target.value })} placeholder='Ex: "A crise que parece fim pode ser começo."' />
 
+              <label>Formato</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[{ id: "texto", label: "Texto" }, { id: "carousel", label: "Carousel de imagens" }].map((t) => (
+                  <button key={t.id} type="button"
+                    onClick={() => setForm({ ...form, tipo: t.id })}
+                    className={"pill-status" + (form.tipo === t.id ? " pill-status-ativa" : "")}
+                    style={{ "--cor-pill": "var(--cor-marca)" }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
               {erro && <p className="mensagem-erro">{erro}</p>}
               <div className="acoes-modal">
                 <button type="button" className="botao-secundario" onClick={aoFechar}>Cancelar</button>
@@ -1114,21 +1294,28 @@ function WizardNovaFabula({ item, aoFechar }) {
 
           {passo === 3 && (
             <>
-              <label>Páginas da fábula</label>
-              <p className="texto-vazio" style={{ marginTop: 0 }}>Cada página é um bloco de texto. O paciente avança página por página.</p>
+              <label>{form.tipo === "carousel" ? "Imagens do carousel" : "Páginas da fábula"}</label>
+              <p className="texto-vazio" style={{ marginTop: 0 }}>
+                {form.tipo === "carousel"
+                  ? "Cole a URL de cada imagem PNG hospedada no GitHub Pages."
+                  : "Cada página é um bloco de texto. O paciente avança página por página."}
+              </p>
               {paginas.map((p, i) => (
                 <div key={i} style={{ marginBottom: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <label style={{ margin: 0 }}>Página {i + 1}</label>
+                    <label style={{ margin: 0 }}>{form.tipo === "carousel" ? `Imagem ${i + 1}` : `Página ${i + 1}`}</label>
                     {paginas.length > 1 && (
                       <button type="button" className="botao-icone botao-icone-perigo" onClick={() => remPagina(i)}><Icone nome="x" tamanho={14} /></button>
                     )}
                   </div>
-                  <TextAreaVoz className="campo-descricao" rows={4} value={p} onChange={(e) => setPagina(i, e.target.value)} placeholder={`Texto da página ${i + 1}...`} />
+                  {form.tipo === "carousel"
+                    ? <input value={p} onChange={(e) => setPagina(i, e.target.value)} placeholder="https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/admin/imagens/nome-da-fabula/painel1.png" />
+                    : <TextAreaVoz className="campo-descricao" rows={4} value={p} onChange={(e) => setPagina(i, e.target.value)} placeholder={`Texto da página ${i + 1}...`} />
+                  }
                 </div>
               ))}
               <button type="button" className="botao-secundario" style={{ width: "100%", justifyContent: "center" }} onClick={() => setPaginas((p) => [...p, ""])}>
-                <Icone nome="plus" tamanho={14} /> Adicionar página
+                <Icone nome="plus" tamanho={14} /> {form.tipo === "carousel" ? "Adicionar imagem" : "Adicionar página"}
               </button>
 
               {erro && <p className="mensagem-erro">{erro}</p>}
@@ -1172,44 +1359,48 @@ function WizardNovaFabula({ item, aoFechar }) {
   );
 }
 
-// ─── Busca por sintoma (IA) ──────────────────────────────────────
-// A chamada de verdade pra IA vive na Cloud Function buscarPorSintoma
-// (functions/index.js) — a chave da Anthropic nunca fica no
-// navegador. Aqui só manda a queixa + a lista de itens já cadastrados
-// e cruza a resposta com os itens reais pelo título (protege contra
-// a IA inventar um título que não existe na biblioteca).
+// ─── Busca por sintoma (palavras-chave local) ────────────────────
 function BuscaPorSintoma({ itens, aoFechar, aoEnviar, aoVisualizar }) {
   const [sintoma, setSintoma] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState("");
 
-  async function buscar() {
+  function buscar() {
     if (!sintoma.trim()) return;
     setBuscando(true);
     setErro("");
     setResultado(null);
-    try {
-      const chamar = functions.httpsCallable("buscarPorSintoma");
-      const itensSimplificados = itens.map((it) => ({ titulo: it.titulo || it.nome, categoria: it.categoria, descricao: it.descricao }));
-      const resposta = await chamar({ sintoma, itens: itensSimplificados });
-      const recomendados = (resposta.data?.recomendacoes || [])
-        .map((r) => ({ ...r, item: itens.find((x) => (x.titulo || x.nome || "").toLowerCase() === (r.titulo || "").toLowerCase()) }))
-        .filter((r) => r.item)
-        .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-      setResultado(recomendados);
-    } catch (e) {
-      setErro(e.message || "Erro ao consultar a IA. Tente novamente.");
-    } finally {
-      setBuscando(false);
-    }
+    setTimeout(() => {
+      try {
+        function norm(t) {
+          return (t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9\s]/g, " ");
+        }
+        const palavras = norm(sintoma).split(/\s+/).filter((p) => p.length >= 3);
+        if (palavras.length === 0) { setResultado([]); setBuscando(false); return; }
+        const scored = itens.map((it) => {
+          const corpus = norm([it.titulo, it.nome, it.descricao, it.objetivo, it.categoria, Array.isArray(it.tags) ? it.tags.join(" ") : ""].join(" "));
+          const pontos = palavras.filter((p) => corpus.includes(p)).length;
+          return { item: it, pontos };
+        }).filter((r) => r.pontos > 0).sort((a, b) => b.pontos - a.pontos).slice(0, 6);
+        setResultado(scored.map((r, i) => ({
+          item: r.item,
+          ordem: i + 1,
+          motivo: r.item.descricao || r.item.objetivo || "Recurso terapêutico relacionado à busca",
+        })));
+      } catch (e) {
+        setErro("Erro na busca. Tente novamente.");
+      } finally {
+        setBuscando(false);
+      }
+    }, 200);
   }
 
   return (
     <div className="sobreposicao" onClick={aoFechar}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Icone nome="sparkles" tamanho={18} /> Busca por sintoma</h3>
-        <p style={{ marginTop: 0 }}>Descreva a queixa da paciente — a IA sugere as opções mais indicadas dentro do que já está cadastrado nesta biblioteca.</p>
+        <p style={{ marginTop: 0 }}>Descreva a queixa da paciente — o sistema busca automaticamente os recursos mais relacionados nesta biblioteca.</p>
         <TextAreaVoz className="campo-descricao" rows={2} value={sintoma} onChange={(e) => setSintoma(e.target.value)} placeholder="Ex: crises de ansiedade antes de dormir, ruminação de pensamentos..." />
         <button className="botao-primario" style={{ width: "100%", justifyContent: "center", marginTop: 10 }} onClick={buscar} disabled={buscando || !sintoma.trim()}>
           <Icone nome="search" tamanho={14} /> {buscando ? "Buscando..." : "Buscar"}
@@ -2572,6 +2763,7 @@ function PreviewFabula({ item }) {
   if (paginas.length === 0) return null;
   const pagina = paginas[idx];
   const textoPagina = typeof pagina === "string" ? pagina : pagina?.texto || "";
+  const ehImagem = /\.(jpg|jpeg|png|webp|gif)$/i.test(textoPagina);
   const pct = Math.round(((idx + 1) / paginas.length) * 100);
   const concluido = idx === paginas.length - 1;
 
@@ -2584,8 +2776,12 @@ function PreviewFabula({ item }) {
         <span style={{ fontSize: 12, color: "var(--cor-marca)", fontWeight: 700, flexShrink: 0 }}>{idx + 1}/{paginas.length}</span>
       </div>
 
-      <div style={{ background: "linear-gradient(145deg, var(--cor-marca-escura), var(--cor-marca))", borderRadius: 20, padding: "32px 26px", minHeight: 170, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ fontSize: 18, color: "white", lineHeight: 1.9, textAlign: "center", fontStyle: "italic", margin: 0 }}>{textoPagina}</p>
+      <div style={{ background: "linear-gradient(145deg, var(--cor-marca-escura), var(--cor-marca))", borderRadius: 20, padding: ehImagem ? 6 : "32px 26px", minHeight: ehImagem ? 0 : 170, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {ehImagem ? (
+          <img src={textoPagina} alt={"Painel " + (idx + 1)} style={{ width: "100%", display: "block", borderRadius: 15 }} />
+        ) : (
+          <p style={{ fontSize: 18, color: "white", lineHeight: 1.9, textAlign: "center", fontStyle: "italic", margin: 0 }}>{textoPagina}</p>
+        )}
       </div>
 
       {concluido && item.moral && (
