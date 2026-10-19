@@ -40,18 +40,15 @@ const BOOTSTRAP_SECRET = defineSecret("BOOTSTRAP_SECRET");
 // ─────────────────────────────────────────────────────────────
 // 0) BOOTSTRAP — cria a conta Admin Matriz (uso único).
 //    APAGAR ESTA FUNÇÃO depois de rodar uma vez.
-//    Requer documento _bootstrap/token {ativo:true} no Firestore.
+//    Chamar com ?s=<BOOTSTRAP_SECRET>
 // ─────────────────────────────────────────────────────────────
 exports.bootstrapAdminMatriz = onRequest(
-  { region: "southamerica-east1" },
+  { region: "southamerica-east1", secrets: [BOOTSTRAP_SECRET] },
   async (req, res) => {
-    const tokenRef = db.collection("_bootstrap").doc("token");
-    const tokenDoc = await tokenRef.get();
-    if (!tokenDoc.exists || tokenDoc.data().ativo !== true) {
-      res.status(403).send("Token nao encontrado ou ja utilizado.");
+    if (!req.query.s || req.query.s !== BOOTSTRAP_SECRET.value()) {
+      res.status(403).send("Acesso negado.");
       return;
     }
-    await tokenRef.delete();
     const EMAIL = "contato@luciakratz.com.br";
     try {
       let usuario;
@@ -480,7 +477,72 @@ exports.criarEventoAgenda = onCall(
 );
 
 // ─────────────────────────────────────────────────────────────
-// 7) BUSCA POR SINTOMA (IA) — Recursos Terapêuticos
+// 7) ATUALIZAR EVENTO — remarcação ou realização de sessão
+// ─────────────────────────────────────────────────────────────
+exports.atualizarEventoAgenda = onCall(
+  { secrets: [GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET] },
+  async (request) => {
+    const chamador = request.auth;
+    if (!chamador || !["psi", "secretaria"].includes(chamador.token.role)) {
+      throw new HttpsError("permission-denied", "Só a equipe da clínica atualiza sessões.");
+    }
+
+    const { eventoGoogleId, titulo, inicio, fim, descricao } = request.data || {};
+    if (!eventoGoogleId) {
+      throw new HttpsError("invalid-argument", "eventoGoogleId é obrigatório.");
+    }
+
+    const oauth2Client = await obterClienteAutenticado(chamador.token.psi_id);
+    const calendar = obterGoogle().calendar({ version: "v3", auth: oauth2Client });
+
+    const patch = {};
+    if (titulo !== undefined) patch.summary = titulo;
+    if (descricao !== undefined) patch.description = descricao;
+    if (inicio !== undefined) patch.start = { dateTime: inicio };
+    if (fim !== undefined) patch.end = { dateTime: fim };
+
+    await calendar.events.patch({
+      calendarId: "primary",
+      eventId: eventoGoogleId,
+      requestBody: patch,
+    });
+
+    return { ok: true };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// 8) EXCLUIR EVENTO — ao deletar pacote/sessão
+// ─────────────────────────────────────────────────────────────
+exports.excluirEventoAgenda = onCall(
+  { secrets: [GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET] },
+  async (request) => {
+    const chamador = request.auth;
+    if (!chamador || !["psi", "secretaria"].includes(chamador.token.role)) {
+      throw new HttpsError("permission-denied", "Só a equipe da clínica remove sessões.");
+    }
+
+    const { eventoGoogleId } = request.data || {};
+    if (!eventoGoogleId) {
+      throw new HttpsError("invalid-argument", "eventoGoogleId é obrigatório.");
+    }
+
+    const oauth2Client = await obterClienteAutenticado(chamador.token.psi_id);
+    const calendar = obterGoogle().calendar({ version: "v3", auth: oauth2Client });
+
+    try {
+      await calendar.events.delete({ calendarId: "primary", eventId: eventoGoogleId });
+    } catch (e) {
+      // 404 = evento já foi removido manualmente — não é erro
+      if (e?.status !== 404 && e?.code !== 404) throw e;
+    }
+
+    return { ok: true };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// 9) BUSCA POR SINTOMA (IA) — Recursos Terapêuticos
 // ─────────────────────────────────────────────────────────────
 // A psicóloga digita a queixa/sintoma da paciente e a IA escolhe, só
 // entre os itens que já existem na biblioteca da clínica, quais fazem
@@ -754,6 +816,74 @@ function montarEmailAvisoAniversario({ nomeClinica, corMarca, logoUrl, quantidad
 // "Trigger Email from Firestore" (ext-firestore-send-email) instalada
 // e apontando pra coleção clinica_emails — sem ela, os documentos são
 // criados normalmente mas nenhum e-mail sai de verdade.
+// ─────────────────────────────────────────────────────────────
+// 7) ORGANIZAR ANOTAÇÃO DE SESSÃO TCC COM IA
+// ─────────────────────────────────────────────────────────────
+exports.organizarProntuarioIA = onCall(
+  { secrets: [ANTHROPIC_API_KEY] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Acesso negado.");
+    const { textoBruto, pacienteNome, dataSessao } = request.data || {};
+    if (!textoBruto || !textoBruto.trim()) {
+      throw new HttpsError("invalid-argument", "Texto da sessão é obrigatório.");
+    }
+
+    const chave = ANTHROPIC_API_KEY.value();
+    if (!chave || chave === "NAO_CONFIGURADA") {
+      throw new HttpsError("failed-precondition", "Chave da Anthropic não configurada.");
+    }
+
+    const prompt =
+      "Você é uma psicóloga especialista em Terapia Cognitivo-Comportamental (TCC).\n" +
+      "Organize as anotações brutas da sessão abaixo no formato de prontuário TCC.\n" +
+      "Retorne SOMENTE um JSON válido, sem markdown, sem explicações extras, com as seguintes chaves:\n" +
+      "humor, agenda, pensamentosAutomaticos, crencas, tecnicas, tarefas, observacoes.\n\n" +
+      "Paciente: " + (pacienteNome || "não informado") + "\n" +
+      "Data: " + (dataSessao || "não informada") + "\n\n" +
+      "Anotações brutas:\n" + textoBruto.trim();
+
+    let resp;
+    try {
+      resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": chave,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-3-5-haiku-20241022",
+          max_tokens: 1500,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+    } catch (fetchErr) {
+      console.error("organizarProntuarioIA fetch error:", fetchErr);
+      throw new HttpsError("internal", "Falha ao conectar com a API de IA: " + fetchErr.message);
+    }
+
+    if (!resp.ok) {
+      const errTxt = await resp.text();
+      console.error("organizarProntuarioIA API error:", resp.status, errTxt.slice(0, 500));
+      throw new HttpsError("internal", "Erro na API de IA (" + resp.status + "): " + errTxt.slice(0, 150));
+    }
+
+    const dados = await resp.json();
+    const texto = (dados.content?.[0]?.text || "").trim();
+
+    // Remover possíveis blocos markdown que a IA possa retornar
+    const jsonLimpo = texto.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+
+    try {
+      const tcc = JSON.parse(jsonLimpo);
+      return { tcc };
+    } catch (parseErr) {
+      console.error("organizarProntuarioIA parse error:", parseErr, "texto:", texto.slice(0, 300));
+      throw new HttpsError("internal", "Resposta da IA fora do formato JSON. Tente novamente.");
+    }
+  }
+);
+
 exports.verificarAniversarios = onSchedule(
   { schedule: "0 8 * * *", timeZone: "America/Sao_Paulo" },
   async () => {

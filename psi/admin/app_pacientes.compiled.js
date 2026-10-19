@@ -70,6 +70,10 @@ const ABAS_PACIENTE = [{
   id: "links",
   rotulo: "Links Partilhados",
   icone: "link"
+}, {
+  id: "sessoes-tcc",
+  rotulo: "Sessões TCC",
+  icone: "notebook-pen"
 }];
 function TelaPacientes({
   usuario
@@ -561,8 +565,7 @@ function PerfilPaciente({
     paciente: paciente
   }), aba === "modulos" && /*#__PURE__*/React.createElement(AbaModulosPaciente, {
     paciente: paciente
-  }), aba === "questionarios" && /*#__PURE__*/React.createElement(AbaQuestionariosPaciente, {
-    usuario: usuario,
+  }), aba === "questionarios" && /*#__PURE__*/React.createElement(AbaQuestionarios, {
     paciente: paciente
   }), aba === "metas" && /*#__PURE__*/React.createElement(AbaMetasPaciente, {
     usuario: usuario,
@@ -577,6 +580,9 @@ function PerfilPaciente({
     usuario: usuario,
     paciente: paciente
   }), aba === "links" && /*#__PURE__*/React.createElement(AbaLinksPaciente, {
+    usuario: usuario,
+    paciente: paciente
+  }), aba === "sessoes-tcc" && /*#__PURE__*/React.createElement(AbaSessoesTCC, {
     usuario: usuario,
     paciente: paciente
   }));

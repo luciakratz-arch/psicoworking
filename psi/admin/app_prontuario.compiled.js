@@ -219,6 +219,28 @@ function ProntAvisoCrp({
     }
   }, "O n\xFAmero do seu CRP ainda n\xE3o foi informado. Preencha em Configura\xE7\xF5es para ele aparecer nos documentos.");
 }
+const TCC_SECOES = [{
+  key: "humor",
+  rotulo: "Estado de Humor / Início da Sessão"
+}, {
+  key: "agenda",
+  rotulo: "Agenda e Temas Abordados"
+}, {
+  key: "pensamentosAutomaticos",
+  rotulo: "Pensamentos Automáticos"
+}, {
+  key: "crencas",
+  rotulo: "Crenças Intermediárias e Centrais"
+}, {
+  key: "tecnicas",
+  rotulo: "Técnicas Utilizadas"
+}, {
+  key: "tarefas",
+  rotulo: "Tarefas de Casa"
+}, {
+  key: "observacoes",
+  rotulo: "Observações do Terapeuta"
+}];
 
 // ═══════════════════════════════════════════════════════════════════
 //  METAS
@@ -2050,4 +2072,372 @@ function AbaLinksPaciente({
       tamanho: 13
     }), " ", l.cancelado ? "Reativar" : "Cancelar link")));
   }))));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SESSÕES TCC — anotações clínicas por sessão + PDF por período
+// ═══════════════════════════════════════════════════════════════════
+
+function ModalAnotacaoTCC({
+  usuario,
+  paciente,
+  sessao,
+  notaExistente,
+  aoFechar
+}) {
+  const [textoBruto, setTextoBruto] = useState(notaExistente?.textoBruto || "");
+  const [tcc, setTcc] = useState(notaExistente?.tcc || {});
+  const [organizando, setOrganizando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const temTcc = TCC_SECOES.some(s => tcc[s.key]);
+  async function organizarComIA() {
+    if (!textoBruto.trim()) {
+      setErro("Digite ou dite as anotações antes de organizar.");
+      return;
+    }
+    setOrganizando(true);
+    setErro("");
+    try {
+      const fn = appAdmin.functions("southamerica-east1").httpsCallable("organizarProntuarioIA");
+      const resultado = await fn({
+        textoBruto,
+        pacienteNome: paciente.nome,
+        dataSessao: sessao.data
+      });
+      setTcc(resultado.data.tcc || {});
+    } catch (e) {
+      setErro("Erro ao organizar: " + e.message);
+    } finally {
+      setOrganizando(false);
+    }
+  }
+  async function salvar() {
+    if (!textoBruto.trim()) {
+      setErro("Insira alguma anotação antes de salvar.");
+      return;
+    }
+    setSalvando(true);
+    setErro("");
+    try {
+      const dados = {
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome,
+        sessaoId: sessao.id,
+        pacoteId: sessao.pacoteId || null,
+        data: sessao.data || null,
+        textoBruto,
+        tcc,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (notaExistente) {
+        await db.collection("clinica_prontuarios").doc(notaExistente.id).update(dados);
+      } else {
+        await db.collection("clinica_prontuarios").add({
+          ...dados,
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      aoFechar();
+    } catch (e) {
+      setErro("Erro ao salvar: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+  const dataFormatada = sessao.data ? new Date(sessao.data + "T12:00:00").toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  }) : "";
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sobreposicao",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal modal-largo",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      margin: 0
+    }
+  }, "Anota\xE7\xE3o de Sess\xE3o TCC"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: 4
+    },
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "x",
+    tamanho: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 0 10px",
+      fontSize: 12,
+      color: "var(--texto-suave)"
+    }
+  }, paciente.nome, " \xB7 ", dataFormatada, sessao.horario ? " · " + sessao.horario : ""), /*#__PURE__*/React.createElement("label", null, "Anota\xE7\xF5es brutas da sess\xE3o ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(dite ou escreva livremente)")), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    value: textoBruto,
+    onChange: e => setTextoBruto(e.target.value),
+    rows: 6,
+    placeholder: "Descreva o que aconteceu na sess\xE3o, os temas discutidos, t\xE9cnicas usadas, tarefas combinadas..."
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      margin: "12px 0 18px",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: organizarComIA,
+    disabled: organizando
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "sparkles",
+    tamanho: 15
+  }), " ", organizando ? "Organizando..." : "Organizar com IA"), temTcc && !organizando && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--sucesso)",
+      display: "flex",
+      alignItems: "center",
+      gap: 4
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "check-circle",
+    tamanho: 13
+  }), " Organizado")), temTcc && /*#__PURE__*/React.createElement("div", {
+    style: {
+      border: "1px solid var(--borda)",
+      borderRadius: 10,
+      padding: "14px 16px",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "var(--cor-marca)",
+      marginBottom: 12
+    }
+  }, "Prontu\xE1rio TCC \u2014 revise e edite se necess\xE1rio"), TCC_SECOES.map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.key,
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#6B7280",
+      textTransform: "uppercase"
+    }
+  }, s.rotulo), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    value: tcc[s.key] || "",
+    onChange: e => setTcc(prev => ({
+      ...prev,
+      [s.key]: e.target.value
+    })),
+    rows: 3
+  })))), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: 10,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: aoFechar
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: salvar,
+    disabled: salvando
+  }, salvando ? "Salvando..." : "Salvar anotação"))));
+}
+function AbaSessoesTCC({
+  usuario,
+  paciente
+}) {
+  const [sessoes, setSessoes] = useState([]);
+  const [notas, setNotas] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [mesFiltro, setMesFiltro] = useState(null);
+  const [sessaoModal, setSessaoModal] = useState(null);
+  const cfg = useConfigProntuario(usuario.psiId);
+  useEffect(() => {
+    const unsubSess = db.collection("clinica_sessoes").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).onSnapshot(snap => {
+      const lista = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+      lista.sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+      setSessoes(lista);
+      setCarregando(false);
+    }, () => setCarregando(false));
+    const unsubNotas = db.collection("clinica_prontuarios").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).onSnapshot(snap => setNotas(snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }))), () => {});
+    return () => {
+      unsubSess();
+      unsubNotas();
+    };
+  }, [usuario.psiId, paciente.id]);
+  const mesesDisponiveis = [...new Set(sessoes.map(s => (s.data || "").slice(0, 7)).filter(Boolean))].sort().reverse();
+  const sessoesExibidas = mesFiltro ? sessoes.filter(s => (s.data || "").startsWith(mesFiltro)) : sessoes;
+  function gerarPdf() {
+    const notasFiltradas = (mesFiltro ? notas.filter(n => (n.data || "").startsWith(mesFiltro)) : notas).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+    if (notasFiltradas.length === 0) {
+      alert("Nenhuma anotação registrada" + (mesFiltro ? " neste mês" : "") + ".");
+      return;
+    }
+    const cor = cfg.corPrimaria || "#6A2BD9";
+    const linhaCrp = [cfg.crp ? "CRP " + cfg.crp : "", cfg.tituloProfissional || ""].filter(Boolean).join(" · ");
+    const periodo = mesFiltro ? new Date(mesFiltro + "-01").toLocaleDateString("pt-BR", {
+      month: "long",
+      year: "numeric"
+    }) : "Todas as sessões";
+    const sessoesHtml = notasFiltradas.map(n => {
+      const dataFmt = n.data ? new Date(n.data + "T12:00:00").toLocaleDateString("pt-BR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      }) : "—";
+      const t = n.tcc || {};
+      return "<div style='margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #E5E7EB'>" + "<div style='font-size:13px;font-weight:700;color:" + cor + ";margin-bottom:14px;text-transform:uppercase'>" + dataFmt + "</div>" + TCC_SECOES.filter(s => t[s.key]).map(s => "<div style='margin-bottom:10px'>" + "<div style='font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px'>" + s.rotulo + "</div>" + "<div style='font-size:12.5px;line-height:1.7;color:#1f2937;white-space:pre-wrap'>" + t[s.key] + "</div>" + "</div>").join("") + "</div>";
+    }).join("");
+    const html = "<html><head><meta charset='UTF-8'><title>Prontuário TCC — " + paciente.nome + "</title>" + "<style>body{font-family:Arial,sans-serif;margin:40px;color:#1f2937;font-size:13px;line-height:1.6}" + "@media print{body{margin:20px}.no-print{display:none}}</style></head><body>" + "<div style='display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid " + cor + ";padding-bottom:14px;margin-bottom:24px'>" + "<div><div style='font-size:20px;font-weight:700;color:" + cor + "'>" + (cfg.nome || "Clínica") + "</div>" + (linhaCrp ? "<div style='font-size:11px;color:#6B7280'>" + linhaCrp + "</div>" : "") + (cfg.cidade ? "<div style='font-size:11px;color:#6B7280'>" + cfg.cidade + "</div>" : "") + "</div>" + (cfg.logoUrl ? "<img src='" + cfg.logoUrl + "' style='height:48px;object-fit:contain'>" : "") + "</div>" + "<div style='text-align:center;margin-bottom:24px'>" + "<div style='font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1px'>Prontuário de Sessões TCC</div>" + "<div style='font-size:12px;color:#6B7280;margin-top:4px'>" + paciente.nome + " · " + periodo + "</div></div>" + sessoesHtml + "<div style='font-size:10px;color:#9CA3AF;text-align:center;margin-top:24px'>Documento confidencial — Resolução CFP nº 06/2019</div>" + "<div class='no-print' style='text-align:center;margin-top:20px'>" + "<button onclick='window.print()' style='background:" + cor + ";color:white;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer'>Imprimir / Salvar PDF</button></div>" + "</body></html>";
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => {
+      w.focus();
+      w.print();
+    }, 600);
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "titulo-cartao-secao"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "notebook-pen",
+    tamanho: 16
+  }), " Anota\xE7\xF5es de Sess\xE3o TCC"), /*#__PURE__*/React.createElement("p", {
+    className: "descricao-cartao-secao"
+  }, "Registre e organize as anota\xE7\xF5es de cada sess\xE3o no formato TCC com aux\xEDlio de IA. Gere relat\xF3rios em PDF por per\xEDodo."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap",
+      alignItems: "center",
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    className: "campo-select",
+    value: mesFiltro || "",
+    onChange: e => setMesFiltro(e.target.value || null)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Todos os meses"), mesesDisponiveis.map(m => /*#__PURE__*/React.createElement("option", {
+    key: m,
+    value: m
+  }, new Date(m + "-01").toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric"
+  }), " ", "(", notas.filter(n => (n.data || "").startsWith(m)).length, " nota(s))"))), /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: gerarPdf
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "file-text",
+    tamanho: 15
+  }), " Gerar PDF")), carregando ? /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Carregando sess\xF5es...") : sessoesExibidas.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhuma sess\xE3o", mesFiltro ? " neste mês" : "", " encontrada para este paciente.") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, sessoesExibidas.map(s => {
+    const nota = notas.find(n => n.sessaoId === s.id);
+    const dataFmt = s.data ? new Date(s.data + "T12:00:00").toLocaleDateString("pt-BR", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    }) : "Data não definida";
+    return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      style: {
+        border: "1px solid var(--borda)",
+        borderRadius: 10,
+        padding: "12px 14px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: 13
+      }
+    }, dataFmt, s.horario ? " · " + s.horario : ""), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--texto-suave)",
+        marginTop: 2
+      }
+    }, [s.modalidade, s.status].filter(Boolean).join(" · ")), nota && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--sucesso)",
+        marginTop: 3,
+        display: "flex",
+        alignItems: "center",
+        gap: 4
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "check-circle",
+      tamanho: 12
+    }), " Anota\xE7\xE3o registrada")), /*#__PURE__*/React.createElement("button", {
+      className: nota ? "botao-secundario" : "botao-primario",
+      style: {
+        fontSize: 12,
+        padding: "6px 14px"
+      },
+      onClick: () => setSessaoModal({
+        sessao: s,
+        nota: nota || null
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: nota ? "eye" : "notebook-pen",
+      tamanho: 13
+    }), " ", nota ? "Ver / Editar" : "Anotar"));
+  }))), sessaoModal && /*#__PURE__*/React.createElement(ModalAnotacaoTCC, {
+    usuario: usuario,
+    paciente: paciente,
+    sessao: sessaoModal.sessao,
+    notaExistente: sessaoModal.nota,
+    aoFechar: () => setSessaoModal(null)
+  }));
 }

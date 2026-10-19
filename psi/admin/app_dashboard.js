@@ -148,15 +148,26 @@ function TelaDashboard({ usuario, aoAbrirPaciente }) {
 
           {aniversariantesHoje.length > 0 && (
             <div style={{ marginBottom: 14 }}>
-              <div className="rotulo-mini" style={{ color: "#d97706" }}>Hoje</div>
+              <div className="rotulo-mini" style={{ color: "var(--cor-marca)", fontWeight: 600 }}>Hoje</div>
               {aniversariantesHoje.map((p) => {
                 const anos = p.dataNasc ? hojeD.getFullYear() - parseInt(p.dataNasc.slice(0, 4), 10) : null;
                 return (
-                  <div key={p.id} className="linha-atividade">
-                    <div className="avatar-paciente">{(p.nome || "?").charAt(0).toUpperCase()}</div>
+                  <div key={p.id} className="linha-atividade" style={{
+                    borderLeft: "3px solid var(--cor-marca)",
+                    paddingLeft: 12,
+                    borderRadius: "0 8px 8px 0",
+                    background: "color-mix(in srgb, var(--cor-marca) 8%, transparent)",
+                  }}>
+                    <div className="avatar-paciente" style={{ background: "var(--cor-marca)", color: "#fff" }}>
+                      {(p.nome || "?").charAt(0).toUpperCase()}
+                    </div>
                     <div className="info-atividade">
                       <div className="nome-paciente">{p.nome}</div>
-                      {anos != null && <div className="badges-atividade"><span className="badge-atividade">{anos} anos</span></div>}
+                      {anos != null && (
+                        <div className="badges-atividade">
+                          <span className="badge-atividade" style={{ background: "var(--cor-marca)", color: "#fff" }}>{anos} anos</span>
+                        </div>
+                      )}
                     </div>
                     {p.email && (
                       <a

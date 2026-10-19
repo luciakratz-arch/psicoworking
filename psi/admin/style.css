@@ -502,6 +502,32 @@ button {
 }
 .item-selecao-ativo { border-color: var(--cor-marca); background: var(--marca-plataforma-lavanda); }
 
+/* ── Avisos e índice alfabético — aba Pacotes & Sessões ────────────── */
+.aviso-pacotes { border-radius: 10px; padding: 14px 18px; margin-bottom: 14px; }
+.aviso-pacotes.aviso-amarelo { background: #FEF9C3; border: 1px solid #FDE047; }
+.aviso-pacotes.aviso-laranja { background: #FFF7ED; border: 1px solid #FED7AA; }
+.aviso-pacotes .aviso-titulo { display: flex; align-items: center; gap: 6px; font-weight: 600; margin-bottom: 4px; }
+.aviso-pacotes.aviso-amarelo .aviso-titulo { color: #78350F; }
+.aviso-pacotes.aviso-laranja .aviso-titulo { color: #7C2D12; }
+.aviso-pacotes .aviso-subtitulo { font-size: 13px; color: #6B7280; margin-bottom: 8px; }
+.aviso-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-aviso { border-radius: 20px; padding: 3px 10px; font-size: 13px; font-weight: 500; }
+.chip-aviso.chip-amarelo { background: #FDE68A; color: #78350F; }
+.chip-aviso.chip-amarelo-esc { background: #F59E0B; color: white; }
+.chip-aviso.chip-laranja { background: #FED7AA; color: #7C2D12; }
+.chip-aviso.chip-laranja-esc { background: #F97316; color: white; }
+.indice-letras { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+.botao-letra {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1.5px solid #D1D5DB; background: white; color: #374151;
+  font-weight: 600; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.botao-letra:hover { border-color: var(--cor-marca); color: var(--cor-marca); }
+.botao-letra.botao-letra-ativo { border-color: var(--cor-marca); background: var(--cor-marca); color: white; }
+/* ─────────────────────────────────────────────────────────────────── */
+
 .aviso-modulo-futuro {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px;
@@ -883,4 +909,8 @@ button {
   .barra-lateral nav { flex: none; }
   .rodape-barra-lateral { border: none; padding: 0; margin-left: auto; }
   .area-principal { padding: 20px; }
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
 }

@@ -117,26 +117,29 @@ function TelaLogin({ aoLogar }) {
   }
 
   return (
-    <div className="tela-login">
-      <div className="card-login">
-        <h1>PsiCoWorking</h1>
-        <p>Painel Admin Matriz</p>
-        <form onSubmit={entrar}>
-          <div className="form-grupo">
-            <label>E-mail</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </div>
-          <div className="form-grupo">
-            <label>Senha</label>
-            <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
-          </div>
-          {erro && <div className="msg-erro">{erro}</div>}
-          <button type="submit" className="btn btn-primario" style={{ width: "100%", justifyContent: "center", marginTop: 12 }} disabled={carregando}>
-            {carregando ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
+    <>
+      <style>{estilos}</style>
+      <div className="tela-login">
+        <div className="card-login">
+          <h1>PsiCoWorking</h1>
+          <p>Painel Admin Matriz</p>
+          <form onSubmit={entrar}>
+            <div className="form-grupo">
+              <label>E-mail</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="form-grupo">
+              <label>Senha</label>
+              <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
+            </div>
+            {erro && <div className="msg-erro">{erro}</div>}
+            <button type="submit" className="btn btn-primario" style={{ width: "100%", justifyContent: "center", marginTop: 12 }} disabled={carregando}>
+              {carregando ? "Entrando..." : "Entrar"}
+            </button>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

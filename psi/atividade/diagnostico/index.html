@@ -33,6 +33,10 @@
     .modulo-num { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
     .divider { border: none; border-top: 1px solid #F3F4F6; margin: 16px 0; }
     .aviso { padding: 12px 16px; border-radius: 10px; font-size: 12.5px; line-height: 1.5; margin-bottom: 16px; }
+    .respondente-card { flex: 1; border: 2px solid #E5E7EB; border-radius: 12px; padding: 16px 12px; text-align: center; cursor: pointer; transition: all .15s; background: white; }
+    .respondente-card.ativo { background: #F5F3FF; }
+    .campo-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #6B7280; letter-spacing: 0.5px; margin-bottom: 6px; display: block; }
+    .campo-input { display: block; width: 100%; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px 12px; font-size: 13px; font-family: inherit; }
     textarea { width: 100%; border: 1px solid #D1D5DB; border-radius: 10px; padding: 10px 12px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 80px; color: #374151; }
     textarea:focus { outline: none; border-color: #6A2BD9; }
     .nav-botoes { display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; margin-top: 20px; }
@@ -402,7 +406,7 @@
         ],
       },
       bulimia: {
-        rotulo: "Bulimia / TCA (Transtorno de Compulsão Alimentar)",
+        rotulo: "Bulimia Nervosa",
         instrucao: "Pense em episódios de comer exageradamente e em comportamentos com o peso.",
         perguntas: [
           "Você tem episódios recorrentes de comer exageradamente em curto período — muito mais do que a maioria das pessoas?",
@@ -410,6 +414,45 @@
           "Após esses episódios, você faz comportamentos para compensar (vomitar, tomar laxante, jejuar, se exercitar em excesso)?",
           "Sua autoestima é muito influenciada pelo seu peso e formato corporal?",
           "Você sente vergonha ou culpa intensa após esses episódios?",
+        ],
+      },
+      tca: {
+        rotulo: "TCA (Compulsão Alimentar)",
+        instrucao: "Pense nos últimos 3 meses. Esses episódios acontecem com frequência?",
+        perguntas: [
+          "Você tem episódios recorrentes de comer uma quantidade muito grande de comida em pouco tempo?",
+          "Durante esses episódios, você sente que perdeu o controle sobre o que ou quanto está comendo?",
+          "Você come muito mais rápido do que o normal durante esses episódios?",
+          "Você come até sentir um desconforto físico — sensação de estufamento?",
+          "Você come sem sentir fome física real?",
+          "Após os episódios, você sente nojo de si mesmo(a), culpa intensa ou tristeza?",
+          "Esses episódios causam sofrimento significativo para você?",
+        ],
+      },
+      arfid: {
+        rotulo: "ARFID (Seletividade Alimentar)",
+        instrucao: "Responda sobre seus hábitos alimentares habituais.",
+        perguntas: [
+          "Você evita ou recusa categorias inteiras de alimentos por causa de textura, cheiro, cor ou aparência?",
+          "Você tem medo de se engasgar, vomitar ou se machucar ao engolir alimentos?",
+          "Você sente desinteresse intenso por comida ou pelo ato de comer?",
+          "Sua alimentação é tão restrita que afeta sua saúde (perda de peso, deficiências nutricionais)?",
+          "Você precisa de suplementos ou alimentação especial por não conseguir variedade suficiente?",
+          "Você evita refeições sociais ou situações em que outros esperam que você coma?",
+          "Essa seletividade vai muito além do que é comum para a sua idade ou cultura?",
+        ],
+      },
+      sexual: {
+        rotulo: "Saúde Sexual",
+        instrucao: "Pense nos últimos 6 meses. Suas respostas são totalmente confidenciais.",
+        perguntas: [
+          "Você sente pouco ou nenhum desejo sexual na maior parte do tempo?",
+          "Você tem dificuldade em se sentir excitado(a) durante atividade sexual?",
+          "Você tem dificuldade para chegar ao orgasmo ou demora muito mais do que desejaria?",
+          "Você sente dor durante ou após relações sexuais?",
+          "Esses problemas causam sofrimento ou afetam seu relacionamento?",
+          "Esses problemas estão presentes há pelo menos 6 meses?",
+          "Você evita intimidade sexual por causa dessas dificuldades?",
         ],
       },
     };
@@ -425,6 +468,9 @@
       const [obsFinais, setObsFinais] = useState("");
       const [enviando, setEnviando] = useState(false);
       const [msgErro, setMsgErro] = useState("");
+      const [respondente, setRespondente] = useState(null);
+      const [nomeRespondente, setNomeRespondente] = useState("");
+      const [parentesco, setParentesco] = useState("");
       const topoRef = useRef(null);
 
       useEffect(() => {
@@ -488,6 +534,9 @@
             token,
             respostas: docRespostas,
             obsFinais: obsFinais.trim(),
+            respondente: respondente || "paciente",
+            nomeRespondente: respondente === "familiar" ? nomeRespondente.trim() : "",
+            parentesco: respondente === "familiar" ? parentesco.trim() : "",
             criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
           });
           await db.collection("clinica_rastreamento_tokens").doc(token).update({ usado: true });
@@ -536,31 +585,88 @@
       }
 
       if (fase === "intro") {
-        const primeiroNome = (cfg.pacienteNome || "").split(" ")[0] || "Olá";
+        const corMarca = cfg.corMarca || "#6A2BD9";
         return (
           <div className="container">
+            <div className="card" style={{ textAlign: "center" }}>
+              {cfg.logoUrl && (
+                <img src={cfg.logoUrl} style={{ width: 72, height: 72, borderRadius: 14, objectFit: "contain", margin: "0 auto 12px", display: "block" }} alt="logo" />
+              )}
+              <h1 style={{ color: corMarca, marginBottom: 4 }}>{cfg.grupoTitulo || "Avaliação Clínica"}</h1>
+              {cfg.nomeClinica && (
+                <p className="subtitulo">{cfg.nomeClinica}</p>
+              )}
+            </div>
             <div className="card">
-              <h1>Questionário Clínico</h1>
-              <p className="subtitulo" style={{ marginBottom: 20 }}>
-                Olá, <strong>{primeiroNome}</strong>! Sua psicóloga preparou um questionário clínico personalizado para você.
+              <p style={{ fontWeight: 700, fontSize: 13, color: corMarca, marginBottom: 10 }}>
+                📋 Antes de começar, leia com atenção:
               </p>
-              <div style={{ background: "#F5F3FF", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
-                <p style={{ fontSize: 12.5, color: "#4B5563", lineHeight: 1.6 }}>
-                  Este questionário é <strong>confidencial</strong> — as respostas vão diretamente para o prontuário clínico.<br />
-                  Responda com honestidade. Não há respostas certas ou erradas.
-                  <br /><br />
-                  <strong>Como responder:</strong><br />
-                  <strong style={{ color: "#374151" }}>N</strong> = Não / Nunca<br />
-                  <strong style={{ color: "#92400E" }}>B</strong> = Às vezes / Parcialmente<br />
-                  <strong style={{ color: "#166534" }}>C</strong> = Sim / Claramente
-                </p>
+              <ul style={{ fontSize: 12.5, color: "#4B5563", lineHeight: 1.85, paddingLeft: 18 }}>
+                <li>Este questionário leva entre <strong>10 e 20 minutos</strong> para ser respondido.</li>
+                <li>Não há respostas certas ou erradas — responda com <strong>honestidade e calma</strong>.</li>
+                <li>Se for familiar, responda sobre o <strong>comportamento da pessoa avaliada</strong>.</li>
+                <li>Suas respostas são <strong>confidenciais</strong> e usadas apenas para fins clínicos.</li>
+                {cfg.pacienteNome && <li>Paciente: <strong>{cfg.pacienteNome}</strong></li>}
+              </ul>
+            </div>
+            <div className="card">
+              <p style={{ fontWeight: 700, fontSize: 11, color: corMarca, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 }}>
+                👤 Quem está respondendo?
+              </p>
+              <div style={{ display: "flex", gap: 12, marginBottom: respondente === "familiar" ? 16 : 0 }}>
+                <div
+                  className={"respondente-card" + (respondente === "paciente" ? " ativo" : "")}
+                  style={{ borderColor: respondente === "paciente" ? corMarca : "#E5E7EB" }}
+                  onClick={() => setRespondente("paciente")}
+                >
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🙋</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: respondente === "paciente" ? corMarca : "#374151" }}>O próprio paciente</div>
+                  <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>Você é a pessoa avaliada</div>
+                </div>
+                <div
+                  className={"respondente-card" + (respondente === "familiar" ? " ativo" : "")}
+                  style={{ borderColor: respondente === "familiar" ? corMarca : "#E5E7EB" }}
+                  onClick={() => setRespondente("familiar")}
+                >
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>👨‍👩‍👧</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: respondente === "familiar" ? corMarca : "#374151" }}>Familiar / pessoa próxima</div>
+                  <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>Você conhece bem o avaliado</div>
+                </div>
               </div>
-              <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 20 }}>
-                Módulos: <strong style={{ color: "#111827" }}>{modulos.map((id) => BANCO_PERGUNTAS[id]?.rotulo || id).join(", ")}</strong>
+              {respondente === "familiar" && (
+                <div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label className="campo-label">Seu nome</label>
+                    <input
+                      type="text"
+                      placeholder="Seu nome completo"
+                      value={nomeRespondente}
+                      onChange={(e) => setNomeRespondente(e.target.value)}
+                      className="campo-input"
+                    />
+                  </div>
+                  <div style={{ marginBottom: 4 }}>
+                    <label className="campo-label">Parentesco / Relação</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: mãe, cônjuge, amigo(a)"
+                      value={parentesco}
+                      onChange={(e) => setParentesco(e.target.value)}
+                      className="campo-input"
+                    />
+                  </div>
+                </div>
+              )}
+              <div style={{ marginTop: 20 }}>
+                <button
+                  className="btn-primario"
+                  style={{ width: "100%", justifyContent: "center", background: corMarca, fontSize: 15, padding: "14px 24px", borderRadius: 12 }}
+                  disabled={!respondente || (respondente === "familiar" && !nomeRespondente.trim())}
+                  onClick={() => setFase("form")}
+                >
+                  Começar questionário →
+                </button>
               </div>
-              <button className="btn-primario" onClick={() => setFase("form")}>
-                Começar questionário
-              </button>
             </div>
           </div>
         );
@@ -609,7 +715,7 @@
         <div className="container" ref={topoRef}>
           {/* Progresso geral */}
           <div style={{ marginBottom: 16, fontSize: 12, color: "#6B7280" }}>
-            Módulo {moduloAtual + 1} de {modulos.length}: <strong style={{ color: "#111827" }}>{moduloInfo?.rotulo}</strong>
+            Parte {moduloAtual + 1} de {modulos.length}
             <div className="progresso-bar" style={{ marginTop: 6 }}>
               <div
                 className="progresso-fill"
@@ -625,7 +731,7 @@
                 {moduloAtual + 1}/{modulos.length}
               </span>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{moduloInfo?.rotulo}</div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>Avaliação clínica — Parte {moduloAtual + 1}</div>
                 {moduloInfo?.instrucao && (
                   <div style={{ fontSize: 12, color: "#6B7280", marginTop: 3, lineHeight: 1.4 }}>{moduloInfo.instrucao}</div>
                 )}

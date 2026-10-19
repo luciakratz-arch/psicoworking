@@ -440,6 +440,7 @@ function TelaFinanceiro({
   }, /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
   }, "Essa aba (", ABAS_FINANCEIRO.find(a => a.id === aba)?.rotulo, ") ainda n\xE3o foi constru\xEDda \u2014 \xE9 a pr\xF3xima etapa combinada.")), aba === "pacotes" && /*#__PURE__*/React.createElement(ListaPacotes, {
+    usuario: usuario,
     pacotes: pacotes,
     sessoes: sessoesPacotes,
     pacientes: pacientes,
@@ -911,41 +912,143 @@ function FormDespesa({
 
 const MODALIDADES_PACOTE = ["Online", "Presencial"];
 function ListaPacotes({
+  usuario,
   pacotes,
   sessoes,
   pacientes,
   aoEditar
 }) {
-  // Cada paciente é um bloco recolhível, sempre fechado por padrão —
-  // evita uma lista gigante quando há muitos pacientes com pacotes.
-  // O estado de expandido/recolhido mora AQUI (no pai), não dentro de
-  // CardPacotesPaciente: toda vez que os pacotes mudam (onSnapshot do
-  // Firestore) o React recria os componentes filhos, e um useState
-  // local ali dentro perderia o valor e o card fecharia sozinho.
   const [expandidosPac, setExpandidosPac] = useState({});
+  const [letraSelecionada, setLetraSelecionada] = useState(null);
   async function excluirPacote(pacote) {
     if (!confirm("Excluir este pacote e todas as sessões vinculadas a ele?")) return;
-    const batch = db.batch();
-    batch.delete(db.collection("clinica_pacotes").doc(pacote.id));
-    sessoes.filter(s => s.pacoteId === pacote.id).forEach(s => batch.delete(db.collection("clinica_sessoes").doc(s.id)));
-    const lancSnap = await db.collection("clinica_lancamentos").where("pacoteId", "==", pacote.id).get();
-    lancSnap.docs.forEach(d => batch.delete(d.ref));
-    await batch.commit();
+    const chamarExcluirEventoAgenda = functions.httpsCallable("excluirEventoAgenda");
+    try {
+      const sessPac = sessoes.filter(s => s.pacoteId === pacote.id);
+
+      // 1. Remove eventos do Google Agenda (silencioso — não bloqueia a exclusão)
+      const sessComEvento = sessPac.filter(s => s.eventoGoogleId);
+      await Promise.allSettled(sessComEvento.map(s => chamarExcluirEventoAgenda({
+        eventoGoogleId: s.eventoGoogleId
+      })));
+
+      // 2. Exclui o pacote
+      await db.collection("clinica_pacotes").doc(pacote.id).delete();
+
+      // 3. Exclui as sessões vinculadas
+      if (sessPac.length > 0) {
+        const bSess = db.batch();
+        sessPac.forEach(s => bSess.delete(db.collection("clinica_sessoes").doc(s.id)));
+        await bSess.commit();
+      }
+
+      // 4. Exclui os lançamentos vinculados (tenta; se falhar por permissão, fica órfão sem bloquear)
+      try {
+        const lancSnap = await db.collection("clinica_lancamentos").where("pacoteId", "==", pacote.id).get();
+        if (lancSnap.docs.length > 0) {
+          const bLanc = db.batch();
+          lancSnap.docs.forEach(d => bLanc.delete(d.ref));
+          await bLanc.commit();
+        }
+      } catch (lancErr) {
+        console.warn("Lançamentos não excluídos (dados antigos sem psi_id):", lancErr.message);
+      }
+    } catch (err) {
+      alert("Erro ao excluir pacote: " + err.message);
+    }
   }
   if (pacotes.length === 0) {
     return /*#__PURE__*/React.createElement("p", {
       className: "texto-vazio"
     }, "Nenhum pacote cadastrado ainda.");
   }
+
+  // Avisos
+  const hoje = new Date().toISOString().slice(0, 10);
+  const sessoesSemStatus = sessoes.filter(s => s.status === "agendado" && s.data && s.data < hoje);
+  const abertoPorPaciente = {};
+  pacotes.filter(p => p.statusPag !== "recebido").forEach(p => {
+    if (!abertoPorPaciente[p.pacienteId]) {
+      abertoPorPaciente[p.pacienteId] = {
+        pacienteId: p.pacienteId,
+        pacienteNome: p.pacienteNome,
+        total: 0,
+        pagas: 0
+      };
+    }
+    const sp = sessoes.filter(s => s.pacoteId === p.id);
+    abertoPorPaciente[p.pacienteId].total += sp.length;
+    abertoPorPaciente[p.pacienteId].pagas += sp.filter(s => s.pagamento === "pago").length;
+  });
+  const listaAbertos = Object.values(abertoPorPaciente);
+
+  // Lista ordenada A-Z
   const porPaciente = {};
   pacotes.forEach(p => {
     const chave = p.pacienteId || "sem-paciente";
     if (!porPaciente[chave]) porPaciente[chave] = [];
     porPaciente[chave].push(p);
   });
-  return /*#__PURE__*/React.createElement("div", null, Object.entries(porPaciente).map(([pacienteId, lista]) => /*#__PURE__*/React.createElement(CardPacotesPaciente, {
+  const entradas = Object.entries(porPaciente).map(([pacienteId, lista]) => ({
+    pacienteId,
+    lista,
+    nome: pacientes.find(p => p.id === pacienteId)?.nome || lista[0].pacienteNome || "Paciente"
+  })).sort((a, b) => {
+    const na = (a.nome || "").toLowerCase();
+    const nb = (b.nome || "").toLowerCase();
+    return na < nb ? -1 : na > nb ? 1 : 0;
+  });
+  const letras = [...new Set(entradas.map(e => (e.nome[0] || "?").toUpperCase()))].sort();
+  const entradasFiltradas = letraSelecionada ? entradas.filter(e => (e.nome[0] || "?").toUpperCase() === letraSelecionada) : entradas;
+  return /*#__PURE__*/React.createElement("div", null, sessoesSemStatus.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "aviso-pacotes aviso-amarelo"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "aviso-titulo"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "triangle-alert",
+    tamanho: 16
+  }), sessoesSemStatus.length, " sess\xE3o(\xF5es) passada(s) sem status final"), /*#__PURE__*/React.createElement("div", {
+    className: "aviso-subtitulo"
+  }, "Sess\xF5es que j\xE1 ocorreram e ainda est\xE3o como \"Agendado\". Marque como ", /*#__PURE__*/React.createElement("strong", null, "Realizada"), ", ", /*#__PURE__*/React.createElement("strong", null, "Cancelada"), " ou ", /*#__PURE__*/React.createElement("strong", null, "Remarcada"), "."), /*#__PURE__*/React.createElement("div", {
+    className: "aviso-chips"
+  }, sessoesSemStatus.slice(0, 5).map(s => /*#__PURE__*/React.createElement("span", {
+    key: s.id,
+    className: "chip-aviso chip-amarelo"
+  }, (s.pacienteNome || "—").split(" ")[0], " \xB7 ", s.data?.split("-").reverse().join("/"))), sessoesSemStatus.length > 5 && /*#__PURE__*/React.createElement("span", {
+    className: "chip-aviso chip-amarelo-esc"
+  }, "+", sessoesSemStatus.length - 5, " mais"))), listaAbertos.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "aviso-pacotes aviso-laranja"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "aviso-titulo"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "circle-dollar-sign",
+    tamanho: 16
+  }), listaAbertos.length, " paciente(s) com pagamento em aberto"), /*#__PURE__*/React.createElement("div", {
+    className: "aviso-subtitulo"
+  }, "Pacotes ativos com sess\xF5es ainda n\xE3o marcadas como pagas."), /*#__PURE__*/React.createElement("div", {
+    className: "aviso-chips"
+  }, listaAbertos.slice(0, 5).map(item => {
+    const nome = (pacientes.find(p => p.id === item.pacienteId)?.nome || item.pacienteNome || "—").split(" ")[0];
+    return /*#__PURE__*/React.createElement("span", {
+      key: item.pacienteId,
+      className: "chip-aviso chip-laranja"
+    }, nome, " \xB7 ", item.pagas, "/", item.total, " pagas");
+  }), listaAbertos.length > 5 && /*#__PURE__*/React.createElement("span", {
+    className: "chip-aviso chip-laranja-esc"
+  }, "+", listaAbertos.length - 5, " mais"))), letras.length > 1 && /*#__PURE__*/React.createElement("div", {
+    className: "indice-letras"
+  }, letras.map(letra => /*#__PURE__*/React.createElement("button", {
+    key: letra,
+    className: "botao-letra" + (letraSelecionada === letra ? " botao-letra-ativo" : ""),
+    onClick: () => setLetraSelecionada(letraSelecionada === letra ? null : letra)
+  }, letra))), entradasFiltradas.map(({
+    pacienteId,
+    lista,
+    nome
+  }) => /*#__PURE__*/React.createElement(CardPacotesPaciente, {
     key: pacienteId,
-    nome: pacientes.find(p => p.id === pacienteId)?.nome || lista[0].pacienteNome || "Paciente",
+    usuario: usuario,
+    nome: nome,
     lista: lista,
     sessoes: sessoes,
     expandido: !!expandidosPac[pacienteId],
@@ -955,9 +1058,374 @@ function ListaPacotes({
     })),
     aoEditar: aoEditar,
     aoExcluir: excluirPacote
+  })), entradasFiltradas.length === 0 && letraSelecionada && /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhum paciente com nome iniciando por \"", letraSelecionada, "\"."));
+}
+const STATUS_LABEL_PDF = {
+  realizada: "Realizada",
+  realizado: "Realizada",
+  cancelada: "Cancelada",
+  cancelado: "Cancelada",
+  remarcada: "Remarcada",
+  remarcado: "Remarcada",
+  agendado: "Agendada",
+  agendada: "Agendada"
+};
+const STATUS_COR_PDF = {
+  realizada: "#10B981",
+  realizado: "#10B981",
+  cancelada: "#EF4444",
+  cancelado: "#EF4444",
+  remarcada: "#F59E0B",
+  remarcado: "#F59E0B",
+  agendado: "#6A2BD9",
+  agendada: "#6A2BD9"
+};
+function gerarPDFPacote(pac, sessPac, pacienteNome, configPsi) {
+  const ord = [...sessPac].sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const fmtD = d => {
+    if (!d) return "—";
+    const dt = new Date(d + "T12:00:00");
+    return dt.toLocaleDateString("pt-BR", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit"
+    });
+  };
+  const fmtR = v => "R$ " + (v || 0).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const valorSessao = pac.valorSessao || Math.round((pac.valorTotal || 0) / (pac.totalSessoes || 1));
+  const realizadas = ord.filter(s => s.status === "realizada" || s.status === "realizado").length;
+  const recebido = pac.statusPag === "recebido" ? pac.valorTotal || 0 : realizadas * valorSessao;
+  const nomePsi = configPsi?.nome || "Psicóloga";
+  const infoHeader = [configPsi?.crp ? "CRP " + configPsi.crp : "", configPsi?.tituloProfissional || "", configPsi?.cidade || ""].filter(Boolean).join(" · ");
+  const agora = new Date();
+  const dataDoc = agora.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  });
+  const horaDoc = agora.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  const linhas = ord.map((s, i) => {
+    const cor = STATUS_COR_PDF[s.status] || "#6B7280";
+    const sl = STATUS_LABEL_PDF[s.status] || s.status || "—";
+    return `<tr><td><strong>${i + 1}</strong></td><td>${fmtD(s.data)}</td><td>${s.hora || "—"}</td><td>Psicoterapia</td><td><span style="background:${cor};color:white;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600">${sl}</span></td><td style="text-align:right">${fmtR(valorSessao)}</td></tr>`;
+  }).join("");
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Frequência</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;padding:40px;color:#1F2937;font-size:13px}.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}.psi-n{font-size:22px;font-weight:700;color:#4C1D95}.psi-i{font-size:11px;color:#6B7280;margin-top:3px}.data-d{font-size:12px;color:#6B7280}hr{border:none;border-top:2px solid #6A2BD9;margin:12px 0 20px}.box{border-left:4px solid #6A2BD9;background:#F5F3FF;border-radius:0 8px 8px 0;padding:14px 18px;margin-bottom:22px}.box h2{font-size:16px;font-weight:700;margin-bottom:8px}.meta{display:flex;gap:24px}.meta .lbl{font-size:9px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}.meta .val{font-size:13px;font-weight:600}table{width:100%;border-collapse:collapse;margin-top:4px}th{background:#6A2BD9;color:white;padding:8px 12px;text-align:left;font-size:11px;font-weight:600}td{padding:9px 12px;border-bottom:1px solid #E5E7EB;font-size:12px}tr:nth-child(even) td{background:#F9FAFB}.resumo{display:flex;gap:32px;margin-top:24px;padding:16px;background:#F3F4F6;border-radius:8px}.resumo .lbl{font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.5px}.resumo .val{font-size:18px;font-weight:700;margin-top:2px}.ct{color:#1F2937}.cr{color:#10B981}.ca{color:#F59E0B}.footer{margin-top:32px;text-align:center;font-size:11px;color:#9CA3AF;border-top:1px solid #E5E7EB;padding-top:12px}@media print{body{padding:20px}}</style></head><body><div class="hdr"><div><div class="psi-n">${nomePsi}</div>${infoHeader ? `<div class="psi-i">${infoHeader}</div>` : ""}</div><div class="data-d">${dataDoc}</div></div><hr/><div class="box"><h2>${pacienteNome}</h2><div class="meta"><div><div class="lbl">Início</div><div class="val">${pac.dataInicio?.split("-").reverse().join("/") || "—"}</div></div><div><div class="lbl">Horário</div><div class="val">${pac.horario || "—"}</div></div><div><div class="lbl">Recorrência</div><div class="val">${pac.recorrencia || "—"}</div></div><div><div class="lbl">Sessões</div><div class="val">${pac.totalSessoes || "—"}</div></div></div></div><table><thead><tr><th>Nº</th><th>Data</th><th>Horário</th><th>Tipo</th><th>Presença</th><th style="text-align:right">Valor</th></tr></thead><tbody>${linhas}</tbody></table><div class="resumo"><div><div class="lbl">Total do Pacote</div><div class="val ct">${fmtR(pac.valorTotal)}</div></div><div><div class="lbl">Recebido</div><div class="val cr">${fmtR(recebido)}</div></div><div><div class="lbl">A Receber</div><div class="val ca">${fmtR(Math.max(0, (pac.valorTotal || 0) - recebido))}</div></div></div><div class="footer">Documento gerado em ${dataDoc} às ${horaDoc} · Clínica ${nomePsi}</div></body></html>`;
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
+function ModalSessoesPacote({
+  usuario,
+  pacote,
+  sessoes,
+  pacienteNome,
+  aoFechar
+}) {
+  const [sessaoTcc, setSessaoTcc] = useState(null);
+  const [notas, setNotas] = useState([]);
+  const [configPsi, setConfigPsi] = useState(null);
+  useEffect(() => {
+    if (!usuario?.psiId) return;
+    db.collection("psi_config").doc(usuario.psiId).get().then(d => d.exists ? setConfigPsi(d.data()) : null).catch(() => null);
+  }, [usuario?.psiId]);
+  useEffect(() => {
+    if (!usuario?.psiId || !pacote?.pacienteId) return;
+    const unsub = db.collection("clinica_prontuarios").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", pacote.pacienteId).onSnapshot(snap => setNotas(snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }))));
+    return () => unsub();
+  }, [pacote?.pacienteId, usuario?.psiId]);
+  const sessPac = [...sessoes].sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const chamarAtualizarEventoAgenda = functions.httpsCallable("atualizarEventoAgenda");
+  async function atualizarSessao(id, campos) {
+    try {
+      await db.collection("clinica_sessoes").doc(id).update(campos);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  async function atualizarStatus(sessaoId, novoStatus) {
+    await atualizarSessao(sessaoId, {
+      status: novoStatus
+    });
+    // Sincroniza título no Google Agenda quando marcada como realizada
+    const s = sessPac.find(x => x.id === sessaoId);
+    if (novoStatus === "realizado" && s?.eventoGoogleId) {
+      try {
+        await chamarAtualizarEventoAgenda({
+          eventoGoogleId: s.eventoGoogleId,
+          titulo: `✓ ${s.pacienteNome || pacienteNome} — Sessão ${s.numSessao}/${pacote.totalSessoes}`
+        });
+      } catch (e) {
+        console.warn("Não foi possível atualizar Google Agenda:", e.message);
+      }
+    }
+  }
+  async function remarcarSessao(s, novaData, novaHora) {
+    if (!novaData) return;
+    const campos = {
+      data: novaData,
+      remarcada: true,
+      dataRemarcada: novaData,
+      dataOriginal: s.dataOriginal || s.data
+    };
+    if (novaHora) campos.hora = novaHora;
+    await atualizarSessao(s.id, campos);
+    // Atualiza data/hora no Google Agenda automaticamente
+    if (s.eventoGoogleId) {
+      try {
+        const horaFinal = novaHora || s.hora || "09:00";
+        const inicio = new Date(`${novaData}T${horaFinal}:00`);
+        const fim = new Date(inicio.getTime() + 50 * 60000);
+        await chamarAtualizarEventoAgenda({
+          eventoGoogleId: s.eventoGoogleId,
+          inicio: inicio.toISOString(),
+          fim: fim.toISOString(),
+          titulo: `${s.pacienteNome || pacienteNome} — Sessão ${s.numSessao}/${pacote.totalSessoes} (Remarcada)`
+        });
+      } catch (e) {
+        console.warn("Não foi possível atualizar Google Agenda:", e.message);
+      }
+    }
+  }
+  const thS = {
+    textAlign: "left",
+    padding: "6px 10px",
+    fontWeight: 700,
+    fontSize: 11,
+    color: "var(--texto-suave)",
+    textTransform: "uppercase"
+  };
+  const tdS = {
+    padding: "8px 10px",
+    verticalAlign: "middle"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sobreposicao",
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal modal-largo",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      margin: 0
+    }
+  }, "Controle de Sess\xF5es e Frequ\xEAncia"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--texto-suave)",
+      marginTop: 4
+    }
+  }, pacienteNome, " \xB7 ", pacote.totalSessoes, " sess\xF5es \xB7 ", pacote.recorrencia, pacote.dataInicio ? " · Início " + pacote.dataInicio.split("-").reverse().join("/") : "")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center",
+      padding: "6px 12px",
+      fontSize: 13
+    },
+    onClick: () => gerarPDFPacote(pacote, sessoes, pacienteNome, configPsi)
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "file-text",
+    tamanho: 14
+  }), " PDF"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: 4
+    },
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "x",
+    tamanho: 18
+  })))), /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "collapse"
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      borderBottom: "2px solid var(--borda)"
+    }
+  }, /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...thS,
+      width: 36
+    }
+  }, "N\xBA"), /*#__PURE__*/React.createElement("th", {
+    style: thS
+  }, "Data"), /*#__PURE__*/React.createElement("th", {
+    style: thS
+  }, "Presen\xE7a"), /*#__PURE__*/React.createElement("th", {
+    style: thS
+  }, "Modalidade"), /*#__PURE__*/React.createElement("th", {
+    style: {
+      ...thS,
+      textAlign: "center"
+    }
+  }, "TCC"))), /*#__PURE__*/React.createElement("tbody", null, sessPac.map((s, i) => {
+    const nota = notas.find(n => n.sessaoId === s.id);
+    const mostraRemarc = ["remarcado", "remarcada", "cancelado", "cancelada"].includes(s.status);
+    return /*#__PURE__*/React.createElement("tr", {
+      key: s.id,
+      style: {
+        borderBottom: "1px solid var(--borda)"
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...tdS,
+        color: "var(--texto-suave)",
+        fontSize: 12
+      }
+    }, i + 1), /*#__PURE__*/React.createElement("td", {
+      style: tdS
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 500,
+        fontSize: 13
+      }
+    }, s.data?.split("-").reverse().join("/") || "—"), s.hora && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--texto-suave)"
+      }
+    }, s.hora)), /*#__PURE__*/React.createElement("td", {
+      style: tdS
+    }, /*#__PURE__*/React.createElement("select", {
+      value: s.status || "agendado",
+      onChange: e => atualizarStatus(s.id, e.target.value),
+      style: {
+        fontSize: 12,
+        padding: "4px 8px",
+        border: "1px solid var(--borda)",
+        borderRadius: 6,
+        background: "var(--branco)",
+        color: STATUS_SESSAO[s.status]?.cor || "inherit",
+        fontWeight: 600
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: "agendado"
+    }, "Agendada"), /*#__PURE__*/React.createElement("option", {
+      value: "confirmado"
+    }, "Confirmada"), /*#__PURE__*/React.createElement("option", {
+      value: "realizado"
+    }, "Realizada"), /*#__PURE__*/React.createElement("option", {
+      value: "falta"
+    }, "Falta"), /*#__PURE__*/React.createElement("option", {
+      value: "cancelado"
+    }, "Cancelada"), /*#__PURE__*/React.createElement("option", {
+      value: "remarcado"
+    }, "Remarcada")), mostraRemarc && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#0891b2",
+        marginBottom: 2
+      }
+    }, "Nova data e hor\xE1rio:"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 4
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      id: "data_rem_" + s.id,
+      defaultValue: s.dataRemarcada || s.data || "",
+      onBlur: e => {
+        const h = document.getElementById("hora_rem_" + s.id)?.value || null;
+        if (e.target.value) remarcarSessao(s, e.target.value, h);
+      },
+      style: {
+        fontSize: 10,
+        border: "1px solid #0891b2",
+        borderRadius: 4,
+        padding: "2px 5px",
+        color: "#0891b2",
+        width: 115
+      }
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "time",
+      id: "hora_rem_" + s.id,
+      defaultValue: s.hora || "",
+      onBlur: e => {
+        const d = document.getElementById("data_rem_" + s.id)?.value || null;
+        if (d && e.target.value) remarcarSessao(s, d, e.target.value);
+      },
+      style: {
+        fontSize: 10,
+        border: "1px solid #0891b2",
+        borderRadius: 4,
+        padding: "2px 5px",
+        color: "#0891b2",
+        width: 75
+      }
+    })))), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...tdS,
+        fontSize: 12,
+        color: "var(--texto-suave)"
+      }
+    }, s.modalidade || "—"), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...tdS,
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "botao-icone",
+      title: nota ? "Ver anotação TCC" : "Anotar TCC",
+      style: nota ? {
+        background: "#EDE9FE",
+        color: "var(--cor-marca)",
+        borderColor: "#C4B5FD"
+      } : {},
+      onClick: () => setSessaoTcc({
+        sessao: s,
+        nota: nota || null
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "notebook-pen",
+      tamanho: 15
+    }))));
+  }))), sessPac.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhuma sess\xE3o registrada para este pacote."), sessaoTcc && /*#__PURE__*/React.createElement(ModalAnotacaoTCC, {
+    usuario: usuario,
+    paciente: {
+      id: pacote.pacienteId,
+      nome: pacienteNome
+    },
+    sessao: sessaoTcc.sessao,
+    notaExistente: sessaoTcc.nota,
+    aoFechar: () => setSessaoTcc(null)
   })));
 }
 function CardPacotesPaciente({
+  usuario,
   nome,
   lista,
   sessoes,
@@ -966,6 +1434,7 @@ function CardPacotesPaciente({
   aoEditar,
   aoExcluir
 }) {
+  const [sessoesPacoteAberto, setSessoesPacoteAberto] = useState(null);
   const totalPacotes = lista.length;
   const recebidos = lista.filter(p => p.statusPag === "recebido").length;
   const pendentes = totalPacotes - recebidos;
@@ -1012,16 +1481,23 @@ function CardPacotesPaciente({
     }
   })), expandido && /*#__PURE__*/React.createElement("div", {
     className: "cartao-lista-pacientes"
-  }, lista.map(pac => {
+  }, [...lista].sort((a, b) => (b.dataInicio || "").localeCompare(a.dataInicio || "")).map(pac => {
     const sessoesPac = sessoes.filter(s => s.pacoteId === pac.id);
     const realizadas = sessoesPac.filter(s => s.status === "realizada" || s.pagamento === "pago").length;
     const total = pac.totalSessoes || sessoesPac.length || 1;
     const pct = Math.min(100, Math.round(realizadas / total * 100));
     return /*#__PURE__*/React.createElement("div", {
       key: pac.id,
-      className: "cartao-pacote"
+      className: "cartao-pacote",
+      style: {
+        flexWrap: "wrap"
+      }
     }, /*#__PURE__*/React.createElement("div", {
-      className: "info-pacote"
+      className: "info-pacote",
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
     }, /*#__PURE__*/React.createElement("div", {
       className: "descricao-lancamento"
     }, "Pacote de ", pac.totalSessoes, " sess\xF5es \u2014 ", pac.recorrencia), /*#__PURE__*/React.createElement("div", {
@@ -1035,26 +1511,87 @@ function CardPacotesPaciente({
       }
     })), /*#__PURE__*/React.createElement("div", {
       className: "detalhe-lancamento"
-    }, realizadas, " de ", total, " sess\xF5es realizadas")), /*#__PURE__*/React.createElement("span", {
-      className: "etiqueta-status-lanc etiqueta-" + (pac.statusPag || "pendente")
-    }, pac.statusPag === "recebido" ? "✓ Recebido" : "Pendente"), /*#__PURE__*/React.createElement("span", {
-      className: "valor-lancamento valor-receita"
-    }, fmtMoeda(pac.valorTotal)), /*#__PURE__*/React.createElement("button", {
-      className: "botao-icone",
-      onClick: () => aoEditar(pac),
-      title: "Editar"
+    }, realizadas, " de ", total, " sess\xF5es realizadas"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginTop: 12,
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "botao-secundario",
+      style: {
+        padding: "5px 14px",
+        fontSize: 13
+      },
+      onClick: e => {
+        e.stopPropagation();
+        aoEditar(pac);
+      }
+    }, "Editar"), /*#__PURE__*/React.createElement("button", {
+      className: "botao-primario",
+      style: {
+        padding: "5px 14px",
+        fontSize: 13,
+        display: "flex",
+        gap: 5,
+        alignItems: "center"
+      },
+      onClick: e => {
+        e.stopPropagation();
+        setSessoesPacoteAberto(pac);
+      }
     }, /*#__PURE__*/React.createElement(Icone, {
-      nome: "pencil",
-      tamanho: 15
-    })), /*#__PURE__*/React.createElement("button", {
+      nome: "list-checks",
+      tamanho: 13
+    }), " Sess\xF5es"), /*#__PURE__*/React.createElement("button", {
+      className: "botao-secundario",
+      style: {
+        padding: "5px 14px",
+        fontSize: 13,
+        display: "flex",
+        gap: 5,
+        alignItems: "center"
+      },
+      onClick: e => {
+        e.stopPropagation();
+        gerarPDFPacote(pac, sessoesPac, nome);
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "file-text",
+      tamanho: 13
+    }), " PDF"), /*#__PURE__*/React.createElement("button", {
       className: "botao-icone botao-icone-perigo",
-      onClick: () => aoExcluir(pac),
+      style: {
+        marginLeft: "auto"
+      },
+      onClick: e => {
+        e.stopPropagation();
+        aoExcluir(pac);
+      },
       title: "Excluir"
     }, /*#__PURE__*/React.createElement(Icone, {
       nome: "trash-2",
       tamanho: 15
-    })));
-  })));
+    })))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-end",
+        gap: 4
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "etiqueta-status-lanc etiqueta-" + (pac.statusPag || "pendente")
+    }, pac.statusPag === "recebido" ? "✓ Recebido" : "Pendente"), /*#__PURE__*/React.createElement("span", {
+      className: "valor-lancamento valor-receita"
+    }, fmtMoeda(pac.valorTotal))));
+  })), sessoesPacoteAberto && /*#__PURE__*/React.createElement(ModalSessoesPacote, {
+    usuario: usuario,
+    pacote: sessoesPacoteAberto,
+    sessoes: sessoes.filter(s => s.pacoteId === sessoesPacoteAberto.id),
+    pacienteNome: nome,
+    aoFechar: () => setSessoesPacoteAberto(null)
+  }));
 }
 function PacoteForm({
   usuario,
@@ -1564,15 +2101,15 @@ function AcompanhamentoGeral({
 }
 const STATUS_SESSAO = {
   agendado: {
-    rotulo: "Agendado",
+    rotulo: "Agendada",
     cor: "var(--cor-marca)"
   },
   confirmado: {
-    rotulo: "Confirmado",
+    rotulo: "Confirmada",
     cor: "var(--sucesso)"
   },
   realizado: {
-    rotulo: "✓ Realizado",
+    rotulo: "Realizada",
     cor: "var(--sucesso)"
   },
   falta: {
@@ -1580,8 +2117,29 @@ const STATUS_SESSAO = {
     cor: "#d97706"
   },
   cancelado: {
-    rotulo: "Cancelado",
+    rotulo: "Cancelada",
     cor: "var(--erro)"
+  },
+  remarcado: {
+    rotulo: "Remarcada",
+    cor: "#0891b2"
+  },
+  // variantes legacy (feminino) para compatibilidade com registros antigos
+  agendada: {
+    rotulo: "Agendada",
+    cor: "var(--cor-marca)"
+  },
+  realizada: {
+    rotulo: "Realizada",
+    cor: "var(--sucesso)"
+  },
+  cancelada: {
+    rotulo: "Cancelada",
+    cor: "var(--erro)"
+  },
+  remarcada: {
+    rotulo: "Remarcada",
+    cor: "#0891b2"
   }
 };
 function ControleSessoes({

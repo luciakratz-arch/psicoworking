@@ -1243,7 +1243,7 @@ function TelaRecursosPaciente({ paciente, usuario, recursoAberto, setRecursoAber
         try {
           const doc = await db.collection(colecao).doc(a.id).get();
           if (!doc.exists) return null;
-          return { id: doc.id, tipo: a.tipo, ...doc.data() };
+          return { id: doc.id, ...doc.data(), tipo: a.tipo };
         } catch (e) {
           return null;
         }

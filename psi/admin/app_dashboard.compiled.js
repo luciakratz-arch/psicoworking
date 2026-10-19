@@ -155,15 +155,26 @@ function TelaDashboard({
   }, /*#__PURE__*/React.createElement("div", {
     className: "rotulo-mini",
     style: {
-      color: "#d97706"
+      color: "var(--cor-marca)",
+      fontWeight: 600
     }
   }, "Hoje"), aniversariantesHoje.map(p => {
     const anos = p.dataNasc ? hojeD.getFullYear() - parseInt(p.dataNasc.slice(0, 4), 10) : null;
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
-      className: "linha-atividade"
+      className: "linha-atividade",
+      style: {
+        borderLeft: "3px solid var(--cor-marca)",
+        paddingLeft: 12,
+        borderRadius: "0 8px 8px 0",
+        background: "color-mix(in srgb, var(--cor-marca) 8%, transparent)"
+      }
     }, /*#__PURE__*/React.createElement("div", {
-      className: "avatar-paciente"
+      className: "avatar-paciente",
+      style: {
+        background: "var(--cor-marca)",
+        color: "#fff"
+      }
     }, (p.nome || "?").charAt(0).toUpperCase()), /*#__PURE__*/React.createElement("div", {
       className: "info-atividade"
     }, /*#__PURE__*/React.createElement("div", {
@@ -171,7 +182,11 @@ function TelaDashboard({
     }, p.nome), anos != null && /*#__PURE__*/React.createElement("div", {
       className: "badges-atividade"
     }, /*#__PURE__*/React.createElement("span", {
-      className: "badge-atividade"
+      className: "badge-atividade",
+      style: {
+        background: "var(--cor-marca)",
+        color: "#fff"
+      }
     }, anos, " anos"))), p.email && /*#__PURE__*/React.createElement("a", {
       className: "botao-secundario",
       href: `mailto:${p.email}?subject=${encodeURIComponent("Feliz Aniversário, " + (p.nome || "").split(" ")[0] + "!")}`

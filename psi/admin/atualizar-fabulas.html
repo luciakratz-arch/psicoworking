@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atualizar Fábulas — PsiCoWorking</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 540px; margin: 60px auto; padding: 24px; background: #f5f3ff; }
+    h2 { color: #6B21A8; margin-bottom: 4px; }
+    p { color: #555; margin-bottom: 20px; }
+    input { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 12px; font-size: 15px; }
+    .btn { width: 100%; padding: 14px; background: #6B21A8; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    .btn:hover { background: #7C3AED; }
+    .btn:disabled { background: #aaa; cursor: default; }
+    .btn-sec { background: white; color: #6B21A8; border: 1px solid #6B21A8; margin-top: 10px; }
+    .btn-sec:hover { background: #f5f3ff; }
+    #log { margin-top: 20px; background: white; border-radius: 8px; padding: 16px; font-size: 14px; line-height: 1.8; display: none; }
+    .ok { color: #15803D; }
+    .err { color: #DC2626; }
+    #tela-login, #tela-logado { display: none; }
+  </style>
+</head>
+<body>
+  <h2>Atualizar Fábulas para Carousel</h2>
+  <p>Converte as 3 fábulas com imagens para o formato carousel.</p>
+
+  <div id="tela-carregando">
+    <p style="color:#888;">Verificando sessão...</p>
+  </div>
+
+  <div id="tela-login" style="display:none">
+    <p style="color:#555;">Entre com o mesmo e-mail e senha que usa no admin:</p>
+    <input type="email" id="email" placeholder="E-mail" />
+    <input type="password" id="senha" placeholder="Senha" />
+    <button class="btn" onclick="entrar()">Entrar</button>
+    <div id="login-err" style="color:#DC2626; margin-top:8px; font-size:14px;"></div>
+  </div>
+
+  <div id="tela-logado">
+    <p id="msg-usuario" style="color:#15803D; font-weight:600;"></p>
+    <button class="btn" id="btn-atualizar" onclick="atualizar()">Atualizar as 3 Fábulas Agora</button>
+    <button class="btn btn-sec" onclick="sair()">Sair (trocar conta)</button>
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+    const cfg = {
+      apiKey: "AIzaSyCJx1RwX5-FM2wcUqzeC_CYAUdkmTKU2u4",
+      authDomain: "psicoworking.firebaseapp.com",
+      projectId: "psicoworking",
+      storageBucket: "psicoworking.firebasestorage.app",
+      messagingSenderId: "176262015536",
+      appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
+    };
+
+    // Usa o mesmo nome de app do admin principal para compartilhar a sessão
+    const app = firebase.apps.find(a => a.name === "psicoworking-admin")
+              || firebase.initializeApp(cfg, "psicoworking-admin");
+    const auth = app.auth();
+    const db = app.firestore();
+
+    const BASE = "https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/admin/imagens/";
+    const FABULAS = [
+      {
+        busca: "Cadeira",
+        novoTitulo: "A Cadeira de Balanço",
+        tipo: "carousel",
+        paginas: [
+          BASE + "cadeira-de-balanco/painel1.png",
+          BASE + "cadeira-de-balanco/painel2.png",
+          BASE + "cadeira-de-balanco/painel3.png",
+          BASE + "cadeira-de-balanco/painel4.png",
+          BASE + "cadeira-de-balanco/painel5.png",
+          BASE + "cadeira-de-balanco/painel6.png"
+        ]
+      },
+      {
+        busca: "Detetive",
+        novoTitulo: null,
+        tipo: "carousel",
+        paginas: [
+          BASE + "detetive-crimes-imaginarios/imagens1.png",
+          BASE + "detetive-crimes-imaginarios/imagens2.png",
+          BASE + "detetive-crimes-imaginarios/imagens3.png",
+          BASE + "detetive-crimes-imaginarios/imagens4.png",
+          BASE + "detetive-crimes-imaginarios/imagens5.png",
+          BASE + "detetive-crimes-imaginarios/imagens6.png",
+          BASE + "detetive-crimes-imaginarios/imagens7.png",
+          BASE + "detetive-crimes-imaginarios/imagens8.png",
+          BASE + "detetive-crimes-imaginarios/imagens9.png"
+        ]
+      },
+      {
+        busca: "Escorpi",
+        novoTitulo: null,
+        tipo: "carousel",
+        paginas: [
+          BASE + "escorpiao-sapo/painel1.jpg",
+          BASE + "escorpiao-sapo/painel2.jpg",
+          BASE + "escorpiao-sapo/painel3.jpg",
+          BASE + "escorpiao-sapo/painel4.jpg",
+          BASE + "escorpiao-sapo/painel5.jpg",
+          BASE + "escorpiao-sapo/painel6.jpg",
+          BASE + "escorpiao-sapo/painel7.jpg",
+          BASE + "escorpiao-sapo/painel8.jpg"
+        ]
+      }
+    ];
+
+    function log(msg, tipo) {
+      const el = document.getElementById("log");
+      el.style.display = "block";
+      el.innerHTML += `<div class="${tipo || ''}">${msg}</div>`;
+    }
+
+    auth.onAuthStateChanged(user => {
+      document.getElementById("tela-carregando").style.display = "none";
+      if (user) {
+        document.getElementById("tela-login").style.display = "none";
+        document.getElementById("tela-logado").style.display = "block";
+        document.getElementById("msg-usuario").textContent = "Logada como: " + user.email;
+      } else {
+        document.getElementById("tela-login").style.display = "block";
+        document.getElementById("tela-logado").style.display = "none";
+      }
+    });
+
+    async function entrar() {
+      const email = document.getElementById("email").value.trim();
+      const senha = document.getElementById("senha").value;
+      document.getElementById("login-err").textContent = "";
+      try {
+        await auth.signInWithEmailAndPassword(email, senha);
+      } catch (e) {
+        const msgs = {
+          "auth/wrong-password": "Senha incorreta.",
+          "auth/user-not-found": "E-mail não encontrado.",
+          "auth/invalid-email": "E-mail inválido.",
+          "auth/too-many-requests": "Muitas tentativas. Aguarde alguns minutos."
+        };
+        document.getElementById("login-err").textContent = msgs[e.code] || e.message;
+      }
+    }
+
+    async function sair() {
+      await auth.signOut();
+      document.getElementById("log").style.display = "none";
+      document.getElementById("log").innerHTML = "";
+    }
+
+    async function atualizar() {
+      const btn = document.getElementById("btn-atualizar");
+      btn.disabled = true;
+      btn.textContent = "Atualizando...";
+      document.getElementById("log").style.display = "none";
+      document.getElementById("log").innerHTML = "";
+
+      try {
+        // Forçar refresh do token para garantir claims atualizados
+        await auth.currentUser.getIdToken(true);
+        log("Buscando fábulas no banco...");
+
+        const snap = await db.collection("fabulas_terapeuticas").get();
+        let count = 0;
+
+        for (const doc of snap.docs) {
+          const titulo = doc.data().titulo || "";
+          const match = FABULAS.find(f => titulo.includes(f.busca));
+          if (!match) continue;
+
+          const upd = { tipo: match.tipo, paginas: match.paginas };
+          if (match.novoTitulo) upd.titulo = match.novoTitulo;
+
+          await doc.ref.update(upd);
+          log("Atualizado: " + (match.novoTitulo || titulo) + " (" + match.paginas.length + " imagens)", "ok");
+          count++;
+        }
+
+        if (count === 0) {
+          log("Nenhuma fábula encontrada com esses nomes. Verifique no admin se os títulos contêm 'Cadeira', 'Detetive' ou 'Escorpi'.", "err");
+        } else {
+          log("Pronto! " + count + " fábulas atualizadas.", "ok");
+          log("Abra o admin, recarregue a página (F5) e visualize as fábulas.");
+          btn.textContent = "Concluído!";
+        }
+      } catch (e) {
+        log("Erro: " + e.message, "err");
+        if (e.code === "permission-denied") {
+          log("Sua conta não tem permissão de admin_matriz para editar fábulas. Entre em contato com o suporte.", "err");
+        }
+        btn.disabled = false;
+        btn.textContent = "Tentar Novamente";
+      }
+    }
+  </script>
+</body>
+</html>

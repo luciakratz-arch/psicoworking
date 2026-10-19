@@ -174,20 +174,28 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
   );
 }
 
-// Wrapper simples da biblioteca Lucide (CDN, sem lucide-react) —
-// desenha um <i data-lucide> e deixa a lib substituir pelo SVG.
+// Wrapper simples da biblioteca Lucide (CDN, sem lucide-react).
+// React gerencia o <span>; lucide gerencia o conteúdo interno.
+// Se usarmos <i> como nó React direto, o lucide substitui o <i> por
+// <svg> fora do controle do React e o removeChild quebra na desmontagem.
 function Icone({ nome, tamanho = 16 }) {
   const ref = useRef(null);
-  // Sem array de dependências, isso rodava a cada re-render de CADA
-  // ícone da tela — e window.lucide.createIcons() escaneia o
-  // documento inteiro toda vez que é chamado. Com dezenas de ícones
-  // numa tela (o assistente de Nova Ferramenta tem muitos), qualquer
-  // digitação virava um monte de varreduras completas do DOM, deixando
-  // tudo pesado. Só precisa rodar de novo se o nome do ícone mudar.
   useEffect(() => {
-    if (window.lucide) window.lucide.createIcons();
-  }, [nome]);
-  return <i ref={ref} data-lucide={nome} className="icone-lucide" style={{ width: tamanho, height: tamanho }}></i>;
+    if (!ref.current || !window.lucide) return;
+    ref.current.innerHTML = `<i data-lucide="${nome}" class="icone-lucide" style="width:${tamanho}px;height:${tamanho}px"></i>`;
+    window.lucide.createIcons();
+  }, [nome, tamanho]);
+  return <span ref={ref} style={{ display: "inline-flex", width: tamanho, height: tamanho, flexShrink: 0 }} />;
+}
+
+function Spinner({ tamanho = 24 }) {
+  return (
+    <div style={{
+      display: "inline-block", width: tamanho, height: tamanho,
+      border: "3px solid var(--borda)", borderTopColor: "var(--cor-marca)",
+      borderRadius: "50%", animation: "girar 0.7s linear infinite",
+    }} />
+  );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);

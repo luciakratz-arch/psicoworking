@@ -46,6 +46,7 @@ const ABAS_PACIENTE = [
   { id: "saude-ocupacional", rotulo: "Saúde Ocupacional", icone: "briefcase" },
   { id: "questionarios", rotulo: "Questionários", icone: "clipboard-list" },
   { id: "links", rotulo: "Links Partilhados", icone: "link" },
+  { id: "sessoes-tcc", rotulo: "Sessões TCC", icone: "notebook-pen" },
 ];
 
 function TelaPacientes({ usuario }) {
@@ -497,13 +498,14 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
 
       {aba === "perfil" && <AbaPerfilPaciente paciente={paciente} />}
       {aba === "modulos" && <AbaModulosPaciente paciente={paciente} />}
-      {aba === "questionarios" && <AbaQuestionariosPaciente usuario={usuario} paciente={paciente} />}
+      {aba === "questionarios" && <AbaQuestionarios paciente={paciente} />}
 
       {aba === "metas" && <AbaMetasPaciente usuario={usuario} paciente={paciente} />}
       {aba === "laudos" && <AbaLaudosPaciente usuario={usuario} paciente={paciente} />}
       {aba === "evolucao" && <AbaEvolucaoPaciente usuario={usuario} paciente={paciente} />}
       {aba === "saude-ocupacional" && <AbaSaudeOcupacionalPaciente usuario={usuario} paciente={paciente} />}
       {aba === "links" && <AbaLinksPaciente usuario={usuario} paciente={paciente} />}
+      {aba === "sessoes-tcc" && <AbaSessoesTCC usuario={usuario} paciente={paciente} />}
     </div>
   );
 }

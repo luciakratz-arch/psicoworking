@@ -111,6 +111,16 @@ function ProntAvisoCrp({ cfg }) {
   );
 }
 
+const TCC_SECOES = [
+  { key: "humor", rotulo: "Estado de Humor / Início da Sessão" },
+  { key: "agenda", rotulo: "Agenda e Temas Abordados" },
+  { key: "pensamentosAutomaticos", rotulo: "Pensamentos Automáticos" },
+  { key: "crencas", rotulo: "Crenças Intermediárias e Centrais" },
+  { key: "tecnicas", rotulo: "Técnicas Utilizadas" },
+  { key: "tarefas", rotulo: "Tarefas de Casa" },
+  { key: "observacoes", rotulo: "Observações do Terapeuta" },
+];
+
 // ═══════════════════════════════════════════════════════════════════
 //  METAS
 // ═══════════════════════════════════════════════════════════════════
@@ -1131,6 +1141,271 @@ function AbaLinksPaciente({ usuario, paciente }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SESSÕES TCC — anotações clínicas por sessão + PDF por período
+// ═══════════════════════════════════════════════════════════════════
+
+function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, aoFechar }) {
+  const [textoBruto, setTextoBruto] = useState(notaExistente?.textoBruto || "");
+  const [tcc, setTcc] = useState(notaExistente?.tcc || {});
+  const [organizando, setOrganizando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const temTcc = TCC_SECOES.some((s) => tcc[s.key]);
+
+  async function organizarComIA() {
+    if (!textoBruto.trim()) { setErro("Digite ou dite as anotações antes de organizar."); return; }
+    setOrganizando(true);
+    setErro("");
+    try {
+      const fn = appAdmin.functions("southamerica-east1").httpsCallable("organizarProntuarioIA");
+      const resultado = await fn({ textoBruto, pacienteNome: paciente.nome, dataSessao: sessao.data });
+      setTcc(resultado.data.tcc || {});
+    } catch (e) {
+      setErro("Erro ao organizar: " + e.message);
+    } finally {
+      setOrganizando(false);
+    }
+  }
+
+  async function salvar() {
+    if (!textoBruto.trim()) { setErro("Insira alguma anotação antes de salvar."); return; }
+    setSalvando(true);
+    setErro("");
+    try {
+      const dados = {
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome,
+        sessaoId: sessao.id,
+        pacoteId: sessao.pacoteId || null,
+        data: sessao.data || null,
+        textoBruto,
+        tcc,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      if (notaExistente) {
+        await db.collection("clinica_prontuarios").doc(notaExistente.id).update(dados);
+      } else {
+        await db.collection("clinica_prontuarios").add({ ...dados, criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+      aoFechar();
+    } catch (e) {
+      setErro("Erro ao salvar: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  const dataFormatada = sessao.data
+    ? new Date(sessao.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : "";
+
+  return (
+    <div className="sobreposicao" onClick={aoFechar}>
+      <div className="modal modal-largo" onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>Anotação de Sessão TCC</h3>
+          <button style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }} onClick={aoFechar}><Icone nome="x" tamanho={18} /></button>
+        </div>
+        <div style={{ padding: "0 0 10px", fontSize: 12, color: "var(--texto-suave)" }}>
+          {paciente.nome} · {dataFormatada}{sessao.horario ? " · " + sessao.horario : ""}
+        </div>
+
+        <label>Anotações brutas da sessão <span className="opcional">(dite ou escreva livremente)</span></label>
+        <TextAreaVoz value={textoBruto} onChange={e => setTextoBruto(e.target.value)} rows={6} placeholder="Descreva o que aconteceu na sessão, os temas discutidos, técnicas usadas, tarefas combinadas..." />
+
+        <div style={{ display: "flex", gap: 10, margin: "12px 0 18px", alignItems: "center" }}>
+          <button className="botao-primario" onClick={organizarComIA} disabled={organizando}>
+            <Icone nome="sparkles" tamanho={15} /> {organizando ? "Organizando..." : "Organizar com IA"}
+          </button>
+          {temTcc && !organizando && (
+            <span style={{ fontSize: 12, color: "var(--sucesso)", display: "flex", alignItems: "center", gap: 4 }}>
+              <Icone nome="check-circle" tamanho={13} /> Organizado
+            </span>
+          )}
+        </div>
+
+        {temTcc && (
+          <div style={{ border: "1px solid var(--borda)", borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--cor-marca)", marginBottom: 12 }}>Prontuário TCC — revise e edite se necessário</div>
+            {TCC_SECOES.map((s) => (
+              <div key={s.key} style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase" }}>{s.rotulo}</label>
+                <TextAreaVoz value={tcc[s.key] || ""} onChange={e => setTcc((prev) => ({ ...prev, [s.key]: e.target.value }))} rows={3} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {erro && <p className="mensagem-erro">{erro}</p>}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+          <button className="botao-secundario" onClick={aoFechar}>Cancelar</button>
+          <button className="botao-primario" onClick={salvar} disabled={salvando}>
+            {salvando ? "Salvando..." : "Salvar anotação"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AbaSessoesTCC({ usuario, paciente }) {
+  const [sessoes, setSessoes] = useState([]);
+  const [notas, setNotas] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [mesFiltro, setMesFiltro] = useState(null);
+  const [sessaoModal, setSessaoModal] = useState(null);
+  const cfg = useConfigProntuario(usuario.psiId);
+
+  useEffect(() => {
+    const unsubSess = db.collection("clinica_sessoes")
+      .where("psi_id", "==", usuario.psiId)
+      .where("pacienteId", "==", paciente.id)
+      .onSnapshot(
+        (snap) => {
+          const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          lista.sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+          setSessoes(lista);
+          setCarregando(false);
+        },
+        () => setCarregando(false)
+      );
+    const unsubNotas = db.collection("clinica_prontuarios")
+      .where("psi_id", "==", usuario.psiId)
+      .where("pacienteId", "==", paciente.id)
+      .onSnapshot((snap) => setNotas(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => {});
+    return () => { unsubSess(); unsubNotas(); };
+  }, [usuario.psiId, paciente.id]);
+
+  const mesesDisponiveis = [...new Set(sessoes.map((s) => (s.data || "").slice(0, 7)).filter(Boolean))].sort().reverse();
+  const sessoesExibidas = mesFiltro ? sessoes.filter((s) => (s.data || "").startsWith(mesFiltro)) : sessoes;
+
+  function gerarPdf() {
+    const notasFiltradas = (mesFiltro ? notas.filter((n) => (n.data || "").startsWith(mesFiltro)) : notas)
+      .sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+    if (notasFiltradas.length === 0) {
+      alert("Nenhuma anotação registrada" + (mesFiltro ? " neste mês" : "") + ".");
+      return;
+    }
+    const cor = cfg.corPrimaria || "#6A2BD9";
+    const linhaCrp = [cfg.crp ? "CRP " + cfg.crp : "", cfg.tituloProfissional || ""].filter(Boolean).join(" · ");
+    const periodo = mesFiltro
+      ? new Date(mesFiltro + "-01").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+      : "Todas as sessões";
+    const sessoesHtml = notasFiltradas.map((n) => {
+      const dataFmt = n.data
+        ? new Date(n.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+        : "—";
+      const t = n.tcc || {};
+      return (
+        "<div style='margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #E5E7EB'>" +
+        "<div style='font-size:13px;font-weight:700;color:" + cor + ";margin-bottom:14px;text-transform:uppercase'>" + dataFmt + "</div>" +
+        TCC_SECOES.filter((s) => t[s.key]).map((s) =>
+          "<div style='margin-bottom:10px'>" +
+          "<div style='font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px'>" + s.rotulo + "</div>" +
+          "<div style='font-size:12.5px;line-height:1.7;color:#1f2937;white-space:pre-wrap'>" + t[s.key] + "</div>" +
+          "</div>"
+        ).join("") +
+        "</div>"
+      );
+    }).join("");
+    const html =
+      "<html><head><meta charset='UTF-8'><title>Prontuário TCC — " + paciente.nome + "</title>" +
+      "<style>body{font-family:Arial,sans-serif;margin:40px;color:#1f2937;font-size:13px;line-height:1.6}" +
+      "@media print{body{margin:20px}.no-print{display:none}}</style></head><body>" +
+      "<div style='display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid " + cor + ";padding-bottom:14px;margin-bottom:24px'>" +
+      "<div><div style='font-size:20px;font-weight:700;color:" + cor + "'>" + (cfg.nome || "Clínica") + "</div>" +
+      (linhaCrp ? "<div style='font-size:11px;color:#6B7280'>" + linhaCrp + "</div>" : "") +
+      (cfg.cidade ? "<div style='font-size:11px;color:#6B7280'>" + cfg.cidade + "</div>" : "") + "</div>" +
+      (cfg.logoUrl ? "<img src='" + cfg.logoUrl + "' style='height:48px;object-fit:contain'>" : "") + "</div>" +
+      "<div style='text-align:center;margin-bottom:24px'>" +
+      "<div style='font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1px'>Prontuário de Sessões TCC</div>" +
+      "<div style='font-size:12px;color:#6B7280;margin-top:4px'>" + paciente.nome + " · " + periodo + "</div></div>" +
+      sessoesHtml +
+      "<div style='font-size:10px;color:#9CA3AF;text-align:center;margin-top:24px'>Documento confidencial — Resolução CFP nº 06/2019</div>" +
+      "<div class='no-print' style='text-align:center;margin-top:20px'>" +
+      "<button onclick='window.print()' style='background:" + cor + ";color:white;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer'>Imprimir / Salvar PDF</button></div>" +
+      "</body></html>";
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => { w.focus(); w.print(); }, 600);
+  }
+
+  return (
+    <div>
+      <div className="cartao-secao">
+        <div className="titulo-cartao-secao"><Icone nome="notebook-pen" tamanho={16} /> Anotações de Sessão TCC</div>
+        <p className="descricao-cartao-secao">Registre e organize as anotações de cada sessão no formato TCC com auxílio de IA. Gere relatórios em PDF por período.</p>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
+          <select className="campo-select" value={mesFiltro || ""} onChange={(e) => setMesFiltro(e.target.value || null)}>
+            <option value="">Todos os meses</option>
+            {mesesDisponiveis.map((m) => (
+              <option key={m} value={m}>
+                {new Date(m + "-01").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                {" "}({notas.filter((n) => (n.data || "").startsWith(m)).length} nota(s))
+              </option>
+            ))}
+          </select>
+          <button className="botao-secundario" onClick={gerarPdf}>
+            <Icone nome="file-text" tamanho={15} /> Gerar PDF
+          </button>
+        </div>
+
+        {carregando ? (
+          <p className="texto-vazio">Carregando sessões...</p>
+        ) : sessoesExibidas.length === 0 ? (
+          <p className="texto-vazio">Nenhuma sessão{mesFiltro ? " neste mês" : ""} encontrada para este paciente.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {sessoesExibidas.map((s) => {
+              const nota = notas.find((n) => n.sessaoId === s.id);
+              const dataFmt = s.data
+                ? new Date(s.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+                : "Data não definida";
+              return (
+                <div key={s.id} style={{ border: "1px solid var(--borda)", borderRadius: 10, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{dataFmt}{s.horario ? " · " + s.horario : ""}</div>
+                    <div style={{ fontSize: 11, color: "var(--texto-suave)", marginTop: 2 }}>
+                      {[s.modalidade, s.status].filter(Boolean).join(" · ")}
+                    </div>
+                    {nota && (
+                      <div style={{ fontSize: 11, color: "var(--sucesso)", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                        <Icone nome="check-circle" tamanho={12} /> Anotação registrada
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className={nota ? "botao-secundario" : "botao-primario"}
+                    style={{ fontSize: 12, padding: "6px 14px" }}
+                    onClick={() => setSessaoModal({ sessao: s, nota: nota || null })}
+                  >
+                    <Icone nome={nota ? "eye" : "notebook-pen"} tamanho={13} />
+                    {" "}{nota ? "Ver / Editar" : "Anotar"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {sessaoModal && (
+        <ModalAnotacaoTCC
+          usuario={usuario}
+          paciente={paciente}
+          sessao={sessaoModal.sessao}
+          notaExistente={sessaoModal.nota}
+          aoFechar={() => setSessaoModal(null)}
+        />
+      )}
     </div>
   );
 }

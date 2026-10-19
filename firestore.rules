@@ -314,6 +314,12 @@ service cloud.firestore {
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
     }
 
+    // ── Prontuários de sessões TCC (anotações clínicas por sessão) ──
+    match /clinica_prontuarios/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+    }
+
     match /clinica_comissoes/{comissaoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
@@ -338,7 +344,7 @@ service cloud.firestore {
     }
     match /fabulas_terapeuticas/{id} {
       allow read: if estaLogado();
-      allow write: if ehAdminMatriz();
+      allow write: if ehAdminMatriz() || ehEquipeDeAlgumaClinica();
     }
     match /psicoeducacao_conteudos/{id} {
       allow read: if estaLogado();
@@ -356,6 +362,13 @@ service cloud.firestore {
     match /clinica_audit_log/{logId} {
       allow read: if ehAdminMatriz();
       allow write: if false;
+    }
+
+    // ── Formulário de interesse (site institucional) ─────────────
+    // Qualquer pessoa pode criar (sem login) — só a Admin Matriz lê.
+    match /psi_interesse/{docId} {
+      allow create: if true;
+      allow read: if ehAdminMatriz();
     }
 
     // ── Tudo que não foi listado: bloqueado por padrão ──────────
