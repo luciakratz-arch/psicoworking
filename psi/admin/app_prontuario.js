@@ -1333,7 +1333,9 @@ function AbaSessoesTCC({ usuario, paciente }) {
   const [sessoes, setSessoes] = useState([]);
   const [notas, setNotas] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [mesFiltro, setMesFiltro] = useState(null);
+  const [de, setDe] = useState("");
+  const [ate, setAte] = useState("");
+  const [ordem, setOrdem] = useState("recentes");
   const [sessaoModal, setSessaoModal] = useState(null);
   const [notasCarregadas, setNotasCarregadas] = useState(false);
   const cfg = useConfigProntuario(usuario.psiId);
@@ -1386,28 +1388,37 @@ function AbaSessoesTCC({ usuario, paciente }) {
   }, [usuario.psiId, paciente.id]);
 
   const mesesDisponiveis = [...new Set(sessoes.map((s) => (s.data || "").slice(0, 7)).filter(Boolean))].sort().reverse();
-  const sessoesExibidas = mesFiltro ? sessoes.filter((s) => (s.data || "").startsWith(mesFiltro)) : sessoes;
+  // Mês escolhido na lista = período do primeiro ao último dia daquele mês.
+  const mesFiltro = de && ate && de.endsWith("-01") && ate.endsWith("-31") && de.slice(0, 7) === ate.slice(0, 7) ? de.slice(0, 7) : "";
+  const temPeriodo = !!(de || ate);
+  const noPeriodo = (data) => !!data && (!de || data >= de) && (!ate || data <= ate);
+  const comOrdem = (lista) => (ordem === "antigas" ? [...lista].reverse() : lista);
+  const fmtBr = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
+  const sessoesExibidas = comOrdem(temPeriodo ? sessoes.filter((s) => noPeriodo(s.data)) : sessoes);
 
   // Anotações cuja sessão não está aqui (ex.: feitas pelo botão do sistema antigo
   // da clínica). Sem esta lista elas ficariam salvas mas invisíveis.
   const idsDasSessoes = new Set(sessoes.map((s) => s.id));
   const notasSemSessao = notas
     .filter((n) => !idsDasSessoes.has(n.sessaoId))
-    .filter((n) => !mesFiltro || (n.data || "").startsWith(mesFiltro))
-    .sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+    .filter((n) => !temPeriodo || noPeriodo(n.data))
+    .sort((a, b) => (ordem === "antigas" ? 1 : -1) * (a.data || "").localeCompare(b.data || ""));
 
   function gerarPdf() {
-    const notasFiltradas = (mesFiltro ? notas.filter((n) => (n.data || "").startsWith(mesFiltro)) : notas)
-      .sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+    if (de && ate && de > ate) { alert("A data inicial é depois da data final. Confira o período."); return; }
+    const notasFiltradas = (temPeriodo ? notas.filter((n) => noPeriodo(n.data)) : [...notas])
+      .sort((a, b) => (ordem === "antigas" ? 1 : -1) * (b.data || "").localeCompare(a.data || "") * -1);
     if (notasFiltradas.length === 0) {
-      alert("Nenhuma anotação registrada" + (mesFiltro ? " neste mês" : "") + ".");
+      alert("Nenhuma anotação registrada" + (temPeriodo ? " neste período" : "") + ".");
       return;
     }
     const cor = cfg.corPrimaria || "#6A2BD9";
     const linhaCrp = [cfg.crp ? "CRP " + cfg.crp : "", cfg.tituloProfissional || ""].filter(Boolean).join(" · ");
-    const periodo = mesFiltro
-      ? new Date(mesFiltro + "-01").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
-      : "Todas as sessões";
+    const periodo = !temPeriodo
+      ? "Todas as sessões"
+      : mesFiltro
+        ? new Date(mesFiltro + "-01T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+        : (de && ate ? "de " + fmtBr(de) + " a " + fmtBr(ate) : de ? "a partir de " + fmtBr(de) : "até " + fmtBr(ate));
     const sessoesHtml = notasFiltradas.map((n) => {
       const dataFmt = n.data
         ? new Date(n.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
@@ -1455,7 +1466,11 @@ function AbaSessoesTCC({ usuario, paciente }) {
         <p className="descricao-cartao-secao">Registre e organize as anotações de cada sessão no formato TCC com auxílio de IA. Gere relatórios em PDF por período.</p>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
-          <select className="campo-select" value={mesFiltro || ""} onChange={(e) => setMesFiltro(e.target.value || null)}>
+          <select className="campo-select" value={mesFiltro} onChange={(e) => {
+            const m = e.target.value;
+            setDe(m ? m + "-01" : "");
+            setAte(m ? m + "-31" : "");
+          }}>
             <option value="">Todos os meses</option>
             {mesesDisponiveis.map((m) => (
               <option key={m} value={m}>
@@ -1468,11 +1483,32 @@ function AbaSessoesTCC({ usuario, paciente }) {
             <Icone nome="file-text" tamanho={15} /> Gerar PDF
           </button>
         </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 20 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "#6B7280" }}>De</label>
+            <input type="date" className="campo-select" value={de} onChange={(e) => setDe(e.target.value)} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "#6B7280" }}>Até</label>
+            <input type="date" className="campo-select" value={ate} onChange={(e) => setAte(e.target.value)} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "#6B7280" }}>Ordem</label>
+            <select className="campo-select" value={ordem} onChange={(e) => setOrdem(e.target.value)}>
+              <option value="recentes">Mais recentes primeiro</option>
+              <option value="antigas">Mais antigas primeiro</option>
+            </select>
+          </div>
+          {temPeriodo && (
+            <button className="botao-secundario" onClick={() => { setDe(""); setAte(""); }}>Limpar período</button>
+          )}
+        </div>
+        <p className="descricao-cartao-secao" style={{ marginTop: -8 }}>O período e a ordem valem para a lista e para o PDF.</p>
 
         {carregando ? (
           <p className="texto-vazio">Carregando sessões...</p>
         ) : sessoesExibidas.length === 0 ? (
-          <p className="texto-vazio">Nenhuma sessão{mesFiltro ? " neste mês" : ""} encontrada para este paciente.</p>
+          <p className="texto-vazio">Nenhuma sessão{temPeriodo ? " neste período" : ""} encontrada para este paciente.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {sessoesExibidas.map((s) => {

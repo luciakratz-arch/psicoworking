@@ -2366,7 +2366,9 @@ function AbaSessoesTCC({
   const [sessoes, setSessoes] = useState([]);
   const [notas, setNotas] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [mesFiltro, setMesFiltro] = useState(null);
+  const [de, setDe] = useState("");
+  const [ate, setAte] = useState("");
+  const [ordem, setOrdem] = useState("recentes");
   const [sessaoModal, setSessaoModal] = useState(null);
   const [notasCarregadas, setNotasCarregadas] = useState(false);
   const cfg = useConfigProntuario(usuario.psiId);
@@ -2417,24 +2419,34 @@ function AbaSessoesTCC({
     };
   }, [usuario.psiId, paciente.id]);
   const mesesDisponiveis = [...new Set(sessoes.map(s => (s.data || "").slice(0, 7)).filter(Boolean))].sort().reverse();
-  const sessoesExibidas = mesFiltro ? sessoes.filter(s => (s.data || "").startsWith(mesFiltro)) : sessoes;
+  // Mês escolhido na lista = período do primeiro ao último dia daquele mês.
+  const mesFiltro = de && ate && de.endsWith("-01") && ate.endsWith("-31") && de.slice(0, 7) === ate.slice(0, 7) ? de.slice(0, 7) : "";
+  const temPeriodo = !!(de || ate);
+  const noPeriodo = data => !!data && (!de || data >= de) && (!ate || data <= ate);
+  const comOrdem = lista => ordem === "antigas" ? [...lista].reverse() : lista;
+  const fmtBr = iso => iso ? iso.split("-").reverse().join("/") : "";
+  const sessoesExibidas = comOrdem(temPeriodo ? sessoes.filter(s => noPeriodo(s.data)) : sessoes);
 
   // Anotações cuja sessão não está aqui (ex.: feitas pelo botão do sistema antigo
   // da clínica). Sem esta lista elas ficariam salvas mas invisíveis.
   const idsDasSessoes = new Set(sessoes.map(s => s.id));
-  const notasSemSessao = notas.filter(n => !idsDasSessoes.has(n.sessaoId)).filter(n => !mesFiltro || (n.data || "").startsWith(mesFiltro)).sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+  const notasSemSessao = notas.filter(n => !idsDasSessoes.has(n.sessaoId)).filter(n => !temPeriodo || noPeriodo(n.data)).sort((a, b) => (ordem === "antigas" ? 1 : -1) * (a.data || "").localeCompare(b.data || ""));
   function gerarPdf() {
-    const notasFiltradas = (mesFiltro ? notas.filter(n => (n.data || "").startsWith(mesFiltro)) : notas).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+    if (de && ate && de > ate) {
+      alert("A data inicial é depois da data final. Confira o período.");
+      return;
+    }
+    const notasFiltradas = (temPeriodo ? notas.filter(n => noPeriodo(n.data)) : [...notas]).sort((a, b) => (ordem === "antigas" ? 1 : -1) * (b.data || "").localeCompare(a.data || "") * -1);
     if (notasFiltradas.length === 0) {
-      alert("Nenhuma anotação registrada" + (mesFiltro ? " neste mês" : "") + ".");
+      alert("Nenhuma anotação registrada" + (temPeriodo ? " neste período" : "") + ".");
       return;
     }
     const cor = cfg.corPrimaria || "#6A2BD9";
     const linhaCrp = [cfg.crp ? "CRP " + cfg.crp : "", cfg.tituloProfissional || ""].filter(Boolean).join(" · ");
-    const periodo = mesFiltro ? new Date(mesFiltro + "-01").toLocaleDateString("pt-BR", {
+    const periodo = !temPeriodo ? "Todas as sessões" : mesFiltro ? new Date(mesFiltro + "-01T12:00:00").toLocaleDateString("pt-BR", {
       month: "long",
       year: "numeric"
-    }) : "Todas as sessões";
+    }) : de && ate ? "de " + fmtBr(de) + " a " + fmtBr(ate) : de ? "a partir de " + fmtBr(de) : "até " + fmtBr(ate);
     const sessoesHtml = notasFiltradas.map(n => {
       const dataFmt = n.data ? new Date(n.data + "T12:00:00").toLocaleDateString("pt-BR", {
         weekday: "long",
@@ -2473,8 +2485,12 @@ function AbaSessoesTCC({
     }
   }, /*#__PURE__*/React.createElement("select", {
     className: "campo-select",
-    value: mesFiltro || "",
-    onChange: e => setMesFiltro(e.target.value || null)
+    value: mesFiltro,
+    onChange: e => {
+      const m = e.target.value;
+      setDe(m ? m + "-01" : "");
+      setAte(m ? m + "-31" : "");
+    }
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
   }, "Todos os meses"), mesesDisponiveis.map(m => /*#__PURE__*/React.createElement("option", {
@@ -2489,11 +2505,66 @@ function AbaSessoesTCC({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "file-text",
     tamanho: 15
-  }), " Gerar PDF")), carregando ? /*#__PURE__*/React.createElement("p", {
+  }), " Gerar PDF")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 12,
+      flexWrap: "wrap",
+      alignItems: "flex-end",
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#6B7280"
+    }
+  }, "De"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "campo-select",
+    value: de,
+    onChange: e => setDe(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#6B7280"
+    }
+  }, "At\xE9"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    className: "campo-select",
+    value: ate,
+    onChange: e => setAte(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#6B7280"
+    }
+  }, "Ordem"), /*#__PURE__*/React.createElement("select", {
+    className: "campo-select",
+    value: ordem,
+    onChange: e => setOrdem(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "recentes"
+  }, "Mais recentes primeiro"), /*#__PURE__*/React.createElement("option", {
+    value: "antigas"
+  }, "Mais antigas primeiro"))), temPeriodo && /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: () => {
+      setDe("");
+      setAte("");
+    }
+  }, "Limpar per\xEDodo")), /*#__PURE__*/React.createElement("p", {
+    className: "descricao-cartao-secao",
+    style: {
+      marginTop: -8
+    }
+  }, "O per\xEDodo e a ordem valem para a lista e para o PDF."), carregando ? /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
   }, "Carregando sess\xF5es...") : sessoesExibidas.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
-  }, "Nenhuma sess\xE3o", mesFiltro ? " neste mês" : "", " encontrada para este paciente.") : /*#__PURE__*/React.createElement("div", {
+  }, "Nenhuma sess\xE3o", temPeriodo ? " neste período" : "", " encontrada para este paciente.") : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
