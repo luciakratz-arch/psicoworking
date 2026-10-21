@@ -14,12 +14,20 @@
 // senha preenchidos, pra psicóloga só clicar em enviar (sem precisar
 // copiar e colar nada). Usa o telefone que ela cadastrou no paciente.
 function enviarWhatsAppCredenciais(paciente, link) {
-  const numero = (paciente.telefone || "").replace(/\D/g, "");
-  const mensagem =
-    `Olá, ${paciente.nome}!\n\n` +
-    `Seu cadastro foi feito com sucesso. Para acessar o Portal do Paciente, primeiro defina sua senha pelo link abaixo:\n\n` +
-    `${link}\n\n` +
-    `Depois é só entrar com seu e-mail e a senha que você escolher. Qualquer dúvida, estou à disposição.`;
+  const wa = whatsappDoPaciente(paciente);
+  const numero = wa.numero;
+  // Se o e-mail do cadastro é interno (ou o telefone é do responsável), o
+  // paciente não saberia qual usuário digitar: a mensagem informa.
+  const precisaInformarUsuario = wa.ehResponsavel || !emailEhReal(paciente.email);
+  const abertura = wa.ehResponsavel
+    ? `Olá${wa.nome ? ", " + primeiroNomeDe(wa.nome) : ""}!\n\n` +
+      `O cadastro de ${paciente.nome} foi feito com sucesso. Para acessar o Portal do Paciente dele(a), primeiro defina a senha pelo link abaixo:`
+    : `Olá, ${paciente.nome}!\n\n` +
+      `Seu cadastro foi feito com sucesso. Para acessar o Portal do Paciente, primeiro defina sua senha pelo link abaixo:`;
+  const fechamento = precisaInformarUsuario
+    ? `Depois é só entrar com o usuário ${paciente.email} e a senha que for escolhida. Qualquer dúvida, estou à disposição.`
+    : `Depois é só entrar com seu e-mail e a senha que você escolher. Qualquer dúvida, estou à disposição.`;
+  const mensagem = `${abertura}\n\n${link}\n\n${fechamento}`;
   const url = numero
     ? `https://wa.me/55${numero}?text=${encodeURIComponent(mensagem)}`
     : `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
@@ -178,7 +186,11 @@ function TelaPacientes({ usuario }) {
                     <div className="avatar-paciente">{(p.nome || "?").charAt(0).toUpperCase()}</div>
                     <div className="info-paciente">
                       <div className="nome-paciente">{p.nome}</div>
-                      <div className="email-paciente">{p.email}</div>
+                      <div className="email-paciente">
+                        {emailEhReal(p.email)
+                          ? p.email
+                          : (contatoDoPaciente(p).email ? "Contato: " + contatoDoPaciente(p).email : "Sem e-mail")}
+                      </div>
                     </div>
                     <Icone nome="chevron-right" tamanho={16} />
                   </div>
@@ -207,8 +219,8 @@ function CamposPaciente({ form, setForm, mostrarStatus }) {
         <input value={form.nome || ""} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
       </div>
       <div>
-        <label>E-mail</label>
-        <input type="email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+        <label>E-mail <span className="opcional">(deixe em branco se o paciente não tem e-mail próprio)</span></label>
+        <input type="email" value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       </div>
       <div>
         <label>Telefone</label>
@@ -261,8 +273,21 @@ function CamposPaciente({ form, setForm, mostrarStatus }) {
         >
           <Icone nome="users" tamanho={14} /> Paciente menor de 18 anos
         </button>
+        <button
+          type="button"
+          onClick={() => setForm({ ...form, usaContatoResponsavel: !form.usaContatoResponsavel })}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, marginLeft: 8,
+            padding: "7px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer",
+            border: form.usaContatoResponsavel ? "1.5px solid #0891b2" : "1.5px solid var(--borda)",
+            background: form.usaContatoResponsavel ? "#0891b2" : "white",
+            color: form.usaContatoResponsavel ? "white" : "var(--texto-suave)",
+          }}
+        >
+          <Icone nome="mail" tamanho={14} /> Receber contato pelo responsável
+        </button>
       </div>
-      {form.ehMenorDeIdade && (
+      {(form.ehMenorDeIdade || form.usaContatoResponsavel) && (
         <>
           <div className="campo-largura-total titulo-secao-form" style={{ color: "#0891b2", borderBottomColor: "#bae6fd" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -298,6 +323,22 @@ function CamposPaciente({ form, setForm, mostrarStatus }) {
           <div>
             <label>E-mail do Responsável</label>
             <input type="email" value={form.responsavelEmail || ""} onChange={(e) => setForm({ ...form, responsavelEmail: e.target.value })} placeholder="email@exemplo.com" />
+          </div>
+          <div className="campo-largura-total">
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600 }}>
+              <input
+                type="checkbox"
+                checked={!!form.telefoneEhDoResponsavel}
+                onChange={(e) => setForm({ ...form, telefoneEhDoResponsavel: e.target.checked })}
+                style={{ width: "auto" }}
+              />
+              O telefone do campo "Telefone" (acima) é do responsável
+            </label>
+            <p className="texto-vazio" style={{ margin: "4px 0 0" }}>
+              Com isso marcado, as mensagens de WhatsApp cumprimentam o responsável e citam o nome do paciente.
+              Para os e-mails irem ao responsável, use o botão "Receber contato pelo responsável" acima
+              (ou deixe o e-mail do paciente em branco).
+            </p>
           </div>
           <div className="campo-largura-total">
             <label>Nome do Segundo Responsável <span className="opcional">(opcional)</span></label>
@@ -370,23 +411,27 @@ function FormNovoPaciente({ usuario, aoFechar }) {
   const [erro, setErro] = useState("");
   const [linkSucesso, setLinkSucesso] = useState("");
   const [emailEnviado, setEmailEnviado] = useState(false);
+  const [enviadoPara, setEnviadoPara] = useState("");
+  const [envioAoResponsavel, setEnvioAoResponsavel] = useState(false);
 
   async function aoEnviar(evento) {
     evento.preventDefault();
     setErro("");
-    if (!form.nome || !form.email) {
-      setErro("Nome e e-mail são obrigatórios.");
+    if (!form.nome) {
+      setErro("O nome é obrigatório.");
       return;
     }
     setEnviando(true);
     try {
       const resultado = await chamarCadastrarPaciente(form);
       setLinkSucesso(resultado.data.linkDefinirSenha);
-      // Manda o e-mail de verdade pro paciente definir a senha —
-      // antes só gerava o link e esperava a psicóloga copiar e enviar
-      // na mão; agora sai automático, igual o autocadastro público.
+      // Manda o e-mail de verdade para o contato certo (o paciente ou o
+      // responsável). O envio padrão do Firebase só chegaria ao e-mail da
+      // conta, que pode ser um endereço interno.
       try {
-        await auth.sendPasswordResetEmail(form.email);
+        const envio = await chamarEnviarAcessoPaciente({ pacienteId: resultado.data.uid });
+        setEnviadoPara(envio.data.enviadoPara);
+        setEnvioAoResponsavel(!!envio.data.ehResponsavel);
         setEmailEnviado(true);
       } catch (eEmail) {
         setEmailEnviado(false);
@@ -422,9 +467,10 @@ function FormNovoPaciente({ usuario, aoFechar }) {
           <div>
             {emailEnviado ? (
               <p className="mensagem-sucesso">
-                Paciente cadastrado! Já mandamos um e-mail para <strong>{form.email}</strong> com o link
+                Paciente cadastrado! Já mandamos um e-mail para <strong>{enviadoPara}</strong>
+                {envioAoResponsavel ? " (responsável)" : ""} com o link
                 para <strong>{form.nome}</strong> definir a própria senha (ninguém, nem a clínica, fica
-                sabendo qual senha ele escolhe).
+                sabendo qual senha foi escolhida).
               </p>
             ) : (
               <p className="mensagem-erro">
@@ -435,7 +481,7 @@ function FormNovoPaciente({ usuario, aoFechar }) {
             <label>Link de definir senha <span className="opcional">(reserva, caso o e-mail não chegue)</span></label>
             <textarea readOnly className="campo-link" value={linkSucesso} />
 
-            {form.telefone && (
+            {whatsappDoPaciente(form).numero && (
               <button type="button" className="botao-secundario" style={{ marginTop: 10 }} onClick={() => enviarWhatsAppCredenciais(form, linkSucesso)}>
                 <Icone nome="message-circle" tamanho={15} /> Enviar por WhatsApp
               </button>
@@ -538,8 +584,8 @@ function AbaPerfilPaciente({ paciente }) {
   async function reenviarLinkSenha() {
     setReenviando(true);
     try {
-      await auth.sendPasswordResetEmail(paciente.email);
-      setMensagem("Link de redefinição enviado para " + paciente.email + ".");
+      const envio = await chamarEnviarAcessoPaciente({ pacienteId: paciente.id });
+      setMensagem("Link de redefinição enviado para " + envio.data.enviadoPara + (envio.data.ehResponsavel ? " (responsável)" : "") + ".");
     } catch (e) {
       setMensagem("Erro ao enviar: " + e.message);
     } finally {

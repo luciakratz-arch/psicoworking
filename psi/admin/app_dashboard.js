@@ -169,10 +169,14 @@ function TelaDashboard({ usuario, aoAbrirPaciente }) {
                         </div>
                       )}
                     </div>
-                    {p.email && (
+                    {contatoDoPaciente(p).email && (
                       <a
                         className="botao-secundario"
-                        href={`mailto:${p.email}?subject=${encodeURIComponent("Feliz Aniversário, " + (p.nome || "").split(" ")[0] + "!")}`}
+                        href={`mailto:${contatoDoPaciente(p).email}?subject=${encodeURIComponent(
+                          contatoDoPaciente(p).ehResponsavel
+                            ? "Hoje é aniversário de " + primeiroNomeDe(p.nome) + "!"
+                            : "Feliz Aniversário, " + primeiroNomeDe(p.nome) + "!"
+                        )}`}
                       >
                         <Icone nome="mail" tamanho={14} /> Enviar e-mail
                       </a>

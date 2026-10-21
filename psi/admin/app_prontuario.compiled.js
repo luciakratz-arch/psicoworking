@@ -2101,10 +2101,14 @@ function ModalAnotacaoTCC({
       return;
     }
     setErro("");
-    const primeiroNome = (paciente.nome || "").trim().split(/\s+/)[0];
     const assinatura = cfg.nome || "Sua psicóloga";
-    const msg = "Olá, " + primeiroNome + "! 😊\n\n" + "*Atividades da Semana:*\n" + tarefas + "\n\n" + "Qualquer dúvida, estou à disposição. 💜\n" + "_" + assinatura + "_";
-    const numero = (paciente.celular || paciente.telefone || "").replace(/\D/g, "");
+    // Se o telefone cadastrado é do responsável (ex.: a mãe), cumprimenta ele
+    // e cita o paciente; senão, fala direto com o paciente.
+    const wa = whatsappDoPaciente(paciente);
+    const abertura = wa.ehResponsavel ? "Olá" + (wa.nome ? ", " + primeiroNomeDe(wa.nome) : "") + "! 😊\n\n" : "Olá, " + primeiroNomeDe(paciente.nome) + "! 😊\n\n";
+    const titulo = wa.ehResponsavel ? "*Atividades da semana de " + primeiroNomeDe(paciente.nome) + ":*\n" : "*Atividades da Semana:*\n";
+    const msg = abertura + titulo + tarefas + "\n\n" + "Qualquer dúvida, estou à disposição. 💜\n" + "_" + assinatura + "_";
+    const numero = (wa.numero || paciente.celular || "").replace(/\D/g, "");
     const base = numero ? "https://wa.me/55" + numero : "https://wa.me/";
     window.open(base + "?text=" + encodeURIComponent(msg), "_blank");
   }

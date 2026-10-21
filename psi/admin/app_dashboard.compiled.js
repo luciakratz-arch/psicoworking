@@ -187,9 +187,9 @@ function TelaDashboard({
         background: "var(--cor-marca)",
         color: "#fff"
       }
-    }, anos, " anos"))), p.email && /*#__PURE__*/React.createElement("a", {
+    }, anos, " anos"))), contatoDoPaciente(p).email && /*#__PURE__*/React.createElement("a", {
       className: "botao-secundario",
-      href: `mailto:${p.email}?subject=${encodeURIComponent("Feliz Aniversário, " + (p.nome || "").split(" ")[0] + "!")}`
+      href: `mailto:${contatoDoPaciente(p).email}?subject=${encodeURIComponent(contatoDoPaciente(p).ehResponsavel ? "Hoje é aniversário de " + primeiroNomeDe(p.nome) + "!" : "Feliz Aniversário, " + primeiroNomeDe(p.nome) + "!")}`
     }, /*#__PURE__*/React.createElement(Icone, {
       nome: "mail",
       tamanho: 14

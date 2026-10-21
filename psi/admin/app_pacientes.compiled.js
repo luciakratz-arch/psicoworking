@@ -14,8 +14,14 @@
 // senha preenchidos, pra psicóloga só clicar em enviar (sem precisar
 // copiar e colar nada). Usa o telefone que ela cadastrou no paciente.
 function enviarWhatsAppCredenciais(paciente, link) {
-  const numero = (paciente.telefone || "").replace(/\D/g, "");
-  const mensagem = `Olá, ${paciente.nome}!\n\n` + `Seu cadastro foi feito com sucesso. Para acessar o Portal do Paciente, primeiro defina sua senha pelo link abaixo:\n\n` + `${link}\n\n` + `Depois é só entrar com seu e-mail e a senha que você escolher. Qualquer dúvida, estou à disposição.`;
+  const wa = whatsappDoPaciente(paciente);
+  const numero = wa.numero;
+  // Se o e-mail do cadastro é interno (ou o telefone é do responsável), o
+  // paciente não saberia qual usuário digitar: a mensagem informa.
+  const precisaInformarUsuario = wa.ehResponsavel || !emailEhReal(paciente.email);
+  const abertura = wa.ehResponsavel ? `Olá${wa.nome ? ", " + primeiroNomeDe(wa.nome) : ""}!\n\n` + `O cadastro de ${paciente.nome} foi feito com sucesso. Para acessar o Portal do Paciente dele(a), primeiro defina a senha pelo link abaixo:` : `Olá, ${paciente.nome}!\n\n` + `Seu cadastro foi feito com sucesso. Para acessar o Portal do Paciente, primeiro defina sua senha pelo link abaixo:`;
+  const fechamento = precisaInformarUsuario ? `Depois é só entrar com o usuário ${paciente.email} e a senha que for escolhida. Qualquer dúvida, estou à disposição.` : `Depois é só entrar com seu e-mail e a senha que você escolher. Qualquer dúvida, estou à disposição.`;
+  const mensagem = `${abertura}\n\n${link}\n\n${fechamento}`;
   const url = numero ? `https://wa.me/55${numero}?text=${encodeURIComponent(mensagem)}` : `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
   window.open(url, "_blank");
 }
@@ -179,7 +185,7 @@ function TelaPacientes({
       className: "nome-paciente"
     }, p.nome), /*#__PURE__*/React.createElement("div", {
       className: "email-paciente"
-    }, p.email)), /*#__PURE__*/React.createElement(Icone, {
+    }, emailEhReal(p.email) ? p.email : contatoDoPaciente(p).email ? "Contato: " + contatoDoPaciente(p).email : "Sem e-mail")), /*#__PURE__*/React.createElement(Icone, {
       nome: "chevron-right",
       tamanho: 16
     })))));
@@ -206,14 +212,15 @@ function CamposPaciente({
       nome: e.target.value
     }),
     required: true
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "E-mail"), /*#__PURE__*/React.createElement("input", {
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "E-mail ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(deixe em branco se o paciente n\xE3o tem e-mail pr\xF3prio)")), /*#__PURE__*/React.createElement("input", {
     type: "email",
     value: form.email || "",
     onChange: e => setForm({
       ...form,
       email: e.target.value
-    }),
-    required: true
+    })
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Telefone"), /*#__PURE__*/React.createElement("input", {
     value: form.telefone || "",
     onChange: e => setForm({
@@ -281,7 +288,31 @@ function CamposPaciente({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "users",
     tamanho: 14
-  }), " Paciente menor de 18 anos")), form.ehMenorDeIdade && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }), " Paciente menor de 18 anos"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setForm({
+      ...form,
+      usaContatoResponsavel: !form.usaContatoResponsavel
+    }),
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 10,
+      marginLeft: 8,
+      padding: "7px 14px",
+      borderRadius: 20,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer",
+      border: form.usaContatoResponsavel ? "1.5px solid #0891b2" : "1.5px solid var(--borda)",
+      background: form.usaContatoResponsavel ? "#0891b2" : "white",
+      color: form.usaContatoResponsavel ? "white" : "var(--texto-suave)"
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "mail",
+    tamanho: 14
+  }), " Receber contato pelo respons\xE1vel")), (form.ehMenorDeIdade || form.usaContatoResponsavel) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "campo-largura-total titulo-secao-form",
     style: {
       color: "#0891b2",
@@ -338,6 +369,31 @@ function CamposPaciente({
     }),
     placeholder: "email@exemplo.com"
   })), /*#__PURE__*/React.createElement("div", {
+    className: "campo-largura-total"
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      cursor: "pointer",
+      fontWeight: 600
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: !!form.telefoneEhDoResponsavel,
+    onChange: e => setForm({
+      ...form,
+      telefoneEhDoResponsavel: e.target.checked
+    }),
+    style: {
+      width: "auto"
+    }
+  }), "O telefone do campo \"Telefone\" (acima) \xE9 do respons\xE1vel"), /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio",
+    style: {
+      margin: "4px 0 0"
+    }
+  }, "Com isso marcado, as mensagens de WhatsApp cumprimentam o respons\xE1vel e citam o nome do paciente. Para os e-mails irem ao respons\xE1vel, use o bot\xE3o \"Receber contato pelo respons\xE1vel\" acima (ou deixe o e-mail do paciente em branco).")), /*#__PURE__*/React.createElement("div", {
     className: "campo-largura-total"
   }, /*#__PURE__*/React.createElement("label", null, "Nome do Segundo Respons\xE1vel ", /*#__PURE__*/React.createElement("span", {
     className: "opcional"
@@ -432,22 +488,28 @@ function FormNovoPaciente({
   const [erro, setErro] = useState("");
   const [linkSucesso, setLinkSucesso] = useState("");
   const [emailEnviado, setEmailEnviado] = useState(false);
+  const [enviadoPara, setEnviadoPara] = useState("");
+  const [envioAoResponsavel, setEnvioAoResponsavel] = useState(false);
   async function aoEnviar(evento) {
     evento.preventDefault();
     setErro("");
-    if (!form.nome || !form.email) {
-      setErro("Nome e e-mail são obrigatórios.");
+    if (!form.nome) {
+      setErro("O nome é obrigatório.");
       return;
     }
     setEnviando(true);
     try {
       const resultado = await chamarCadastrarPaciente(form);
       setLinkSucesso(resultado.data.linkDefinirSenha);
-      // Manda o e-mail de verdade pro paciente definir a senha —
-      // antes só gerava o link e esperava a psicóloga copiar e enviar
-      // na mão; agora sai automático, igual o autocadastro público.
+      // Manda o e-mail de verdade para o contato certo (o paciente ou o
+      // responsável). O envio padrão do Firebase só chegaria ao e-mail da
+      // conta, que pode ser um endereço interno.
       try {
-        await auth.sendPasswordResetEmail(form.email);
+        const envio = await chamarEnviarAcessoPaciente({
+          pacienteId: resultado.data.uid
+        });
+        setEnviadoPara(envio.data.enviadoPara);
+        setEnvioAoResponsavel(!!envio.data.ehResponsavel);
         setEmailEnviado(true);
       } catch (eEmail) {
         setEmailEnviado(false);
@@ -484,7 +546,7 @@ function FormNovoPaciente({
     disabled: enviando
   }, enviando ? "Cadastrando..." : "Salvar"))), linkSucesso && /*#__PURE__*/React.createElement("div", null, emailEnviado ? /*#__PURE__*/React.createElement("p", {
     className: "mensagem-sucesso"
-  }, "Paciente cadastrado! J\xE1 mandamos um e-mail para ", /*#__PURE__*/React.createElement("strong", null, form.email), " com o link para ", /*#__PURE__*/React.createElement("strong", null, form.nome), " definir a pr\xF3pria senha (ningu\xE9m, nem a cl\xEDnica, fica sabendo qual senha ele escolhe).") : /*#__PURE__*/React.createElement("p", {
+  }, "Paciente cadastrado! J\xE1 mandamos um e-mail para ", /*#__PURE__*/React.createElement("strong", null, enviadoPara), envioAoResponsavel ? " (responsável)" : "", " com o link para ", /*#__PURE__*/React.createElement("strong", null, form.nome), " definir a pr\xF3pria senha (ningu\xE9m, nem a cl\xEDnica, fica sabendo qual senha foi escolhida).") : /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
   }, "Paciente cadastrado, mas n\xE3o conseguimos enviar o e-mail autom\xE1tico. Copie o link abaixo e envie voc\xEA mesma para ", /*#__PURE__*/React.createElement("strong", null, form.nome), " (por WhatsApp, por exemplo):"), /*#__PURE__*/React.createElement("label", null, "Link de definir senha ", /*#__PURE__*/React.createElement("span", {
     className: "opcional"
@@ -492,7 +554,7 @@ function FormNovoPaciente({
     readOnly: true,
     className: "campo-link",
     value: linkSucesso
-  }), form.telefone && /*#__PURE__*/React.createElement("button", {
+  }), whatsappDoPaciente(form).numero && /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "botao-secundario",
     style: {
@@ -618,8 +680,10 @@ function AbaPerfilPaciente({
   async function reenviarLinkSenha() {
     setReenviando(true);
     try {
-      await auth.sendPasswordResetEmail(paciente.email);
-      setMensagem("Link de redefinição enviado para " + paciente.email + ".");
+      const envio = await chamarEnviarAcessoPaciente({
+        pacienteId: paciente.id
+      });
+      setMensagem("Link de redefinição enviado para " + envio.data.enviadoPara + (envio.data.ehResponsavel ? " (responsável)" : "") + ".");
     } catch (e) {
       setMensagem("Erro ao enviar: " + e.message);
     } finally {

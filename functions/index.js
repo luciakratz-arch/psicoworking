@@ -126,7 +126,7 @@ exports.cadastrarPaciente = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Só a equipe da clínica cadastra pacientes.");
   }
 
-  const dadosPaciente = validarDadosPaciente(request.data);
+  const dadosPaciente = validarDadosPaciente(request.data, { exigirEmail: false });
 
   const resultado = await criarPacienteEConta({
     psiId: psiIdDoChamador,
@@ -136,6 +136,105 @@ exports.cadastrarPaciente = onCall(async (request) => {
   });
 
   return resultado;
+});
+
+// ─────────────────────────────────────────────────────────────
+// 2a) ENVIAR ACESSO AO PORTAL — manda o link para o paciente definir
+//     a senha. O envio padrão do Firebase só chega ao e-mail da conta,
+//     que pode ser o endereço interno; aqui o e-mail vai para o contato
+//     certo (o paciente ou o responsável) e o texto se adapta.
+// ─────────────────────────────────────────────────────────────
+exports.enviarAcessoPaciente = onCall({ region: "southamerica-east1" }, async (request) => {
+  const chamador = request.auth;
+  if (!chamador) {
+    throw new HttpsError("unauthenticated", "É preciso estar logado.");
+  }
+  const psiId = chamador.token.psi_id;
+  const papel = chamador.token.role;
+  if (!psiId || (papel !== "psi" && papel !== "secretaria")) {
+    throw new HttpsError("permission-denied", "Só a equipe da clínica envia o acesso.");
+  }
+
+  const { pacienteId } = request.data || {};
+  if (!pacienteId) {
+    throw new HttpsError("invalid-argument", "Informe o paciente.");
+  }
+
+  const snap = await db.collection("clinica_pacientes").doc(pacienteId).get();
+  if (!snap.exists || snap.data().psi_id !== psiId) {
+    throw new HttpsError("not-found", "Paciente não encontrado.");
+  }
+  const p = snap.data();
+
+  const contato = contatoDoPaciente(p);
+  if (!contato.email) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Não há e-mail para o envio. Preencha o e-mail do paciente ou o e-mail do responsável."
+    );
+  }
+
+  const linkDefinirSenha = await auth.generatePasswordResetLink(p.email);
+
+  let nomeClinica = "Sua clínica";
+  let corMarca = "#7B00C4";
+  try {
+    const cfg = await db.collection("psi_config").doc(psiId).get();
+    if (cfg.exists) {
+      nomeClinica = cfg.data().nome || nomeClinica;
+      corMarca = cfg.data().corPrimaria || corMarca;
+    }
+  } catch (e) {}
+
+  const primeiroNomePaciente = (p.nome || "").split(" ")[0];
+  const primeiroNomeContato = (contato.nome || "").split(" ")[0];
+  const parentesco = contato.parentesco ? contato.parentesco.toLowerCase() : "responsável";
+
+  const abertura = contato.ehResponsavel
+    ? "Olá" + (primeiroNomeContato ? ", <strong>" + escHtml(primeiroNomeContato) + "</strong>" : "") + ". " +
+      "Você, como " + escHtml(parentesco) + " do paciente <strong>" + escHtml(p.nome) + "</strong>, " +
+      "está recebendo o acesso ao Portal do Paciente dele(a)."
+    : "Olá, <strong>" + escHtml(primeiroNomePaciente) + "</strong>! Seu cadastro foi feito com sucesso.";
+
+  const usuario = contato.ehResponsavel || p.emailInterno || !emailEhReal(p.email)
+    ? "<p style='color:#444'>O <strong>usuário de acesso</strong> é: <strong>" + escHtml(p.email) + "</strong></p>"
+    : "";
+
+  const html =
+    "<div style='font-family:Arial;background:#f5f3ff;padding:30px'><div style='max-width:520px;margin:0 auto;background:white;border-radius:16px;overflow:hidden'>" +
+    "<div style='background:" + escHtml(corMarca) + ";padding:24px;text-align:center'><h1 style='color:white;font-size:20px;margin:0'>" + escHtml(nomeClinica) + "</h1></div>" +
+    "<div style='padding:28px'>" +
+    "<p style='color:#444'>" + abertura + "</p>" +
+    "<p style='color:#444'>Para entrar, primeiro defina a senha pelo botão abaixo. Ninguém, nem a clínica, fica sabendo qual senha foi escolhida.</p>" +
+    usuario +
+    "<p style='text-align:center;margin:26px 0'><a href='" + linkDefinirSenha + "' style='background:" + escHtml(corMarca) + ";color:white;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:bold'>Definir senha</a></p>" +
+    "<p style='color:#888;font-size:12px'>Se o botão não abrir, copie este endereço no navegador:<br>" + escHtml(linkDefinirSenha) + "</p>" +
+    "</div></div></div>";
+
+  await db.collection("clinica_emails").add({
+    to: contato.email,
+    message: {
+      subject: contato.ehResponsavel ? "Acesso ao portal de " + p.nome : "Defina sua senha de acesso",
+      html,
+    },
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await db.collection("clinica_audit_log").add({
+    acao: "enviar_acesso_paciente",
+    alvoUid: pacienteId,
+    psiId,
+    executadoPor: chamador.uid,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return {
+    ok: true,
+    enviadoPara: contato.email,
+    ehResponsavel: contato.ehResponsavel,
+    nomeContato: contato.nome,
+    linkDefinirSenha,
+  };
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -174,14 +273,58 @@ exports.autoCadastroPaciente = onCall(async (request) => {
 
 // Campos aceitos no cadastro de paciente — mesmo modelo do sistema
 // já usado pela Dra. Lucia (nome, contato, dados ocupacionais p/ NR-1).
-function validarDadosPaciente(dados) {
-  const { nome, email } = dados || {};
-  if (!nome || !email) {
-    throw new HttpsError("invalid-argument", "Nome e e-mail do paciente são obrigatórios.");
+// E-mail "de mentira": o Firebase Auth exige um e-mail único por conta, mas
+// nem todo paciente tem o próprio (crianças, ou quem divide o e-mail com a
+// mãe). Nesses casos o sistema cria um endereço interno só para o login, e
+// os envios reais vão para o e-mail do responsável.
+function emailEhReal(e) {
+  return !!e && !/@interno\.local$/i.test(e) && !/^sem-?email/i.test(e);
+}
+
+// Decide para onde vai um envio por e-mail e como cumprimentar.
+function contatoDoPaciente(p) {
+  const emailResp = ((p && p.responsavelEmail) || "").trim();
+  const usaResponsavel = !!emailResp && (p.usaContatoResponsavel || p.ehMenorDeIdade || !emailEhReal(p.email));
+  if (usaResponsavel) {
+    return {
+      email: emailResp,
+      ehResponsavel: true,
+      nome: ((p.responsavelNome) || "").trim(),
+      parentesco: ((p.responsavelParentesco) || "").trim(),
+    };
   }
+  if (emailEhReal(p && p.email)) {
+    return { email: p.email, ehResponsavel: false, nome: (p.nome || "").trim(), parentesco: "" };
+  }
+  return { email: "", ehResponsavel: false, nome: ((p && p.nome) || "").trim(), parentesco: "" };
+}
+
+function escHtml(t) {
+  return String(t == null ? "" : t)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// exigirEmail: o autocadastro público continua exigindo (o próprio paciente
+// preenche). O cadastro feito pela equipe aceita paciente sem e-mail e gera
+// o endereço interno.
+function validarDadosPaciente(dados, { exigirEmail = true } = {}) {
+  const nome = ((dados && dados.nome) || "").trim();
+  let email = ((dados && dados.email) || "").trim();
+  if (!nome) {
+    throw new HttpsError("invalid-argument", "O nome do paciente é obrigatório.");
+  }
+  if (!email) {
+    if (exigirEmail) {
+      throw new HttpsError("invalid-argument", "Nome e e-mail do paciente são obrigatórios.");
+    }
+    email = "sem-email." + Date.now() + String(Math.floor(Math.random() * 900) + 100) + "@interno.local";
+  }
+  const texto = (v) => (typeof v === "string" ? v.trim() : "");
   return {
     nome,
     email,
+    emailInterno: !emailEhReal(email),
     telefone: dados.telefone || "",
     dataNasc: dados.dataNasc || "",
     cpf: dados.cpf || "",
@@ -191,6 +334,16 @@ function validarDadosPaciente(dados) {
     setor: dados.setor || "",
     cargo: dados.cargo || "",
     objetivos: dados.objetivos || "",
+    ehMenorDeIdade: !!dados.ehMenorDeIdade,
+    usaContatoResponsavel: !!dados.usaContatoResponsavel,
+    telefoneEhDoResponsavel: !!dados.telefoneEhDoResponsavel,
+    responsavelNome: texto(dados.responsavelNome),
+    responsavelParentesco: texto(dados.responsavelParentesco),
+    responsavelCpf: texto(dados.responsavelCpf),
+    responsavelTelefone: texto(dados.responsavelTelefone),
+    responsavelEmail: texto(dados.responsavelEmail),
+    responsavel2Nome: texto(dados.responsavel2Nome),
+    responsavel2Parentesco: texto(dados.responsavel2Parentesco),
   };
 }
 
@@ -797,15 +950,21 @@ exports.enviarEmailTeste = onCall(async (request) => {
   return { ok: true, destino };
 });
 
-function montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl }) {
+function montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl, responsavel }) {
+  const nome = escHtml(primeiroNome);
+  // Quando o envio vai para o responsável, o texto fala com ele sobre o paciente.
+  const mensagem = responsavel
+    ? "Olá" + (responsavel.primeiroNome ? ", <strong style='color:" + corMarca + "'>" + escHtml(responsavel.primeiroNome) + "</strong>" : "") +
+      "! Hoje é o aniversário de <strong>" + nome + "</strong>. Desejamos a vocês um novo ciclo repleto de saúde, leveza e crescimento."
+    : "Olá, <strong style='color:" + corMarca + "'>" + nome + "</strong>! Hoje é o seu dia! Que este novo ciclo seja repleto de saúde, leveza e crescimento.";
   return (
     "<div style='font-family:Arial;background:#f5e8ff;padding:30px'><div style='max-width:500px;margin:0 auto;background:white;border-radius:20px;overflow:hidden'>" +
     "<div style='background:" + corMarca + ";padding:30px;text-align:center'>" +
     (logoUrl ? "<img src='" + logoUrl + "' style='width:80px;height:80px;object-fit:contain;border-radius:50%'/>" : "") +
-    "<h1 style='color:white;margin:10px 0'>Feliz Aniversário, " + primeiroNome + "!</h1>" +
+    "<h1 style='color:white;margin:10px 0'>" + (responsavel ? "Aniversário de " + nome : "Feliz Aniversário, " + nome + "!") + "</h1>" +
     (anos ? "<p style='color:rgba(255,255,255,0.85)'>" + anos + " anos</p>" : "") +
     "</div><div style='padding:30px'>" +
-    "<p style='color:#444'>Olá, <strong style='color:" + corMarca + "'>" + primeiroNome + "</strong>! Hoje é o seu dia! Que este novo ciclo seja repleto de saúde, leveza e crescimento.</p>" +
+    "<p style='color:#444'>" + mensagem + "</p>" +
     "<p style='color:" + corMarca + ";font-size:18px;margin-top:20px'>" + nomeClinica + "</p>" +
     "</div></div></div>"
   );
@@ -953,14 +1112,18 @@ exports.verificarAniversarios = onSchedule(
       } catch (e) {}
 
       for (const p of pacientesDaClinica) {
-        if (!p.email) continue;
+        const contato = contatoDoPaciente(p);
+        if (!contato.email) continue;
         const primeiroNome = (p.nome || "").split(" ")[0];
         const anos = hoje.getFullYear() - parseInt(p.dataNasc.slice(0, 4), 10);
+        const responsavel = contato.ehResponsavel
+          ? { primeiroNome: (contato.nome || "").split(" ")[0], parentesco: contato.parentesco }
+          : null;
         await db.collection("clinica_emails").add({
-          to: p.email,
+          to: contato.email,
           message: {
-            subject: "Feliz Aniversário, " + primeiroNome + "!",
-            html: montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl }),
+            subject: responsavel ? "Hoje é aniversário de " + primeiroNome + "!" : "Feliz Aniversário, " + primeiroNome + "!",
+            html: montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl, responsavel }),
           },
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -972,7 +1135,7 @@ exports.verificarAniversarios = onSchedule(
           const lista = pacientesDaClinica
             .map((p) => {
               const anosP = hoje.getFullYear() - parseInt(p.dataNasc.slice(0, 4), 10);
-              return "<li><strong>" + p.nome + "</strong> — " + anosP + " anos · " + (p.email || "sem e-mail") + "</li>";
+              return "<li><strong>" + p.nome + "</strong> — " + anosP + " anos · " + (contatoDoPaciente(p).email || "sem e-mail de contato") + "</li>";
             })
             .join("");
           await db.collection("clinica_emails").add({

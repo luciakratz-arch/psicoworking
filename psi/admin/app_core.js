@@ -34,6 +34,50 @@ const functions = appAdmin.functions();
 // ─── Cloud Functions usadas pelo admin ────────────────────────────
 const chamarCadastrarPaciente = functions.httpsCallable("cadastrarPaciente");
 const chamarDefinirCarimboEquipe = functions.httpsCallable("definirCarimboEquipe");
+// Publicada em southamerica-east1 (as demais ficam na região padrão).
+const chamarEnviarAcessoPaciente = appAdmin.functions("southamerica-east1").httpsCallable("enviarAcessoPaciente");
+
+// ─── Contato do paciente ─────────────────────────────────────────
+// Nem todo paciente tem e-mail ou telefone próprios: criança, ou quem
+// divide o e-mail com a mãe. O e-mail do cadastro pode ser um endereço
+// interno (sem-email...@interno.local), que serve só para o login. Estes
+// ajudantes decidem para quem vai cada envio e como cumprimentar.
+// (Espelha contatoDoPaciente / emailEhReal de functions/index.js.)
+function emailEhReal(e) {
+  return !!e && !/@interno\.local$/i.test(e) && !/^sem-?email/i.test(e);
+}
+
+function primeiroNomeDe(n) {
+  return ((n || "").trim().split(/\s+/)[0]) || "";
+}
+
+function contatoDoPaciente(p) {
+  const emailResp = ((p && p.responsavelEmail) || "").trim();
+  const usaResp = !!emailResp && (p.usaContatoResponsavel || p.ehMenorDeIdade || !emailEhReal(p.email));
+  if (usaResp) {
+    return { email: emailResp, ehResponsavel: true, nome: (p.responsavelNome || "").trim(), parentesco: (p.responsavelParentesco || "").trim() };
+  }
+  if (emailEhReal(p && p.email)) {
+    return { email: p.email, ehResponsavel: false, nome: ((p.nome) || "").trim(), parentesco: "" };
+  }
+  return { email: "", ehResponsavel: false, nome: ((p && p.nome) || "").trim(), parentesco: "" };
+}
+
+// Qual WhatsApp usar e com quem se está falando. Se o telefone cadastrado
+// é do responsável (marcação explícita), ou se o paciente não tem telefone
+// mas o responsável tem, cumprimenta o responsável e cita o paciente.
+function whatsappDoPaciente(p) {
+  const fonePaciente = ((p && p.telefone) || "").replace(/\D/g, "");
+  const foneResp = ((p && p.responsavelTelefone) || "").replace(/\D/g, "");
+  const respNome = ((p && p.responsavelNome) || "").trim();
+  if (p && p.telefoneEhDoResponsavel && (fonePaciente || foneResp)) {
+    return { numero: fonePaciente || foneResp, ehResponsavel: true, nome: respNome, parentesco: (p.responsavelParentesco || "").trim() };
+  }
+  if (!fonePaciente && foneResp) {
+    return { numero: foneResp, ehResponsavel: true, nome: respNome, parentesco: (p.responsavelParentesco || "").trim() };
+  }
+  return { numero: fonePaciente, ehResponsavel: false, nome: ((p && p.nome) || "").trim(), parentesco: "" };
+}
 
 // ─── Login (Firebase Authentication — ver CLAUDE.md REGRA 9) ─────
 // Nunca comparar senha manualmente contra um campo do Firestore.
