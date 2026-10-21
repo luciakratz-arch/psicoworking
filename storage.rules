@@ -21,8 +21,15 @@ service firebase.storage {
     }
 
     // Foto de perfil do próprio paciente: só ele pode enviar a dele.
+    // Leitura direta pelo caminho: só o próprio paciente e a equipe da clínica.
+    // (A foto aparece nas telas pelo endereço com código próprio, guardado
+    // na ficha do paciente, que já é protegida.)
     match /pacientes/{psiId}/{pacienteId}/{arquivo} {
-      allow read: if true;
+      allow read: if request.auth != null
+        && request.auth.token.psi_id == psiId
+        && (request.auth.uid == pacienteId
+            || request.auth.token.role == "psi"
+            || request.auth.token.role == "secretaria");
       allow write: if request.auth != null
         && request.auth.uid == pacienteId
         && request.auth.token.psi_id == psiId
