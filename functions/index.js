@@ -1143,6 +1143,85 @@ exports.organizarPerfilClinicoIA = onCall(
   }
 );
 
+// ─────────────────────────────────────────────────────────────
+// 9) RESUMO DO PERÍODO PARA RELATÓRIO RESUMIDO (envio a terceiros)
+// Recebe as anotações do período e devolve um texto sóbrio para a
+// psicóloga revisar. Nada é gravado aqui.
+// ─────────────────────────────────────────────────────────────
+exports.resumirPeriodoIA = onCall(
+  { region: "southamerica-east1", secrets: [GEMINI_API_KEY] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Acesso negado.");
+    const papel = request.auth.token.role;
+    if (papel !== "psi" && papel !== "secretaria") throw new HttpsError("permission-denied", "Sem permissão.");
+    const { notas, pacienteNome, periodo, finalidade } = request.data || {};
+    if (!Array.isArray(notas) || notas.length === 0) {
+      throw new HttpsError("invalid-argument", "Não há anotações no período para resumir.");
+    }
+    const chave = GEMINI_API_KEY.value();
+    if (!chave || chave === "NAO_CONFIGURADA") {
+      throw new HttpsError("failed-precondition", "Chave do Gemini não configurada.");
+    }
+
+    const campos = ["humor", "agenda", "pensamentosAutomaticos", "crencas", "tecnicas", "observacoes"];
+    const corte = (v) => String(v == null ? "" : v).trim().slice(0, 700);
+    const blocos = notas.slice(0, 60).map((n) => {
+      const tcc = n.tcc || {};
+      const linhas = campos.filter((c) => corte(tcc[c])).map((c) => c + ": " + corte(tcc[c]));
+      return "Sessão de " + corte(n.data) + "\n" + linhas.join("\n");
+    });
+
+    const prompt =
+      "Você auxilia uma psicóloga a redigir um RELATÓRIO PSICOLÓGICO RESUMIDO, que poderá ser entregue a terceiros\n" +
+      "(médico, escola, convênio) se solicitado. Com base nas anotações das sessões abaixo, escreva o resumo do período.\n" +
+      "Regras:\n" +
+      "- Português do Brasil, com acentos, em terceira pessoa, tom técnico, sóbrio e respeitoso.\n" +
+      "- De 150 a 250 palavras, em 2 a 4 parágrafos curtos, sem listas e sem títulos.\n" +
+      "- Descreva de forma geral: demandas e temas trabalhados, evolução observada, abordagem/técnicas e perspectivas.\n" +
+      "- NÃO inclua detalhes íntimos, falas literais, nomes de terceiros, diagnósticos que não estejam nas anotações nem previsões.\n" +
+      "- NÃO invente nada que não conste nas anotações.\n" +
+      "Retorne SOMENTE um JSON válido: { \"resumo\": \"texto\" }.\n\n" +
+      "Paciente: " + corte(pacienteNome) + "\n" +
+      "Período: " + corte(periodo) + "\n" +
+      (finalidade && String(finalidade).trim() ? "Finalidade do relatório: " + corte(finalidade) + "\n" : "") +
+      "\nAnotações:\n" + blocos.join("\n\n");
+
+    let resp;
+    try {
+      resp = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + chave,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json", maxOutputTokens: 4000, temperature: 0.3 },
+          }),
+        }
+      );
+    } catch (fetchErr) {
+      console.error("resumirPeriodoIA fetch error:", fetchErr);
+      throw new HttpsError("internal", "Falha ao conectar com a API de IA.");
+    }
+    if (!resp.ok) {
+      const errTxt = await resp.text();
+      console.error("resumirPeriodoIA API error:", resp.status, errTxt.slice(0, 300));
+      throw new HttpsError("internal", "Erro na API de IA (" + resp.status + ").");
+    }
+    const dados = await resp.json();
+    const partes = dados.candidates?.[0]?.content?.parts || [];
+    const bruto = partes.map((p) => p.text || "").join("").trim()
+      .replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    let obj;
+    try { obj = JSON.parse(bruto); } catch (e) {
+      throw new HttpsError("internal", "Resposta da IA fora do formato. Tente novamente.");
+    }
+    const resumo = String(obj.resumo || "").trim();
+    if (!resumo) throw new HttpsError("internal", "A IA não devolveu o resumo. Tente novamente.");
+    return { resumo };
+  }
+);
+
 exports.verificarAniversarios = onSchedule(
   { schedule: "0 8 * * *", timeZone: "America/Sao_Paulo" },
   async () => {

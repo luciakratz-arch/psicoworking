@@ -2763,6 +2763,230 @@ function PainelCrises({
     disabled: salvando
   }, salvando ? "Salvando..." : "Registrar crise"))));
 }
+function escHtmlRel(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Relatório resumido: curto, com a identidade da psicóloga, para entregar a
+// terceiros se solicitado. A IA escreve o texto, a psicóloga revisa e só então
+// o PDF é gerado. CID, medicações e crises só entram se ela marcar.
+function ModalRelatorioResumido({
+  paciente,
+  cfg,
+  perfil,
+  crisesDoPeriodo,
+  notasDoPeriodo,
+  periodoTexto,
+  aoFechar
+}) {
+  const [finalidade, setFinalidade] = useState("");
+  const [resumo, setResumo] = useState("");
+  const [gerando, setGerando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [incluirCid, setIncluirCid] = useState(false);
+  const [incluirMedicacoes, setIncluirMedicacoes] = useState(false);
+  const [incluirCrises, setIncluirCrises] = useState(false);
+  const temCid = (perfil?.cids || []).length > 0;
+  const temMedicacoes = (perfil?.medicacoes || []).length > 0 || (perfil?.condicoes || []).length > 0;
+  async function gerarTexto() {
+    setGerando(true);
+    setErro("");
+    try {
+      const fn = appAdmin.functions("southamerica-east1").httpsCallable("resumirPeriodoIA");
+      const r = await fn({
+        notas: notasDoPeriodo.map(n => ({
+          data: n.data,
+          tcc: n.tcc || {}
+        })),
+        pacienteNome: paciente.nome,
+        periodo: periodoTexto,
+        finalidade
+      });
+      setResumo(r.data.resumo || "");
+    } catch (e) {
+      setErro("Erro ao gerar o texto: " + e.message);
+    } finally {
+      setGerando(false);
+    }
+  }
+  function gerarPdf() {
+    if (!resumo.trim()) {
+      setErro("Gere ou escreva o texto do resumo antes de criar o PDF.");
+      return;
+    }
+    const cor = cfg.corPrimaria || "#6A2BD9";
+    const linhaCrp = [cfg.crp ? "CRP " + cfg.crp : "", cfg.tituloProfissional || ""].filter(Boolean).join(" · ");
+    const hoje = new Date().toLocaleDateString("pt-BR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+    const extras = [];
+    if (incluirCid && temCid) {
+      extras.push("<div><strong>Diagnóstico (CID):</strong> " + escHtmlRel(perfil.cids.map(c => [c.codigo, c.descricao].filter(Boolean).join(" - ")).join("; ")) + "</div>");
+    }
+    if (incluirMedicacoes && temMedicacoes) {
+      if ((perfil.condicoes || []).length) extras.push("<div><strong>Outras condições:</strong> " + escHtmlRel(perfil.condicoes.join(", ")) + "</div>");
+      if ((perfil.medicacoes || []).length) extras.push("<div><strong>Medicações em uso:</strong> " + escHtmlRel(perfil.medicacoes.map(m => m.nome + (m.dose ? " " + m.dose : "")).join(", ")) + "</div>");
+    }
+    if (incluirCrises) {
+      const n = crisesDoPeriodo.length;
+      extras.push("<div><strong>Crises no período:</strong> " + (n === 0 ? "nenhuma registrada" : n + " registrada(s)") + "</div>");
+    }
+    const paragrafos = resumo.trim().split(/\n{2,}|\n/).filter(Boolean).map(p => "<p style='margin:0 0 12px;text-align:justify'>" + escHtmlRel(p) + "</p>").join("");
+    const html = "<html><head><meta charset='UTF-8'><title>Relatório resumido — " + escHtmlRel(paciente.nome) + "</title>" + "<style>body{font-family:Arial,sans-serif;margin:40px;color:#1f2937;font-size:13px;line-height:1.7}" + "@media print{body{margin:20px}.no-print{display:none}}</style></head><body>" + "<div style='display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid " + cor + ";padding-bottom:14px;margin-bottom:24px'>" + "<div><div style='font-size:20px;font-weight:700;color:" + cor + "'>" + escHtmlRel(cfg.nome || "Clínica") + "</div>" + (linhaCrp ? "<div style='font-size:11px;color:#6B7280'>" + escHtmlRel(linhaCrp) + "</div>" : "") + (cfg.cidade ? "<div style='font-size:11px;color:#6B7280'>" + escHtmlRel(cfg.cidade) + "</div>" : "") + "</div>" + (cfg.logoUrl ? "<img src='" + cfg.logoUrl + "' style='height:48px;object-fit:contain'>" : "") + "</div>" + "<div style='text-align:center;margin-bottom:22px'>" + "<div style='font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1px'>Relatório Psicológico Resumido</div></div>" + "<div style='background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:12px 16px;margin-bottom:22px;font-size:12.5px'>" + "<div><strong>Paciente:</strong> " + escHtmlRel(paciente.nome) + "</div>" + "<div><strong>Período:</strong> " + escHtmlRel(periodoTexto) + "</div>" + "<div><strong>Sessões com anotação no período:</strong> " + notasDoPeriodo.length + "</div>" + (finalidade.trim() ? "<div><strong>Finalidade:</strong> " + escHtmlRel(finalidade.trim()) + "</div>" : "") + extras.join("") + "</div>" + "<div style='font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px'>Resumo do acompanhamento</div>" + paragrafos + "<div style='margin-top:48px;text-align:center'>" + "<div style='font-size:12px;color:#6B7280;margin-bottom:34px'>" + escHtmlRel(cfg.cidade ? cfg.cidade + ", " : "") + hoje + "</div>" + "<div style='display:inline-block;border-top:1px solid #1f2937;padding-top:6px;min-width:260px'>" + "<div style='font-weight:700'>" + escHtmlRel(cfg.nome || "") + "</div>" + (linhaCrp ? "<div style='font-size:11px;color:#6B7280'>" + escHtmlRel(linhaCrp) + "</div>" : "") + "</div></div>" + "<div style='font-size:10px;color:#9CA3AF;text-align:center;margin-top:30px'>Documento confidencial — Resolução CFP nº 06/2019</div>" + "<div class='no-print' style='text-align:center;margin-top:20px'>" + "<button onclick='window.print()' style='background:" + cor + ";color:white;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer'>Imprimir / Salvar PDF</button></div>" + "</body></html>";
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => {
+      w.focus();
+      w.print();
+    }, 600);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sobreposicao",
+    onClick: () => {
+      if (!resumo.trim()) aoFechar();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal modal-largo",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      margin: 0
+    }
+  }, "Relat\xF3rio resumido"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: 4
+    },
+    onClick: aoFechar
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "x",
+    tamanho: 18
+  }))), /*#__PURE__*/React.createElement(ProntAvisoCrp, {
+    cfg: cfg
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--texto-suave)",
+      marginBottom: 12
+    }
+  }, paciente.nome, " \xB7 ", periodoTexto, " \xB7 ", notasDoPeriodo.length, " anota\xE7\xE3o(\xF5es)"), /*#__PURE__*/React.createElement("label", null, "Finalidade ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional, ex.: para o m\xE9dico, para a escola)")), /*#__PURE__*/React.createElement("input", {
+    value: finalidade,
+    onChange: e => setFinalidade(e.target.value),
+    placeholder: "Para quem ou para qu\xEA \xE9 este relat\xF3rio"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "12px 0 4px",
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#6B7280",
+      textTransform: "uppercase"
+    }
+  }, "Incluir no documento"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      fontWeight: 400,
+      opacity: temCid ? 1 : 0.5
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    style: {
+      width: "auto"
+    },
+    disabled: !temCid,
+    checked: incluirCid,
+    onChange: e => setIncluirCid(e.target.checked)
+  }), " CID / diagn\xF3stico ", !temCid && "(nenhum cadastrado)"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      fontWeight: 400,
+      opacity: temMedicacoes ? 1 : 0.5
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    style: {
+      width: "auto"
+    },
+    disabled: !temMedicacoes,
+    checked: incluirMedicacoes,
+    onChange: e => setIncluirMedicacoes(e.target.checked)
+  }), " Condi\xE7\xF5es e medica\xE7\xF5es ", !temMedicacoes && "(nenhuma cadastrada)"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      fontWeight: 400
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    style: {
+      width: "auto"
+    },
+    checked: incluirCrises,
+    onChange: e => setIncluirCrises(e.target.checked)
+  }), " Quantidade de crises no per\xEDodo"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      margin: "14px 0 8px",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: gerarTexto,
+    disabled: gerando
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "sparkles",
+    tamanho: 15
+  }), " ", gerando ? "Escrevendo..." : resumo ? "Gerar o texto de novo" : "Gerar texto com IA"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      color: "var(--texto-suave)"
+    }
+  }, "A IA resume as anota\xE7\xF5es do per\xEDodo. Voc\xEA revisa antes do PDF.")), /*#__PURE__*/React.createElement("label", null, "Texto do resumo ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(revise e edite)")), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    value: resumo,
+    onChange: e => setResumo(e.target.value),
+    rows: 10,
+    placeholder: "Clique em Gerar texto com IA, ou escreva o resumo aqui."
+  }), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: 10,
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: aoFechar
+  }, "Fechar"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: gerarPdf
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "file-text",
+    tamanho: 15
+  }), " Gerar PDF"))));
+}
 function ModalAnotacaoTCC({
   usuario,
   paciente,
@@ -3175,6 +3399,7 @@ function AbaSessoesTCC({
   const [de, setDe] = useState("");
   const [ate, setAte] = useState("");
   const [ordem, setOrdem] = useState("recentes");
+  const [resumoAberto, setResumoAberto] = useState(false);
   const [sessaoModal, setSessaoModal] = useState(null);
   const [notasCarregadas, setNotasCarregadas] = useState(false);
   const [perfil, setPerfil] = useState(null);
@@ -3253,6 +3478,25 @@ function AbaSessoesTCC({
   // da clínica). Sem esta lista elas ficariam salvas mas invisíveis.
   const idsDasSessoes = new Set(sessoes.map(s => s.id));
   const notasSemSessao = notas.filter(n => !idsDasSessoes.has(n.sessaoId)).filter(n => !temPeriodo || noPeriodo(n.data)).sort((a, b) => (ordem === "antigas" ? 1 : -1) * (a.data || "").localeCompare(b.data || ""));
+  function periodoDescrito() {
+    if (!temPeriodo) return "Todas as sessões";
+    if (mesFiltro) return new Date(mesFiltro + "-01T12:00:00").toLocaleDateString("pt-BR", {
+      month: "long",
+      year: "numeric"
+    });
+    return de && ate ? "de " + fmtBr(de) + " a " + fmtBr(ate) : de ? "a partir de " + fmtBr(de) : "até " + fmtBr(ate);
+  }
+  function abrirResumo() {
+    if (de && ate && de > ate) {
+      alert("A data inicial é depois da data final. Confira o período.");
+      return;
+    }
+    if (notas.filter(n => !temPeriodo || noPeriodo(n.data)).length === 0) {
+      alert("Nenhuma anotação registrada" + (temPeriodo ? " neste período" : "") + ".");
+      return;
+    }
+    setResumoAberto(true);
+  }
   function gerarPdf() {
     if (de && ate && de > ate) {
       alert("A data inicial é depois da data final. Confira o período.");
@@ -3338,7 +3582,13 @@ function AbaSessoesTCC({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "file-text",
     tamanho: 15
-  }), " Gerar PDF")), /*#__PURE__*/React.createElement("div", {
+  }), " Relat\xF3rio detalhado (PDF)"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: abrirResumo
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "send",
+    tamanho: 15
+  }), " Relat\xF3rio resumido")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 12,
@@ -3393,7 +3643,7 @@ function AbaSessoesTCC({
     style: {
       marginTop: -8
     }
-  }, "O per\xEDodo e a ordem valem para a lista e para o PDF."), carregando ? /*#__PURE__*/React.createElement("p", {
+  }, "O per\xEDodo e a ordem valem para a lista e para os relat\xF3rios. O detalhado \xE9 para sua consulta; o resumido \xE9 o que se envia, se solicitado."), carregando ? /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
   }, "Carregando sess\xF5es...") : sessoesExibidas.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
@@ -3542,7 +3792,15 @@ function AbaSessoesTCC({
       nome: "eye",
       tamanho: 13
     }), " Ver / Editar"));
-  })))), sessaoModal && /*#__PURE__*/React.createElement(ModalAnotacaoTCC, {
+  })))), resumoAberto && /*#__PURE__*/React.createElement(ModalRelatorioResumido, {
+    paciente: paciente,
+    cfg: cfg,
+    perfil: perfil,
+    crisesDoPeriodo: crises.filter(c => !temPeriodo || noPeriodo(c.data)),
+    notasDoPeriodo: notas.filter(n => !temPeriodo || noPeriodo(n.data)).sort((a, b) => (a.data || "").localeCompare(b.data || "")),
+    periodoTexto: periodoDescrito(),
+    aoFechar: () => setResumoAberto(false)
+  }), sessaoModal && /*#__PURE__*/React.createElement(ModalAnotacaoTCC, {
     usuario: usuario,
     paciente: paciente,
     sessao: sessaoModal.sessao,
