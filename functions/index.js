@@ -38,41 +38,6 @@ const auth = admin.auth();
 const GOOGLE_CLIENT_ID = defineSecret("GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET = defineSecret("GOOGLE_CLIENT_SECRET");
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
-const BOOTSTRAP_SECRET = defineSecret("BOOTSTRAP_SECRET");
-
-// ─────────────────────────────────────────────────────────────
-// 0) BOOTSTRAP — cria a conta Admin Matriz (uso único).
-//    APAGAR ESTA FUNÇÃO depois de rodar uma vez.
-//    Chamar com ?s=<BOOTSTRAP_SECRET>
-// ─────────────────────────────────────────────────────────────
-exports.bootstrapAdminMatriz = onRequest(
-  { region: "southamerica-east1", secrets: [BOOTSTRAP_SECRET] },
-  async (req, res) => {
-    if (!req.query.s || req.query.s !== BOOTSTRAP_SECRET.value()) {
-      res.status(403).send("Acesso negado.");
-      return;
-    }
-    const EMAIL = "contato@luciakratz.com.br";
-    try {
-      let usuario;
-      try {
-        usuario = await auth.getUserByEmail(EMAIL);
-      } catch {
-        usuario = await auth.createUser({ email: EMAIL, displayName: "Admin Matriz" });
-      }
-      await auth.setCustomUserClaims(usuario.uid, { role: "admin_matriz" });
-      const linkSenha = await auth.generatePasswordResetLink(EMAIL);
-      res.send(
-        "<h2>Admin Matriz configurado!</h2>" +
-        "<p>UID: " + usuario.uid + "</p>" +
-        "<p>Clique no link abaixo para definir sua senha:</p>" +
-        "<a href='" + linkSenha + "'>" + linkSenha + "</a>"
-      );
-    } catch (err) {
-      res.status(500).send("Erro: " + err.message);
-    }
-  }
-);
 
 // ─────────────────────────────────────────────────────────────
 // 1) CARIMBO DE IDENTIDADE (custom claims)
