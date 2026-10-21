@@ -2085,13 +2085,67 @@ function ModalAnotacaoTCC({
   notaExistente,
   aoFechar
 }) {
-  const [textoBruto, setTextoBruto] = useState(notaExistente?.textoBruto || "");
-  const [tcc, setTcc] = useState(notaExistente?.tcc || {});
+  // Rascunho de segurança: guarda o que está sendo escrito no próprio navegador
+  // (apenas nesta aba, some ao fechá-la) para não perder nada se a tela recarregar.
+  const chaveRascunho = "psw_rascunho_tcc_" + paciente.id + "_" + sessao.id;
+  const rascunho = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(chaveRascunho) || "null");
+    } catch (e) {
+      return null;
+    }
+  })();
+  const [textoBruto, setTextoBruto] = useState(rascunho?.textoBruto ?? notaExistente?.textoBruto ?? "");
+  const [tcc, setTcc] = useState(rascunho?.tcc ?? notaExistente?.tcc ?? {});
+  const [notaId, setNotaId] = useState(notaExistente?.id || null);
+  const [salvoAuto, setSalvoAuto] = useState(false);
   const [organizando, setOrganizando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const temTcc = TCC_SECOES.some(s => tcc[s.key]);
   const cfg = useConfigProntuario(usuario.psiId);
+  useEffect(() => {
+    try {
+      if (textoBruto.trim() || Object.keys(tcc).length) {
+        sessionStorage.setItem(chaveRascunho, JSON.stringify({
+          textoBruto,
+          tcc
+        }));
+      }
+    } catch (e) {}
+  }, [textoBruto, tcc]);
+
+  // Grava no Firestore sem fechar a janela; usada pelo salvamento automático
+  // (ao organizar com IA e ao enviar tarefas por WhatsApp) e pelo botão Salvar.
+  async function persistir(textoAtual, tccAtual) {
+    const dados = {
+      psi_id: usuario.psiId,
+      pacienteId: paciente.id,
+      pacienteNome: paciente.nome,
+      sessaoId: sessao.id,
+      pacoteId: sessao.pacoteId || null,
+      origem: sessao.origem || null,
+      sessaoAntigaId: sessao.sessaoAntigaId || null,
+      pacoteAntigoId: sessao.pacoteAntigoId || null,
+      data: sessao.data || null,
+      textoBruto: textoAtual,
+      tcc: tccAtual,
+      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if (notaId) {
+      await db.collection("clinica_prontuarios").doc(notaId).update(dados);
+    } else {
+      const ref = await db.collection("clinica_prontuarios").add({
+        ...dados,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setNotaId(ref.id);
+    }
+  }
+  function salvarAutomatico(textoAtual, tccAtual) {
+    if (!textoAtual.trim()) return;
+    persistir(textoAtual, tccAtual).then(() => setSalvoAuto(true)).catch(() => {});
+  }
 
   // Manda ao paciente só as tarefas de casa, nunca o resto do prontuário.
   function enviarTarefasWhatsApp() {
@@ -2110,6 +2164,7 @@ function ModalAnotacaoTCC({
     const msg = abertura + titulo + tarefas + "\n\n" + "Qualquer dúvida, estou à disposição. 💜\n" + "_" + assinatura + "_";
     const numero = (wa.numero || paciente.celular || "").replace(/\D/g, "");
     const base = numero ? "https://wa.me/55" + numero : "https://wa.me/";
+    salvarAutomatico(textoBruto, tcc);
     window.open(base + "?text=" + encodeURIComponent(msg), "_blank");
   }
   async function organizarComIA() {
@@ -2126,7 +2181,9 @@ function ModalAnotacaoTCC({
         pacienteNome: paciente.nome,
         dataSessao: sessao.data
       });
-      setTcc(resultado.data.tcc || {});
+      const novoTcc = resultado.data.tcc || {};
+      setTcc(novoTcc);
+      salvarAutomatico(textoBruto, novoTcc);
     } catch (e) {
       setErro("Erro ao organizar: " + e.message);
     } finally {
@@ -2141,28 +2198,10 @@ function ModalAnotacaoTCC({
     setSalvando(true);
     setErro("");
     try {
-      const dados = {
-        psi_id: usuario.psiId,
-        pacienteId: paciente.id,
-        pacienteNome: paciente.nome,
-        sessaoId: sessao.id,
-        pacoteId: sessao.pacoteId || null,
-        origem: sessao.origem || null,
-        sessaoAntigaId: sessao.sessaoAntigaId || null,
-        pacoteAntigoId: sessao.pacoteAntigoId || null,
-        data: sessao.data || null,
-        textoBruto,
-        tcc,
-        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      if (notaExistente) {
-        await db.collection("clinica_prontuarios").doc(notaExistente.id).update(dados);
-      } else {
-        await db.collection("clinica_prontuarios").add({
-          ...dados,
-          criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      }
+      await persistir(textoBruto, tcc);
+      try {
+        sessionStorage.removeItem(chaveRascunho);
+      } catch (e) {}
       aoFechar();
     } catch (e) {
       setErro("Erro ao salvar: " + e.message);
@@ -2178,7 +2217,9 @@ function ModalAnotacaoTCC({
   }) : "";
   return /*#__PURE__*/React.createElement("div", {
     className: "sobreposicao",
-    onClick: aoFechar
+    onClick: () => {
+      if (!textoBruto.trim()) aoFechar();
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal modal-largo",
     onClick: e => e.stopPropagation()
@@ -2285,7 +2326,17 @@ function ModalAnotacaoTCC({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "message-circle",
     tamanho: 14
-  }), " Enviar tarefas por WhatsApp")))), erro && /*#__PURE__*/React.createElement("p", {
+  }), " Enviar tarefas por WhatsApp")))), rascunho && !notaExistente && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: "var(--texto-suave)"
+    }
+  }, "Rascunho recuperado: voc\xEA n\xE3o perdeu o que escreveu."), salvoAuto && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: "var(--sucesso)"
+    }
+  }, "Anota\xE7\xE3o salva automaticamente."), erro && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
   }, erro), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2296,7 +2347,12 @@ function ModalAnotacaoTCC({
     }
   }, /*#__PURE__*/React.createElement("button", {
     className: "botao-secundario",
-    onClick: aoFechar
+    onClick: () => {
+      try {
+        sessionStorage.removeItem(chaveRascunho);
+      } catch (e) {}
+      aoFechar();
+    }
   }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
     onClick: salvar,

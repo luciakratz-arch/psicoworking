@@ -1150,13 +1150,61 @@ function AbaLinksPaciente({ usuario, paciente }) {
 // ═══════════════════════════════════════════════════════════════════
 
 function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, aoFechar }) {
-  const [textoBruto, setTextoBruto] = useState(notaExistente?.textoBruto || "");
-  const [tcc, setTcc] = useState(notaExistente?.tcc || {});
+  // Rascunho de segurança: guarda o que está sendo escrito no próprio navegador
+  // (apenas nesta aba, some ao fechá-la) para não perder nada se a tela recarregar.
+  const chaveRascunho = "psw_rascunho_tcc_" + paciente.id + "_" + sessao.id;
+  const rascunho = (() => {
+    try { return JSON.parse(sessionStorage.getItem(chaveRascunho) || "null"); } catch (e) { return null; }
+  })();
+  const [textoBruto, setTextoBruto] = useState(rascunho?.textoBruto ?? notaExistente?.textoBruto ?? "");
+  const [tcc, setTcc] = useState(rascunho?.tcc ?? notaExistente?.tcc ?? {});
+  const [notaId, setNotaId] = useState(notaExistente?.id || null);
+  const [salvoAuto, setSalvoAuto] = useState(false);
   const [organizando, setOrganizando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const temTcc = TCC_SECOES.some((s) => tcc[s.key]);
   const cfg = useConfigProntuario(usuario.psiId);
+
+  useEffect(() => {
+    try {
+      if (textoBruto.trim() || Object.keys(tcc).length) {
+        sessionStorage.setItem(chaveRascunho, JSON.stringify({ textoBruto, tcc }));
+      }
+    } catch (e) {}
+  }, [textoBruto, tcc]);
+
+  // Grava no Firestore sem fechar a janela; usada pelo salvamento automático
+  // (ao organizar com IA e ao enviar tarefas por WhatsApp) e pelo botão Salvar.
+  async function persistir(textoAtual, tccAtual) {
+    const dados = {
+      psi_id: usuario.psiId,
+      pacienteId: paciente.id,
+      pacienteNome: paciente.nome,
+      sessaoId: sessao.id,
+      pacoteId: sessao.pacoteId || null,
+      origem: sessao.origem || null,
+      sessaoAntigaId: sessao.sessaoAntigaId || null,
+      pacoteAntigoId: sessao.pacoteAntigoId || null,
+      data: sessao.data || null,
+      textoBruto: textoAtual,
+      tcc: tccAtual,
+      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    if (notaId) {
+      await db.collection("clinica_prontuarios").doc(notaId).update(dados);
+    } else {
+      const ref = await db.collection("clinica_prontuarios").add({ ...dados, criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+      setNotaId(ref.id);
+    }
+  }
+
+  function salvarAutomatico(textoAtual, tccAtual) {
+    if (!textoAtual.trim()) return;
+    persistir(textoAtual, tccAtual)
+      .then(() => setSalvoAuto(true))
+      .catch(() => {});
+  }
 
   // Manda ao paciente só as tarefas de casa, nunca o resto do prontuário.
   function enviarTarefasWhatsApp() {
@@ -1181,6 +1229,7 @@ function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, aoFechar }
       "_" + assinatura + "_";
     const numero = (wa.numero || paciente.celular || "").replace(/\D/g, "");
     const base = numero ? "https://wa.me/55" + numero : "https://wa.me/";
+    salvarAutomatico(textoBruto, tcc);
     window.open(base + "?text=" + encodeURIComponent(msg), "_blank");
   }
 
@@ -1191,7 +1240,9 @@ function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, aoFechar }
     try {
       const fn = appAdmin.functions("southamerica-east1").httpsCallable("organizarProntuarioIA");
       const resultado = await fn({ textoBruto, pacienteNome: paciente.nome, dataSessao: sessao.data });
-      setTcc(resultado.data.tcc || {});
+      const novoTcc = resultado.data.tcc || {};
+      setTcc(novoTcc);
+      salvarAutomatico(textoBruto, novoTcc);
     } catch (e) {
       setErro("Erro ao organizar: " + e.message);
     } finally {
@@ -1204,25 +1255,8 @@ function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, aoFechar }
     setSalvando(true);
     setErro("");
     try {
-      const dados = {
-        psi_id: usuario.psiId,
-        pacienteId: paciente.id,
-        pacienteNome: paciente.nome,
-        sessaoId: sessao.id,
-        pacoteId: sessao.pacoteId || null,
-        origem: sessao.origem || null,
-        sessaoAntigaId: sessao.sessaoAntigaId || null,
-        pacoteAntigoId: sessao.pacoteAntigoId || null,
-        data: sessao.data || null,
-        textoBruto,
-        tcc,
-        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
-      };
-      if (notaExistente) {
-        await db.collection("clinica_prontuarios").doc(notaExistente.id).update(dados);
-      } else {
-        await db.collection("clinica_prontuarios").add({ ...dados, criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
-      }
+      await persistir(textoBruto, tcc);
+      try { sessionStorage.removeItem(chaveRascunho); } catch (e) {}
       aoFechar();
     } catch (e) {
       setErro("Erro ao salvar: " + e.message);
@@ -1236,7 +1270,7 @@ function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, aoFechar }
     : "";
 
   return (
-    <div className="sobreposicao" onClick={aoFechar}>
+    <div className="sobreposicao" onClick={() => { if (!textoBruto.trim()) aoFechar(); }}>
       <div className="modal modal-largo" onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>Anotação de Sessão TCC</h3>
@@ -1277,9 +1311,15 @@ function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, aoFechar }
           </div>
         )}
 
+        {rascunho && !notaExistente && (
+          <p style={{ fontSize: 12, color: "var(--texto-suave)" }}>Rascunho recuperado: você não perdeu o que escreveu.</p>
+        )}
+        {salvoAuto && (
+          <p style={{ fontSize: 12, color: "var(--sucesso)" }}>Anotação salva automaticamente.</p>
+        )}
         {erro && <p className="mensagem-erro">{erro}</p>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
-          <button className="botao-secundario" onClick={aoFechar}>Cancelar</button>
+          <button className="botao-secundario" onClick={() => { try { sessionStorage.removeItem(chaveRascunho); } catch (e) {} aoFechar(); }}>Cancelar</button>
           <button className="botao-primario" onClick={salvar} disabled={salvando}>
             {salvando ? "Salvando..." : "Salvar anotação"}
           </button>
