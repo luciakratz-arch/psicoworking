@@ -34,7 +34,7 @@ const auth = admin.auth();
 
 const GOOGLE_CLIENT_ID = defineSecret("GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET = defineSecret("GOOGLE_CLIENT_SECRET");
-const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const BOOTSTRAP_SECRET = defineSecret("BOOTSTRAP_SECRET");
 
 // ─────────────────────────────────────────────────────────────
@@ -232,7 +232,9 @@ async function criarPacienteEConta({ psiId, status, dadosPaciente, criadoPor }) 
 //     Retorna o link de definição de senha pra Admin Matriz
 //     enviar pra ela por WhatsApp/e-mail.
 // ─────────────────────────────────────────────────────────────
-exports.cadastrarPsicologa = onCall(async (request) => {
+// Sem a região explícita esta função ia para us-central1, enquanto o painel
+// da matriz a chama em southamerica-east1 — a chamada nunca encontrava a função.
+exports.cadastrarPsicologa = onCall({ region: "southamerica-east1" }, async (request) => {
   const chamador = request.auth;
   if (!chamador || chamador.token.role !== "admin_matriz") {
     throw new HttpsError("permission-denied", "Só a Admin Matriz pode cadastrar psicólogas.");
@@ -282,7 +284,9 @@ exports.cadastrarPsicologa = onCall(async (request) => {
 //     Bloqueia o login da psicóloga no Firebase Auth e marca
 //     psi_profiles.ativo para a listagem do painel refletir.
 // ─────────────────────────────────────────────────────────────
-exports.ativarDesativarClinica = onCall(async (request) => {
+// Mesma correção de região da cadastrarPsicologa: o painel da matriz chama
+// em southamerica-east1, então a função precisa estar publicada lá.
+exports.ativarDesativarClinica = onCall({ region: "southamerica-east1" }, async (request) => {
   const chamador = request.auth;
   if (!chamador || chamador.token.role !== "admin_matriz") {
     throw new HttpsError("permission-denied", "Só a Admin Matriz pode ativar ou desativar clínicas.");
@@ -548,7 +552,7 @@ exports.excluirEventoAgenda = onCall(
 // entre os itens que já existem na biblioteca da clínica, quais fazem
 // mais sentido indicar. A chave da Anthropic fica só aqui (Secret
 // Manager) — nunca é exposta no navegador.
-exports.buscarPorSintoma = onCall({ secrets: [ANTHROPIC_API_KEY] }, async (request) => {
+exports.buscarPorSintoma = onCall({ secrets: [GEMINI_API_KEY] }, async (request) => {
   const chamador = request.auth;
   if (!chamador) {
     throw new HttpsError("unauthenticated", "É preciso estar logado.");
@@ -559,15 +563,11 @@ exports.buscarPorSintoma = onCall({ secrets: [ANTHROPIC_API_KEY] }, async (reque
     throw new HttpsError("invalid-argument", "Envie o sintoma e a lista de itens da biblioteca.");
   }
 
-  // A chave só existe de verdade depois que a psicóloga criar uma
-  // conta na Anthropic e rodarmos `firebase functions:secrets:set`.
-  // Até lá o segredo guarda um marcador, e a mensagem abaixo explica
-  // a situação em vez de estourar um erro técnico da API.
-  const chaveConfigurada = ANTHROPIC_API_KEY.value();
+  const chaveConfigurada = GEMINI_API_KEY.value();
   if (!chaveConfigurada || chaveConfigurada === "NAO_CONFIGURADA") {
     throw new HttpsError(
       "failed-precondition",
-      "A busca por sintoma ainda não está ativada: falta cadastrar a chave da Anthropic."
+      "A busca por sintoma ainda não está ativada: falta cadastrar a chave do Gemini."
     );
   }
 
@@ -588,19 +588,23 @@ Escolha as 3 a 5 opções mais indicadas, usando SOMENTE títulos que estão exa
 
   let resposta;
   try {
-    resposta = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": chaveConfigurada,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 1000,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
+    // "gemini-flash-latest" é apelido que sempre aponta para o modelo atual;
+    // versões fixas são aposentadas e quebram a função sem aviso.
+    resposta = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + chaveConfigurada,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            maxOutputTokens: 4000,
+            temperature: 0.2,
+          },
+        }),
+      }
+    );
   } catch (e) {
     throw new HttpsError("internal", "Não foi possível consultar a IA: " + e.message);
   }
@@ -612,8 +616,11 @@ Escolha as 3 a 5 opções mais indicadas, usando SOMENTE títulos que estão exa
 
   let recomendacoes = [];
   try {
-    const texto = dados?.content?.[0]?.text || "{}";
-    const json = JSON.parse(texto);
+    const partes = dados?.candidates?.[0]?.content?.parts || [];
+    const texto = partes.map((p) => p.text || "").join("").trim() || "{}";
+    // Mesmo pedindo JSON puro, o modelo às vezes embrulha em bloco markdown.
+    const limpo = texto.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const json = JSON.parse(limpo);
     recomendacoes = Array.isArray(json.recomendacoes) ? json.recomendacoes : [];
   } catch (e) {
     throw new HttpsError("internal", "A IA respondeu num formato inesperado.");
@@ -820,7 +827,7 @@ function montarEmailAvisoAniversario({ nomeClinica, corMarca, logoUrl, quantidad
 // 7) ORGANIZAR ANOTAÇÃO DE SESSÃO TCC COM IA
 // ─────────────────────────────────────────────────────────────
 exports.organizarProntuarioIA = onCall(
-  { secrets: [ANTHROPIC_API_KEY] },
+  { secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Acesso negado.");
     const { textoBruto, pacienteNome, dataSessao } = request.data || {};
@@ -828,9 +835,9 @@ exports.organizarProntuarioIA = onCall(
       throw new HttpsError("invalid-argument", "Texto da sessão é obrigatório.");
     }
 
-    const chave = ANTHROPIC_API_KEY.value();
+    const chave = GEMINI_API_KEY.value();
     if (!chave || chave === "NAO_CONFIGURADA") {
-      throw new HttpsError("failed-precondition", "Chave da Anthropic não configurada.");
+      throw new HttpsError("failed-precondition", "Chave do Gemini não configurada.");
     }
 
     const prompt =
@@ -838,25 +845,38 @@ exports.organizarProntuarioIA = onCall(
       "Organize as anotações brutas da sessão abaixo no formato de prontuário TCC.\n" +
       "Retorne SOMENTE um JSON válido, sem markdown, sem explicações extras, com as seguintes chaves:\n" +
       "humor, agenda, pensamentosAutomaticos, crencas, tecnicas, tarefas, observacoes.\n\n" +
+      "O campo 'tarefas' tem formato especial: é enviado ao paciente por mensagem, então deve ser\n" +
+      "uma lista numerada, uma tarefa por linha, começando em '1- ', escrita em linguagem simples e\n" +
+      "direta, dirigida ao paciente. Exemplo:\n" +
+      "1- Fazer caminhada duas vezes na semana\n" +
+      "2- Tomar um banho relaxante antes de dormir\n" +
+      "Se não houver tarefa alguma na sessão, devolva o campo 'tarefas' como string vazia.\n\n" +
       "Paciente: " + (pacienteNome || "não informado") + "\n" +
       "Data: " + (dataSessao || "não informada") + "\n\n" +
       "Anotações brutas:\n" + textoBruto.trim();
 
     let resp;
     try {
-      resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": chave,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-3-5-haiku-20241022",
-          max_tokens: 1500,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
+      // responseMimeType força JSON puro na resposta, então não é preciso
+      // limpar blocos markdown como era necessário com a API anterior.
+      // "gemini-flash-latest" é apelido que sempre aponta para o modelo atual.
+      // Versões fixas vão sendo aposentadas e quebram a função sem aviso.
+      resp = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + chave,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              // Folga porque o modelo gasta tokens "pensando" antes de responder.
+              maxOutputTokens: 4000,
+              temperature: 0.2,
+            },
+          }),
+        }
+      );
     } catch (fetchErr) {
       console.error("organizarProntuarioIA fetch error:", fetchErr);
       throw new HttpsError("internal", "Falha ao conectar com a API de IA: " + fetchErr.message);
@@ -869,10 +889,12 @@ exports.organizarProntuarioIA = onCall(
     }
 
     const dados = await resp.json();
-    const texto = (dados.content?.[0]?.text || "").trim();
+    const partes = dados.candidates?.[0]?.content?.parts || [];
+    // O modelo pode devolver várias partes (raciocínio + resposta); juntamos todas.
+    const texto = partes.map((p) => p.text || "").join("").trim();
 
-    // Remover possíveis blocos markdown que a IA possa retornar
-    const jsonLimpo = texto.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+    // Mesmo pedindo JSON puro, o modelo às vezes embrulha em bloco markdown.
+    const jsonLimpo = texto.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 
     try {
       const tcc = JSON.parse(jsonLimpo);

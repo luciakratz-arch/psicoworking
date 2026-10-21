@@ -2091,6 +2091,23 @@ function ModalAnotacaoTCC({
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const temTcc = TCC_SECOES.some(s => tcc[s.key]);
+  const cfg = useConfigProntuario(usuario.psiId);
+
+  // Manda ao paciente só as tarefas de casa, nunca o resto do prontuário.
+  function enviarTarefasWhatsApp() {
+    const tarefas = (tcc.tarefas || "").trim();
+    if (!tarefas) {
+      setErro("Não há tarefas preenchidas para enviar.");
+      return;
+    }
+    setErro("");
+    const primeiroNome = (paciente.nome || "").trim().split(/\s+/)[0];
+    const assinatura = cfg.nome || "Sua psicóloga";
+    const msg = "Olá, " + primeiroNome + "! 😊\n\n" + "*Atividades da Semana:*\n" + tarefas + "\n\n" + "Qualquer dúvida, estou à disposição. 💜\n" + "_" + assinatura + "_";
+    const numero = (paciente.celular || paciente.telefone || "").replace(/\D/g, "");
+    const base = numero ? "https://wa.me/55" + numero : "https://wa.me/";
+    window.open(base + "?text=" + encodeURIComponent(msg), "_blank");
+  }
   async function organizarComIA() {
     if (!textoBruto.trim()) {
       setErro("Digite ou dite as anotações antes de organizar.");
@@ -2251,7 +2268,17 @@ function ModalAnotacaoTCC({
       [s.key]: e.target.value
     })),
     rows: 3
-  })))), erro && /*#__PURE__*/React.createElement("p", {
+  }), s.key === "tarefas" && (tcc.tarefas || "").trim() !== "" && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    style: {
+      marginTop: 8
+    },
+    onClick: enviarTarefasWhatsApp
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "message-circle",
+    tamanho: 14
+  }), " Enviar tarefas por WhatsApp")))), erro && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
   }, erro), /*#__PURE__*/React.createElement("div", {
     style: {

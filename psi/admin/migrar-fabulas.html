@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Migrar Fábulas entre Sistemas — PsiCoWorking</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --marca:#7B00C4; --marca-escura:#3B0D6F; --lavanda:#EADDFC;
+    --grafite:#1F1B2E; --cinza:#6B7280; --cinza-claro:#F3F4F6;
+    --ok:#059669; --erro:#dc2626; --aviso:#ea580c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--cinza-claro);color:var(--grafite);padding:24px}
+  .container{max-width:1100px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:4px}
+  .sub{font-size:13px;color:var(--cinza);margin-bottom:20px}
+  .cartao{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;margin-bottom:18px}
+  label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
+  input[type=text],input[type=email],input[type=password]{
+    width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:9px;font-size:14px;font-family:inherit}
+  button{background:var(--marca);color:#fff;border:none;border-radius:9px;padding:11px 20px;
+    font-size:14px;font-weight:600;font-family:inherit;cursor:pointer}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.secundario{background:#fff;color:var(--marca);border:1.5px solid var(--marca)}
+  .linha{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .colunas{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.colunas{grid-template-columns:1fr}}
+  .painel h2{font-size:15px;margin-bottom:2px}
+  .painel .contagem{font-size:12px;color:var(--cinza);margin-bottom:12px}
+  .lista{max-height:420px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:10px}
+  .item{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #f3f4f6;font-size:13px}
+  .item:last-child{border-bottom:none}
+  .item.so-aqui{background:#fff7ed}
+  .item .tit{font-weight:600;line-height:1.35}
+  .item .meta{font-size:11px;color:var(--cinza);margin-top:2px}
+  .tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;
+    background:#ffedd5;color:var(--aviso);margin-left:6px;vertical-align:middle}
+  .acoes{display:flex;gap:12px;justify-content:center;margin:18px 0;flex-wrap:wrap}
+  #registro{font-size:13px;line-height:1.9;max-height:280px;overflow-y:auto;display:none}
+  .ok{color:var(--ok)} .err{color:var(--erro)} .pulo{color:var(--cinza)}
+  .aviso{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 14px;
+    font-size:13px;color:#9a3412;margin-bottom:16px;line-height:1.55}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Migrar Fábulas entre Sistemas</h1>
+  <p class="sub">Copia fábulas entre o PsiCoWorking e o sistema da Dra. Lucia Kratz, nas duas direções.</p>
+
+  <div class="cartao" id="tela-login">
+    <label>Entre com sua conta do PsiCoWorking</label>
+    <p class="sub" style="margin-bottom:12px">O login é necessário porque o banco do PsiCoWorking é protegido e só aceita gravação de conta autorizada.</p>
+    <div class="linha">
+      <div style="flex:1;min-width:200px"><label>E-mail</label><input type="email" id="email" autocomplete="username"></div>
+      <div style="flex:1;min-width:200px"><label>Senha</label><input type="password" id="senha" autocomplete="current-password"></div>
+      <button id="btn-entrar">Entrar</button>
+    </div>
+    <p id="erro-login" class="err" style="margin-top:10px;font-size:13px"></p>
+  </div>
+
+  <div id="tela-logada" style="display:none">
+
+    <div class="cartao">
+      <div class="linha" style="justify-content:space-between">
+        <span style="font-size:13px;color:var(--cinza)" id="msg-usuario"></span>
+        <button class="secundario" id="btn-recarregar">Recarregar listas</button>
+      </div>
+    </div>
+
+    <div class="aviso">
+      Fábulas destacadas em laranja existem apenas de um lado. Marque o que quiser copiar e use o botão da direção correspondente.
+      Nada é sobrescrito: se já existir uma fábula com o mesmo título do outro lado, ela é pulada.
+    </div>
+
+    <div class="colunas">
+      <div class="cartao painel">
+        <h2>PsiCoWorking</h2>
+        <p class="contagem" id="cont-pw">carregando...</p>
+        <div class="lista" id="lista-pw"></div>
+      </div>
+      <div class="cartao painel">
+        <h2>Dra. Lucia Kratz</h2>
+        <p class="contagem" id="cont-lk">carregando...</p>
+        <div class="lista" id="lista-lk"></div>
+      </div>
+    </div>
+
+    <div class="acoes">
+      <button id="btn-pw-lk">Copiar novas: PsiCoWorking &rarr; Dra. Lucia</button>
+      <button id="btn-lk-pw">Copiar novas: Dra. Lucia &rarr; PsiCoWorking</button>
+    </div>
+    <div class="acoes" style="margin-top:-6px">
+      <button class="secundario" id="btn-upd-pw-lk">Atualizar imagens: PsiCoWorking &rarr; Dra. Lucia</button>
+      <button class="secundario" id="btn-upd-lk-pw">Atualizar imagens: Dra. Lucia &rarr; PsiCoWorking</button>
+    </div>
+    <p class="sub" style="text-align:center;margin:-4px 0 16px">
+      <strong>Copiar novas</strong> cria do outro lado as fábulas que ainda não existem lá.
+      <strong>Atualizar imagens</strong> serve para fábulas que já existem nos dois lados: leva o formato
+      e as imagens de um lado para o outro, sem mexer na moral, nas reflexões nem na categoria do destino.
+    </p>
+
+    <div class="cartao">
+      <label>Registro</label>
+      <div id="registro"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── Os dois bancos ────────────────────────────────────────────
+const appPW = firebase.initializeApp({
+  apiKey: "AIzaSyCJx1RwX5-FM2wcUqzeC_CYAUdkmTKU2u4",
+  authDomain: "psicoworking.firebaseapp.com",
+  projectId: "psicoworking",
+  storageBucket: "psicoworking.firebasestorage.app",
+  messagingSenderId: "176262015536",
+  appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
+}, "pw");
+
+const appLK = firebase.initializeApp({
+  apiKey: "AIzaSyDnrgaY8R0Zetkr18uHQJAZXIUa4EwDnv4",
+  authDomain: "entrevista-inicial.firebaseapp.com",
+  projectId: "entrevista-inicial",
+  storageBucket: "entrevista-inicial.firebasestorage.app",
+  messagingSenderId: "437375609844",
+  appId: "1:437375609844:web:2ed0e16a7da5d46c2e27a1"
+}, "lk");
+
+const authPW = appPW.auth();
+const dbPW   = appPW.firestore();
+const dbLK   = appLK.firestore();
+
+const COL_PW = "fabulas_terapeuticas";
+const COL_LK = "clinica_fabulas";
+
+let fabsPW = [];
+let fabsLK = [];
+
+// ─── Utilidades ────────────────────────────────────────────────
+function normalizar(t) {
+  return (t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function slugificar(t) {
+  return (t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function registrar(msg, classe) {
+  const el = document.getElementById("registro");
+  el.style.display = "block";
+  const div = document.createElement("div");
+  div.className = classe || "";
+  div.textContent = msg;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function escapar(s) {
+  const d = document.createElement("div");
+  d.textContent = s == null ? "" : String(s);
+  return d.innerHTML;
+}
+
+// ─── Login ─────────────────────────────────────────────────────
+document.getElementById("btn-entrar").onclick = async function () {
+  const btn = this;
+  const err = document.getElementById("erro-login");
+  err.textContent = "";
+  btn.disabled = true;
+  btn.textContent = "Entrando...";
+  try {
+    await authPW.signInWithEmailAndPassword(
+      document.getElementById("email").value.trim(),
+      document.getElementById("senha").value
+    );
+  } catch (e) {
+    err.textContent = "Não foi possível entrar: " + e.message;
+    btn.disabled = false;
+    btn.textContent = "Entrar";
+  }
+};
+
+authPW.onAuthStateChanged(function (user) {
+  document.getElementById("tela-login").style.display    = user ? "none"  : "block";
+  document.getElementById("tela-logada").style.display   = user ? "block" : "none";
+  if (user) {
+    document.getElementById("msg-usuario").textContent = "Logada como: " + user.email;
+    carregar();
+  }
+});
+
+// ─── Carregar as duas listas ───────────────────────────────────
+async function carregar() {
+  document.getElementById("cont-pw").textContent = "carregando...";
+  document.getElementById("cont-lk").textContent = "carregando...";
+  try {
+    const [snapPW, snapLK] = await Promise.all([
+      dbPW.collection(COL_PW).get(),
+      dbLK.collection(COL_LK).get()
+    ]);
+    fabsPW = snapPW.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    fabsLK = snapLK.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    desenhar();
+  } catch (e) {
+    registrar("Erro ao carregar: " + e.message, "err");
+  }
+}
+
+function desenhar() {
+  const titulosPW = new Set(fabsPW.map(f => normalizar(f.titulo || f.nome)));
+  const titulosLK = new Set(fabsLK.map(f => normalizar(f.titulo || f.nome)));
+
+  pintar("lista-pw", "cont-pw", fabsPW, titulosLK, "pw");
+  pintar("lista-lk", "cont-lk", fabsLK, titulosPW, "lk");
+}
+
+function pintar(idLista, idContagem, fabs, titulosDoOutroLado, lado) {
+  const ordenadas = fabs.slice().sort((a, b) =>
+    (a.titulo || "").localeCompare(b.titulo || "", "pt-BR"));
+
+  let soAqui = 0;
+  const html = ordenadas.map(f => {
+    const titulo = f.titulo || f.nome || "(sem título)";
+    const ausente = !titulosDoOutroLado.has(normalizar(titulo));
+    if (ausente) soAqui++;
+    const paginas = Array.isArray(f.paginas) ? f.paginas.length : 0;
+    const perguntas = Array.isArray(f.perguntas) ? f.perguntas.length : 0;
+    const tipo = f.tipo === "carousel" ? "carousel" : "texto";
+    return '<label class="item ' + (ausente ? "so-aqui" : "") + '">' +
+      '<input type="checkbox" data-lado="' + lado + '" value="' + escapar(f.id) + '">' +
+      '<span><span class="tit">' + escapar(titulo) + '</span>' +
+      (ausente ? '<span class="tag">só aqui</span>' : '') +
+      '<span class="meta">' + tipo + ' · ' + paginas + ' pág. · ' + perguntas + ' reflexões</span></span>' +
+      '</label>';
+  }).join("");
+
+  document.getElementById(idLista).innerHTML = html || '<div class="item">Nenhuma fábula.</div>';
+  document.getElementById(idContagem).textContent =
+    ordenadas.length + " fábulas · " + soAqui + " só deste lado";
+}
+
+function marcadas(lado) {
+  return Array.prototype.slice
+    .call(document.querySelectorAll('input[data-lado="' + lado + '"]:checked'))
+    .map(c => c.value);
+}
+
+// ─── Montagem do documento de destino ──────────────────────────
+function paraDestino(f, destino) {
+  const base = {
+    titulo: f.titulo || f.nome || "",
+    moral: f.moral || "",
+    categoria: f.categoria || "",
+    tipo: f.tipo || "texto",
+    emoji: f.emoji || "",
+    paginas: Array.isArray(f.paginas) ? f.paginas : [],
+    perguntas: Array.isArray(f.perguntas) ? f.perguntas : []
+  };
+  if (destino === "lk") {
+    base.slug = f.slug || slugificar(base.titulo);
+    base.corCapa = f.corCapa || "#7B00C4";
+    base.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+  } else {
+    base.ativo = f.ativo !== false;
+    base.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
+  }
+  return base;
+}
+
+async function copiar(origemLado) {
+  const destinoLado = origemLado === "pw" ? "lk" : "pw";
+  const ids = marcadas(origemLado);
+  if (ids.length === 0) { alert("Marque pelo menos uma fábula."); return; }
+
+  const origem  = origemLado === "pw" ? fabsPW : fabsLK;
+  const destino = origemLado === "pw" ? fabsLK : fabsPW;
+  const dbDest  = destinoLado === "pw" ? dbPW : dbLK;
+  const colDest = destinoLado === "pw" ? COL_PW : COL_LK;
+  const nomeDest = destinoLado === "pw" ? "PsiCoWorking" : "Dra. Lucia";
+
+  const titulosDestino = new Set(destino.map(f => normalizar(f.titulo || f.nome)));
+
+  document.getElementById("btn-pw-lk").disabled = true;
+  document.getElementById("btn-lk-pw").disabled = true;
+  registrar("--- Copiando " + ids.length + " fábula(s) para " + nomeDest + " ---");
+
+  let criadas = 0, puladas = 0, falhas = 0;
+
+  for (const id of ids) {
+    const f = origem.find(x => x.id === id);
+    if (!f) continue;
+    const titulo = f.titulo || f.nome || "(sem título)";
+    if (titulosDestino.has(normalizar(titulo))) {
+      registrar("já existe, pulada: " + titulo, "pulo");
+      puladas++;
+      continue;
+    }
+    try {
+      await dbDest.collection(colDest).add(paraDestino(f, destinoLado));
+      registrar("criada: " + titulo, "ok");
+      titulosDestino.add(normalizar(titulo));
+      criadas++;
+    } catch (e) {
+      registrar("falhou: " + titulo + " — " + e.message, "err");
+      falhas++;
+    }
+  }
+
+  registrar("Resultado: " + criadas + " criada(s), " + puladas + " pulada(s), " + falhas + " falha(s).",
+            falhas ? "err" : "ok");
+
+  document.getElementById("btn-pw-lk").disabled = false;
+  document.getElementById("btn-lk-pw").disabled = false;
+  carregar();
+}
+
+// ─── Atualizar: leva formato e imagens para a fábula que já existe lá ──
+// A regra de "nunca sobrescrever" do copiar é proposital, mas impedia o caso
+// real de uma fábula virar carousel de um lado e continuar texto do outro.
+// Aqui só mexemos em tipo e paginas; moral, perguntas e categoria do destino
+// ficam intactas, porque podem estar ajustadas de propósito em cada sistema.
+async function atualizar(origemLado) {
+  const destinoLado = origemLado === "pw" ? "lk" : "pw";
+  const ids = marcadas(origemLado);
+  if (ids.length === 0) { alert("Marque pelo menos uma fábula."); return; }
+
+  const origem   = origemLado === "pw" ? fabsPW : fabsLK;
+  const destino  = origemLado === "pw" ? fabsLK : fabsPW;
+  const dbDest   = destinoLado === "pw" ? dbPW : dbLK;
+  const colDest  = destinoLado === "pw" ? COL_PW : COL_LK;
+  const nomeDest = destinoLado === "pw" ? "PsiCoWorking" : "Dra. Lucia";
+
+  document.getElementById("btn-upd-pw-lk").disabled = true;
+  document.getElementById("btn-upd-lk-pw").disabled = true;
+  registrar("--- Atualizando " + ids.length + " fábula(s) em " + nomeDest + " ---");
+
+  let atualizadas = 0, semPar = 0, iguais = 0, falhas = 0;
+
+  for (const id of ids) {
+    const f = origem.find(x => x.id === id);
+    if (!f) continue;
+    const titulo = f.titulo || f.nome || "(sem título)";
+    const alvo = destino.find(d => normalizar(d.titulo || d.nome) === normalizar(titulo));
+
+    if (!alvo) {
+      registrar("não existe em " + nomeDest + ", use Copiar novas: " + titulo, "pulo");
+      semPar++;
+      continue;
+    }
+
+    const paginasOrigem = Array.isArray(f.paginas) ? f.paginas : [];
+    const tipoOrigem = f.tipo || "texto";
+    const mesmasPaginas =
+      Array.isArray(alvo.paginas) &&
+      alvo.paginas.length === paginasOrigem.length &&
+      alvo.paginas.every((p, i) => p === paginasOrigem[i]);
+
+    if (mesmasPaginas && (alvo.tipo || "texto") === tipoOrigem) {
+      registrar("já estava igual: " + titulo, "pulo");
+      iguais++;
+      continue;
+    }
+
+    try {
+      await dbDest.collection(colDest).doc(alvo.id).update({
+        tipo: tipoOrigem,
+        paginas: paginasOrigem
+      });
+      registrar("atualizada (" + tipoOrigem + ", " + paginasOrigem.length + " pág.): " + titulo, "ok");
+      atualizadas++;
+    } catch (e) {
+      registrar("falhou: " + titulo + " — " + e.message, "err");
+      falhas++;
+    }
+  }
+
+  registrar("Resultado: " + atualizadas + " atualizada(s), " + iguais + " já igual(is), " +
+            semPar + " sem par do outro lado, " + falhas + " falha(s).",
+            falhas ? "err" : "ok");
+
+  document.getElementById("btn-upd-pw-lk").disabled = false;
+  document.getElementById("btn-upd-lk-pw").disabled = false;
+  carregar();
+}
+
+document.getElementById("btn-pw-lk").onclick     = () => copiar("pw");
+document.getElementById("btn-lk-pw").onclick     = () => copiar("lk");
+document.getElementById("btn-upd-pw-lk").onclick = () => atualizar("pw");
+document.getElementById("btn-upd-lk-pw").onclick = () => atualizar("lk");
+document.getElementById("btn-recarregar").onclick = carregar;
+</script>
+</body>
+</html>

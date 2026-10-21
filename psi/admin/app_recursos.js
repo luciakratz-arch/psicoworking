@@ -104,6 +104,26 @@ const MACROCATEGORIAS = [
       { id: "compulsao_aval", label: "Rastreamento e Avaliação" },
     ],
   },
+  {
+    id: "macro_autoconhecimento", icone: "compass", label: "Autoconhecimento e Identidade",
+    cor: "#0891b2", bg: "#cffafe",
+    subs: [
+      { id: "autoimagem", label: "Autoimagem e Autoestima" },
+      { id: "valores", label: "Valores e Propósito" },
+      { id: "padroes", label: "Padrões Repetitivos" },
+      { id: "aceitacao", label: "Aceitação e Limites Pessoais" },
+    ],
+  },
+  {
+    id: "macro_produtividade", icone: "zap", label: "Produtividade e Ação",
+    cor: "#ea580c", bg: "#ffedd5",
+    subs: [
+      { id: "ruminacao_acao", label: "Ruminação e Paralisia" },
+      { id: "organizacao", label: "Organização e Rotina" },
+      { id: "metas", label: "Metas e Primeiros Passos" },
+      { id: "foco", label: "Foco e Constância" },
+    ],
+  },
 ];
 
 const CATEGORIAS_LEGADO = [
@@ -240,8 +260,13 @@ function slugify(titulo) {
 }
 
 function MigradorCarousel({ fabulas, aoFechar }) {
-  const fabsTexto = (fabulas || []).filter((f) => f.tipo !== "carousel");
-  const [fabId, setFabId] = useState(fabsTexto[0]?.id || "");
+  // Lista todas as fábulas, inclusive as já marcadas como carousel. Uma fábula
+  // pode ter sido marcada como carousel sem receber as imagens, ou precisar ser
+  // reapontada para outra pasta; escondê-las aqui tornava impossível corrigi-las.
+  const fabsLista = (fabulas || [])
+    .slice()
+    .sort((a, b) => (a.titulo || "").localeCompare(b.titulo || "", "pt-BR"));
+  const [fabId, setFabId] = useState(fabsLista[0]?.id || "");
   const [pasta, setPasta] = useState("");
   const [qtd, setQtd] = useState(6);
   const [prefixo, setPrefixo] = useState("painel");
@@ -249,10 +274,13 @@ function MigradorCarousel({ fabulas, aoFechar }) {
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState(null);
 
-  const fabSel = fabsTexto.find((f) => f.id === fabId);
+  const fabSel = fabsLista.find((f) => f.id === fabId);
 
   useEffect(() => {
-    if (fabSel) setPasta(slugify(fabSel.titulo || ""));
+    if (!fabSel) return;
+    setPasta(slugify(fabSel.titulo || ""));
+    const totalPaginas = Array.isArray(fabSel.paginas) ? fabSel.paginas.length : 0;
+    if (totalPaginas > 0) setQtd(totalPaginas);
   }, [fabId]);
 
   const urls = Array.from({ length: Number(qtd) || 0 }, (_, i) =>
@@ -268,8 +296,7 @@ function MigradorCarousel({ fabulas, aoFechar }) {
         tipo: "carousel",
         paginas: urls,
       });
-      setMsg("Convertida com sucesso!");
-      setFabId(fabsTexto.filter((f) => f.id !== fabId)[0]?.id || "");
+      setMsg("Convertida com sucesso! Feche e abra a visualização para conferir.");
     } catch (e) {
       setMsg("Erro: " + e.message);
     }
@@ -277,24 +304,32 @@ function MigradorCarousel({ fabulas, aoFechar }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={aoFechar}>
-      <div className="modal-conteudo" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
-        <div className="modal-cabecalho">
+    <div className="sobreposicao" onClick={aoFechar}>
+      <div className="modal modal-largo" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+        <div className="cabecalho-wizard-recurso">
           <h3 style={{ margin: 0 }}>Converter Fábula para Carousel</h3>
-          <button className="botao-fechar" onClick={aoFechar}>×</button>
+          <button type="button" className="botao-icone" onClick={aoFechar} style={{ color: "white" }}>
+            <Icone nome="x" tamanho={18} />
+          </button>
         </div>
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
-          {fabsTexto.length === 0 ? (
-            <p style={{ color: "var(--cor-sucesso)" }}>Todas as fábulas já estão em formato carousel!</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {fabsLista.length === 0 ? (
+            <p style={{ color: "var(--cor-sucesso)" }}>Nenhuma fábula cadastrada ainda.</p>
           ) : (
             <>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600 }}>Fábula</label>
                 <select value={fabId} onChange={(e) => setFabId(e.target.value)}
                   style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: "1px solid var(--borda)", fontSize: 14 }}>
-                  {fabsTexto.map((f) => (
-                    <option key={f.id} value={f.id}>{f.titulo || f.id}</option>
-                  ))}
+                  {fabsLista.map((f) => {
+                    const n = Array.isArray(f.paginas) ? f.paginas.length : 0;
+                    const estado = f.tipo === "carousel" ? "já em carousel" : "texto";
+                    return (
+                      <option key={f.id} value={f.id}>
+                        {(f.titulo || f.id) + "  —  " + estado + ", " + n + " pág."}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 100px 80px", gap: 8 }}>
@@ -1297,9 +1332,27 @@ function WizardNovaFabula({ item, aoFechar }) {
               <label>{form.tipo === "carousel" ? "Imagens do carousel" : "Páginas da fábula"}</label>
               <p className="texto-vazio" style={{ marginTop: 0 }}>
                 {form.tipo === "carousel"
-                  ? "Cole a URL de cada imagem PNG hospedada no GitHub Pages."
+                  ? "Cole a URL de cada imagem, ou use o botão abaixo para preencher todas de uma vez."
                   : "Cada página é um bloco de texto. O paciente avança página por página."}
               </p>
+
+              {/* Preenche os campos pela convenção de nomes (pasta = slug do título,
+                  arquivos painel1.png, painel2.png...). Evita colar URL a URL e evita
+                  o erro de digitar a pasta errada, que já quebrou uma fábula inteira. */}
+              {form.tipo === "carousel" && (
+                <button type="button" className="botao-secundario"
+                  style={{ width: "100%", justifyContent: "center", marginBottom: 14 }}
+                  onClick={() => {
+                    const pasta = slugify(form.titulo || "");
+                    if (!pasta) { setErro("Preencha o título da fábula antes de gerar os endereços."); return; }
+                    setPaginas((ps) => ps.map((_, i) => BASE_IMAGENS + pasta + "/painel" + (i + 1) + ".png"));
+                    setErro("");
+                  }}>
+                  <Icone nome="image" tamanho={14} />
+                  {" Preencher com as imagens da pasta " + (slugify(form.titulo || "") || "(defina o título)")}
+                </button>
+              )}
+
               {paginas.map((p, i) => (
                 <div key={i} style={{ marginBottom: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

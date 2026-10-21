@@ -193,6 +193,44 @@ const MACROCATEGORIAS = [{
     id: "compulsao_aval",
     label: "Rastreamento e Avaliação"
   }]
+}, {
+  id: "macro_autoconhecimento",
+  icone: "compass",
+  label: "Autoconhecimento e Identidade",
+  cor: "#0891b2",
+  bg: "#cffafe",
+  subs: [{
+    id: "autoimagem",
+    label: "Autoimagem e Autoestima"
+  }, {
+    id: "valores",
+    label: "Valores e Propósito"
+  }, {
+    id: "padroes",
+    label: "Padrões Repetitivos"
+  }, {
+    id: "aceitacao",
+    label: "Aceitação e Limites Pessoais"
+  }]
+}, {
+  id: "macro_produtividade",
+  icone: "zap",
+  label: "Produtividade e Ação",
+  cor: "#ea580c",
+  bg: "#ffedd5",
+  subs: [{
+    id: "ruminacao_acao",
+    label: "Ruminação e Paralisia"
+  }, {
+    id: "organizacao",
+    label: "Organização e Rotina"
+  }, {
+    id: "metas",
+    label: "Metas e Primeiros Passos"
+  }, {
+    id: "foco",
+    label: "Foco e Constância"
+  }]
 }];
 const CATEGORIAS_LEGADO = [{
   id: "tcc",
@@ -437,17 +475,23 @@ function MigradorCarousel({
   fabulas,
   aoFechar
 }) {
-  const fabsTexto = (fabulas || []).filter(f => f.tipo !== "carousel");
-  const [fabId, setFabId] = useState(fabsTexto[0]?.id || "");
+  // Lista todas as fábulas, inclusive as já marcadas como carousel. Uma fábula
+  // pode ter sido marcada como carousel sem receber as imagens, ou precisar ser
+  // reapontada para outra pasta; escondê-las aqui tornava impossível corrigi-las.
+  const fabsLista = (fabulas || []).slice().sort((a, b) => (a.titulo || "").localeCompare(b.titulo || "", "pt-BR"));
+  const [fabId, setFabId] = useState(fabsLista[0]?.id || "");
   const [pasta, setPasta] = useState("");
   const [qtd, setQtd] = useState(6);
   const [prefixo, setPrefixo] = useState("painel");
   const [ext, setExt] = useState("png");
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState(null);
-  const fabSel = fabsTexto.find(f => f.id === fabId);
+  const fabSel = fabsLista.find(f => f.id === fabId);
   useEffect(() => {
-    if (fabSel) setPasta(slugify(fabSel.titulo || ""));
+    if (!fabSel) return;
+    setPasta(slugify(fabSel.titulo || ""));
+    const totalPaginas = Array.isArray(fabSel.paginas) ? fabSel.paginas.length : 0;
+    if (totalPaginas > 0) setQtd(totalPaginas);
   }, [fabId]);
   const urls = Array.from({
     length: Number(qtd) || 0
@@ -461,43 +505,48 @@ function MigradorCarousel({
         tipo: "carousel",
         paginas: urls
       });
-      setMsg("Convertida com sucesso!");
-      setFabId(fabsTexto.filter(f => f.id !== fabId)[0]?.id || "");
+      setMsg("Convertida com sucesso! Feche e abra a visualização para conferir.");
     } catch (e) {
       setMsg("Erro: " + e.message);
     }
     setSalvando(false);
   }
   return /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
+    className: "sobreposicao",
     onClick: aoFechar
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-conteudo",
+    className: "modal modal-largo",
     onClick: e => e.stopPropagation(),
     style: {
-      maxWidth: 520
+      maxWidth: 560
     }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-cabecalho"
+    className: "cabecalho-wizard-recurso"
   }, /*#__PURE__*/React.createElement("h3", {
     style: {
       margin: 0
     }
   }, "Converter F\xE1bula para Carousel"), /*#__PURE__*/React.createElement("button", {
-    className: "botao-fechar",
-    onClick: aoFechar
-  }, "\xD7")), /*#__PURE__*/React.createElement("div", {
+    type: "button",
+    className: "botao-icone",
+    onClick: aoFechar,
     style: {
-      padding: "20px 24px",
+      color: "white"
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "x",
+    tamanho: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "flex",
       flexDirection: "column",
       gap: 14
     }
-  }, fabsTexto.length === 0 ? /*#__PURE__*/React.createElement("p", {
+  }, fabsLista.length === 0 ? /*#__PURE__*/React.createElement("p", {
     style: {
       color: "var(--cor-sucesso)"
     }
-  }, "Todas as f\xE1bulas j\xE1 est\xE3o em formato carousel!") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, "Nenhuma f\xE1bula cadastrada ainda.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontSize: 13,
       fontWeight: 600
@@ -513,10 +562,14 @@ function MigradorCarousel({
       border: "1px solid var(--borda)",
       fontSize: 14
     }
-  }, fabsTexto.map(f => /*#__PURE__*/React.createElement("option", {
-    key: f.id,
-    value: f.id
-  }, f.titulo || f.id)))), /*#__PURE__*/React.createElement("div", {
+  }, fabsLista.map(f => {
+    const n = Array.isArray(f.paginas) ? f.paginas.length : 0;
+    const estado = f.tipo === "carousel" ? "já em carousel" : "texto";
+    return /*#__PURE__*/React.createElement("option", {
+      key: f.id,
+      value: f.id
+    }, (f.titulo || f.id) + "  —  " + estado + ", " + n + " pág.");
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 80px 100px 80px",
@@ -2513,7 +2566,27 @@ function WizardNovaFabula({
     style: {
       marginTop: 0
     }
-  }, form.tipo === "carousel" ? "Cole a URL de cada imagem PNG hospedada no GitHub Pages." : "Cada página é um bloco de texto. O paciente avança página por página."), paginas.map((p, i) => /*#__PURE__*/React.createElement("div", {
+  }, form.tipo === "carousel" ? "Cole a URL de cada imagem, ou use o botão abaixo para preencher todas de uma vez." : "Cada página é um bloco de texto. O paciente avança página por página."), form.tipo === "carousel" && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    style: {
+      width: "100%",
+      justifyContent: "center",
+      marginBottom: 14
+    },
+    onClick: () => {
+      const pasta = slugify(form.titulo || "");
+      if (!pasta) {
+        setErro("Preencha o título da fábula antes de gerar os endereços.");
+        return;
+      }
+      setPaginas(ps => ps.map((_, i) => BASE_IMAGENS + pasta + "/painel" + (i + 1) + ".png"));
+      setErro("");
+    }
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "image",
+    tamanho: 14
+  }), " Preencher com as imagens da pasta " + (slugify(form.titulo || "") || "(defina o título)")), paginas.map((p, i) => /*#__PURE__*/React.createElement("div", {
     key: i,
     style: {
       marginBottom: 12

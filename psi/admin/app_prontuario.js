@@ -1156,6 +1156,25 @@ function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, aoFechar }
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const temTcc = TCC_SECOES.some((s) => tcc[s.key]);
+  const cfg = useConfigProntuario(usuario.psiId);
+
+  // Manda ao paciente só as tarefas de casa, nunca o resto do prontuário.
+  function enviarTarefasWhatsApp() {
+    const tarefas = (tcc.tarefas || "").trim();
+    if (!tarefas) { setErro("Não há tarefas preenchidas para enviar."); return; }
+    setErro("");
+    const primeiroNome = (paciente.nome || "").trim().split(/\s+/)[0];
+    const assinatura = cfg.nome || "Sua psicóloga";
+    const msg =
+      "Olá, " + primeiroNome + "! 😊\n\n" +
+      "*Atividades da Semana:*\n" +
+      tarefas + "\n\n" +
+      "Qualquer dúvida, estou à disposição. 💜\n" +
+      "_" + assinatura + "_";
+    const numero = (paciente.celular || paciente.telefone || "").replace(/\D/g, "");
+    const base = numero ? "https://wa.me/55" + numero : "https://wa.me/";
+    window.open(base + "?text=" + encodeURIComponent(msg), "_blank");
+  }
 
   async function organizarComIA() {
     if (!textoBruto.trim()) { setErro("Digite ou dite as anotações antes de organizar."); return; }
@@ -1237,6 +1256,11 @@ function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, aoFechar }
               <div key={s.key} style={{ marginBottom: 12 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase" }}>{s.rotulo}</label>
                 <TextAreaVoz value={tcc[s.key] || ""} onChange={e => setTcc((prev) => ({ ...prev, [s.key]: e.target.value }))} rows={3} />
+                {s.key === "tarefas" && (tcc.tarefas || "").trim() !== "" && (
+                  <button type="button" className="botao-secundario" style={{ marginTop: 8 }} onClick={enviarTarefasWhatsApp}>
+                    <Icone nome="message-circle" tamanho={14} /> Enviar tarefas por WhatsApp
+                  </button>
+                )}
               </div>
             ))}
           </div>
