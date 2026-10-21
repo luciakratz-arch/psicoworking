@@ -413,12 +413,17 @@ function FormNovoPaciente({ usuario, aoFechar }) {
   const [emailEnviado, setEmailEnviado] = useState(false);
   const [enviadoPara, setEnviadoPara] = useState("");
   const [envioAoResponsavel, setEnvioAoResponsavel] = useState(false);
+  const [motivoFalhaEnvio, setMotivoFalhaEnvio] = useState("");
 
   async function aoEnviar(evento) {
     evento.preventDefault();
     setErro("");
     if (!form.nome) {
       setErro("O nome é obrigatório.");
+      return;
+    }
+    if (form.usaContatoResponsavel && !(form.responsavelEmail || "").trim()) {
+      setErro('Você marcou "Receber contato pelo responsável", mas o e-mail do responsável está em branco. Preencha-o ou desmarque o botão.');
       return;
     }
     setEnviando(true);
@@ -435,6 +440,7 @@ function FormNovoPaciente({ usuario, aoFechar }) {
         setEmailEnviado(true);
       } catch (eEmail) {
         setEmailEnviado(false);
+        setMotivoFalhaEnvio((eEmail && eEmail.message) || "motivo não informado");
       }
     } catch (e) {
       setErro(e.message || "Não foi possível cadastrar o paciente.");
@@ -474,7 +480,8 @@ function FormNovoPaciente({ usuario, aoFechar }) {
               </p>
             ) : (
               <p className="mensagem-erro">
-                Paciente cadastrado, mas não conseguimos enviar o e-mail automático. Copie o link abaixo e
+                Paciente cadastrado, mas não conseguimos enviar o e-mail automático
+                {motivoFalhaEnvio ? <> (motivo: <strong>{motivoFalhaEnvio}</strong>)</> : ""}. Copie o link abaixo e
                 envie você mesma para <strong>{form.nome}</strong> (por WhatsApp, por exemplo):
               </p>
             )}

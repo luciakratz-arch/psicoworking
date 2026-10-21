@@ -490,11 +490,16 @@ function FormNovoPaciente({
   const [emailEnviado, setEmailEnviado] = useState(false);
   const [enviadoPara, setEnviadoPara] = useState("");
   const [envioAoResponsavel, setEnvioAoResponsavel] = useState(false);
+  const [motivoFalhaEnvio, setMotivoFalhaEnvio] = useState("");
   async function aoEnviar(evento) {
     evento.preventDefault();
     setErro("");
     if (!form.nome) {
       setErro("O nome é obrigatório.");
+      return;
+    }
+    if (form.usaContatoResponsavel && !(form.responsavelEmail || "").trim()) {
+      setErro('Você marcou "Receber contato pelo responsável", mas o e-mail do responsável está em branco. Preencha-o ou desmarque o botão.');
       return;
     }
     setEnviando(true);
@@ -513,6 +518,7 @@ function FormNovoPaciente({
         setEmailEnviado(true);
       } catch (eEmail) {
         setEmailEnviado(false);
+        setMotivoFalhaEnvio(eEmail && eEmail.message || "motivo não informado");
       }
     } catch (e) {
       setErro(e.message || "Não foi possível cadastrar o paciente.");
@@ -548,7 +554,7 @@ function FormNovoPaciente({
     className: "mensagem-sucesso"
   }, "Paciente cadastrado! J\xE1 mandamos um e-mail para ", /*#__PURE__*/React.createElement("strong", null, enviadoPara), envioAoResponsavel ? " (responsável)" : "", " com o link para ", /*#__PURE__*/React.createElement("strong", null, form.nome), " definir a pr\xF3pria senha (ningu\xE9m, nem a cl\xEDnica, fica sabendo qual senha foi escolhida).") : /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
-  }, "Paciente cadastrado, mas n\xE3o conseguimos enviar o e-mail autom\xE1tico. Copie o link abaixo e envie voc\xEA mesma para ", /*#__PURE__*/React.createElement("strong", null, form.nome), " (por WhatsApp, por exemplo):"), /*#__PURE__*/React.createElement("label", null, "Link de definir senha ", /*#__PURE__*/React.createElement("span", {
+  }, "Paciente cadastrado, mas n\xE3o conseguimos enviar o e-mail autom\xE1tico", motivoFalhaEnvio ? /*#__PURE__*/React.createElement(React.Fragment, null, " (motivo: ", /*#__PURE__*/React.createElement("strong", null, motivoFalhaEnvio), ")") : "", ". Copie o link abaixo e envie voc\xEA mesma para ", /*#__PURE__*/React.createElement("strong", null, form.nome), " (por WhatsApp, por exemplo):"), /*#__PURE__*/React.createElement("label", null, "Link de definir senha ", /*#__PURE__*/React.createElement("span", {
     className: "opcional"
   }, "(reserva, caso o e-mail n\xE3o chegue)")), /*#__PURE__*/React.createElement("textarea", {
     readOnly: true,
