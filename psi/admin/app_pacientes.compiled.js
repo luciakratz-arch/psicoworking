@@ -91,6 +91,21 @@ function TelaPacientes({
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("todos");
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [avisoLink, setAvisoLink] = useState("");
+
+  // Pedido vindo do botão "Prontuário TCC" do sistema antigo: abre o perfil
+  // do paciente certo. Se não achar com certeza, avisa em vez de adivinhar.
+  useEffect(() => {
+    if (carregando || !acaoPorLinkPendente() || acaoPorLink.pacienteId) return;
+    const r = acharPacienteDoLink(pacientes, acaoPorLink);
+    if (r.paciente) {
+      acaoPorLink.pacienteId = r.paciente.id;
+      setPacienteSelecionado(r.paciente);
+    } else {
+      setAvisoLink("Não foi possível abrir o prontuário de " + (acaoPorLink.nome || "paciente") + ": " + r.erro + ". Abra o paciente pela lista abaixo.");
+      encerrarAcaoPorLink();
+    }
+  }, [pacientes, carregando]);
   useEffect(() => {
     // Filtra por psi_id no client (defesa em profundidade — quem
     // protege de verdade é a Firestore Rule, ver CLAUDE.md REGRA 3).
@@ -150,7 +165,12 @@ function TelaPacientes({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "user-plus",
     tamanho: 16
-  }), " Novo Paciente"))), /*#__PURE__*/React.createElement("div", {
+  }), " Novo Paciente"))), avisoLink && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro",
+    style: {
+      marginBottom: 12
+    }
+  }, avisoLink), /*#__PURE__*/React.createElement("div", {
     className: "barra-filtros"
   }, /*#__PURE__*/React.createElement("input", {
     className: "campo-busca",
@@ -586,7 +606,8 @@ function PerfilPaciente({
   aoFechar,
   aoExcluir
 }) {
-  const [aba, setAba] = useState("perfil");
+  // Aberto pelo botão "Prontuário TCC" do sistema antigo: cai direto na aba de anotações.
+  const [aba, setAba] = useState(acaoPorLinkPendente() && acaoPorLink.pacienteId === paciente.id ? "sessoes-tcc" : "perfil");
   const [excluindo, setExcluindo] = useState(false);
   async function excluirPaciente() {
     if (!confirm(`Excluir ${paciente.nome}? Isso remove o cadastro clínico dele — não pode ser desfeito.`)) return;

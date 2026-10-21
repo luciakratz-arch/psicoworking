@@ -59,6 +59,14 @@ function App() {
       } catch (e) {}
     }
   }, [usuario]);
+
+  // Prontuário aberto por link do sistema antigo da clínica: leva direto
+  // para a tela de Pacientes, onde o paciente certo é localizado.
+  useEffect(() => {
+    if (usuario && (usuario.role === "psi" || usuario.role === "secretaria") && acaoPorLinkPendente()) {
+      setTelaAtiva("pacientes");
+    }
+  }, [usuario]);
   if (carregando) {
     return /*#__PURE__*/React.createElement("div", {
       className: "tela-central"

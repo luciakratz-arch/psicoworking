@@ -2147,6 +2147,9 @@ function ModalAnotacaoTCC({
         pacienteNome: paciente.nome,
         sessaoId: sessao.id,
         pacoteId: sessao.pacoteId || null,
+        origem: sessao.origem || null,
+        sessaoAntigaId: sessao.sessaoAntigaId || null,
+        pacoteAntigoId: sessao.pacoteAntigoId || null,
         data: sessao.data || null,
         textoBruto,
         tcc,
@@ -2309,7 +2312,32 @@ function AbaSessoesTCC({
   const [carregando, setCarregando] = useState(true);
   const [mesFiltro, setMesFiltro] = useState(null);
   const [sessaoModal, setSessaoModal] = useState(null);
+  const [notasCarregadas, setNotasCarregadas] = useState(false);
   const cfg = useConfigProntuario(usuario.psiId);
+
+  // Aberto pelo botão "Prontuário TCC" do sistema antigo: assim que as sessões
+  // e as anotações carregam, abre a janela da sessão pedida. A sessão do sistema
+  // antigo não existe aqui (de propósito: não cria sessão nem evento na agenda),
+  // então ela vai como uma sessão avulsa com id "antigo:<id>". Se já houver
+  // anotação para ela, reabre a existente em vez de criar outra.
+  useEffect(() => {
+    if (!acaoPorLinkPendente() || acaoPorLink.pacienteId !== paciente.id) return;
+    if (carregando || !notasCarregadas) return;
+    const sessaoId = "antigo:" + acaoPorLink.sessao;
+    setSessaoModal({
+      sessao: {
+        id: sessaoId,
+        data: acaoPorLink.data,
+        horario: acaoPorLink.hora,
+        pacoteId: null,
+        origem: "clinica-antiga",
+        sessaoAntigaId: acaoPorLink.sessao,
+        pacoteAntigoId: acaoPorLink.pacote || null
+      },
+      nota: notas.find(n => n.sessaoId === sessaoId) || null
+    });
+    encerrarAcaoPorLink();
+  }, [carregando, notasCarregadas]);
   useEffect(() => {
     const unsubSess = db.collection("clinica_sessoes").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).onSnapshot(snap => {
       const lista = snap.docs.map(d => ({
@@ -2320,10 +2348,13 @@ function AbaSessoesTCC({
       setSessoes(lista);
       setCarregando(false);
     }, () => setCarregando(false));
-    const unsubNotas = db.collection("clinica_prontuarios").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).onSnapshot(snap => setNotas(snap.docs.map(d => ({
-      id: d.id,
-      ...d.data()
-    }))), () => {});
+    const unsubNotas = db.collection("clinica_prontuarios").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).onSnapshot(snap => {
+      setNotas(snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })));
+      setNotasCarregadas(true);
+    }, () => setNotasCarregadas(true));
     return () => {
       unsubSess();
       unsubNotas();
@@ -2331,6 +2362,11 @@ function AbaSessoesTCC({
   }, [usuario.psiId, paciente.id]);
   const mesesDisponiveis = [...new Set(sessoes.map(s => (s.data || "").slice(0, 7)).filter(Boolean))].sort().reverse();
   const sessoesExibidas = mesFiltro ? sessoes.filter(s => (s.data || "").startsWith(mesFiltro)) : sessoes;
+
+  // Anotações cuja sessão não está aqui (ex.: feitas pelo botão do sistema antigo
+  // da clínica). Sem esta lista elas ficariam salvas mas invisíveis.
+  const idsDasSessoes = new Set(sessoes.map(s => s.id));
+  const notasSemSessao = notas.filter(n => !idsDasSessoes.has(n.sessaoId)).filter(n => !mesFiltro || (n.data || "").startsWith(mesFiltro)).sort((a, b) => (b.data || "").localeCompare(a.data || ""));
   function gerarPdf() {
     const notasFiltradas = (mesFiltro ? notas.filter(n => (n.data || "").startsWith(mesFiltro)) : notas).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
     if (notasFiltradas.length === 0) {
@@ -2464,7 +2500,89 @@ function AbaSessoesTCC({
       nome: nota ? "eye" : "notebook-pen",
       tamanho: 13
     }), " ", nota ? "Ver / Editar" : "Anotar"));
-  }))), sessaoModal && /*#__PURE__*/React.createElement(ModalAnotacaoTCC, {
+  })), notasSemSessao.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 24
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "var(--texto-suave)",
+      textTransform: "uppercase",
+      letterSpacing: ".5px",
+      marginBottom: 4
+    }
+  }, "Anota\xE7\xF5es de sess\xF5es que n\xE3o est\xE3o no PsiCoWorking"), /*#__PURE__*/React.createElement("p", {
+    className: "descricao-cartao-secao",
+    style: {
+      marginBottom: 10
+    }
+  }, "Registradas a partir do sistema antigo da cl\xEDnica. A sess\xE3o e a agenda continuam l\xE1; s\xF3 a anota\xE7\xE3o fica aqui."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, notasSemSessao.map(n => {
+    const dataFmt = n.data ? new Date(n.data + "T12:00:00").toLocaleDateString("pt-BR", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    }) : "Data não definida";
+    return /*#__PURE__*/React.createElement("div", {
+      key: n.id,
+      style: {
+        border: "1px solid var(--borda)",
+        borderRadius: 10,
+        padding: "12px 14px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 600,
+        fontSize: 13
+      }
+    }, dataFmt), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--sucesso)",
+        marginTop: 3,
+        display: "flex",
+        alignItems: "center",
+        gap: 4
+      }
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "check-circle",
+      tamanho: 12
+    }), " Anota\xE7\xE3o registrada")), /*#__PURE__*/React.createElement("button", {
+      className: "botao-secundario",
+      style: {
+        fontSize: 12,
+        padding: "6px 14px"
+      },
+      onClick: () => setSessaoModal({
+        sessao: {
+          id: n.sessaoId,
+          data: n.data,
+          horario: "",
+          pacoteId: n.pacoteId || null,
+          origem: n.origem || null,
+          sessaoAntigaId: n.sessaoAntigaId || null,
+          pacoteAntigoId: n.pacoteAntigoId || null
+        },
+        nota: n
+      })
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "eye",
+      tamanho: 13
+    }), " Ver / Editar"));
+  })))), sessaoModal && /*#__PURE__*/React.createElement(ModalAnotacaoTCC, {
     usuario: usuario,
     paciente: paciente,
     sessao: sessaoModal.sessao,

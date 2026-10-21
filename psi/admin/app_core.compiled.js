@@ -113,6 +113,80 @@ function whatsappDoPaciente(p) {
   };
 }
 
+// ─── Abertura do prontuário por link (vindo do sistema antigo da clínica) ───
+// O botão "Prontuário TCC" do sistema antigo abre este admin com parâmetros
+// (?prontuario=1&idAntigo=...&data=...&sessao=...). O pedido é lido uma vez,
+// guardado na sessão do navegador (sobrevive ao login) e a URL é limpa. Não
+// cria sessão, pacote nem evento na agenda: só abre a anotação.
+const acaoPorLink = function () {
+  try {
+    let bruto = null;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("prontuario") === "1") {
+      bruto = {
+        idAntigo: q.get("idAntigo") || "",
+        email: (q.get("email") || "").trim().toLowerCase(),
+        nome: q.get("nome") || "",
+        data: q.get("data") || "",
+        hora: q.get("hora") || "",
+        sessao: q.get("sessao") || "",
+        pacote: q.get("pacote") || ""
+      };
+      sessionStorage.setItem("psw_acao_link", JSON.stringify(bruto));
+      window.history.replaceState({}, "", window.location.pathname);
+    } else {
+      const guardado = sessionStorage.getItem("psw_acao_link");
+      if (guardado) bruto = JSON.parse(guardado);
+    }
+    if (!bruto || !bruto.sessao) return null;
+    return Object.assign(bruto, {
+      pacienteId: null,
+      consumida: false
+    });
+  } catch (e) {
+    return null;
+  }
+}();
+function acaoPorLinkPendente() {
+  return !!acaoPorLink && !acaoPorLink.consumida;
+}
+function encerrarAcaoPorLink() {
+  if (acaoPorLink) acaoPorLink.consumida = true;
+  try {
+    sessionStorage.removeItem("psw_acao_link");
+  } catch (e) {}
+}
+function normalizarNome(s) {
+  return String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+}
+
+// Acha o paciente do link. Nunca adivinha: com mais de um candidato (ou
+// nenhum), devolve o motivo em vez de escolher.
+function acharPacienteDoLink(pacientes, a) {
+  const porId = a.idAntigo ? pacientes.filter(p => p.idAntigo === a.idAntigo) : [];
+  if (porId.length === 1) return {
+    paciente: porId[0]
+  };
+  if (porId.length > 1) return {
+    erro: "há mais de um cadastro ligado a esse paciente"
+  };
+  const nomeLink = normalizarNome(a.nome);
+  const porEmailNome = pacientes.filter(p => a.email && String(p.email || "").toLowerCase() === a.email && normalizarNome(p.nome) === nomeLink);
+  if (porEmailNome.length === 1) return {
+    paciente: porEmailNome[0]
+  };
+  const porNome = nomeLink ? pacientes.filter(p => normalizarNome(p.nome) === nomeLink) : [];
+  if (porNome.length === 1) return {
+    paciente: porNome[0]
+  };
+  if (porNome.length > 1 || porEmailNome.length > 1) return {
+    erro: "há mais de um paciente com esse nome"
+  };
+  return {
+    erro: "o paciente não está cadastrado"
+  };
+}
+
 // ─── Login (Firebase Authentication — ver CLAUDE.md REGRA 9) ─────
 // Nunca comparar senha manualmente contra um campo do Firestore.
 async function loginComEmailSenha(email, senha) {
