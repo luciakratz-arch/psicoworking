@@ -2078,11 +2078,699 @@ function AbaLinksPaciente({
 //  SESSÕES TCC — anotações clínicas por sessão + PDF por período
 // ═══════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════
+//  PERFIL CLÍNICO (CID, condições, medicações) E CRISES
+// ═══════════════════════════════════════════════════════════════════
+
+const INTENSIDADES_CRISE = [{
+  id: "leve",
+  rotulo: "Leve",
+  cor: "#D97706"
+}, {
+  id: "moderada",
+  rotulo: "Moderada",
+  cor: "#EA580C"
+}, {
+  id: "intensa",
+  rotulo: "Intensa",
+  cor: "#DC2626"
+}];
+function corDaIntensidade(id) {
+  const i = INTENSIDADES_CRISE.find(x => x.id === id);
+  return i ? i.cor : "#6B7280";
+}
+function textoPerfilClinico(p) {
+  if (!p) return "";
+  const partes = [];
+  (p.cids || []).forEach(c => partes.push("CID " + [c.codigo, c.descricao].filter(Boolean).join(" - ")));
+  if ((p.condicoes || []).length) partes.push("Condições: " + p.condicoes.join(", "));
+  if ((p.medicacoes || []).length) partes.push("Medicações: " + p.medicacoes.map(m => m.nome + (m.dose ? " " + m.dose : "")).join(", "));
+  return partes.join(". ");
+}
+function diasDesdeData(dataIso) {
+  const hoje = new Date();
+  hoje.setHours(12, 0, 0, 0);
+  return Math.round((hoje - new Date(dataIso + "T12:00:00")) / 86400000);
+}
+function textoHaQuantoTempo(dias) {
+  if (dias <= 0) return "hoje";
+  if (dias === 1) return "ontem";
+  if (dias < 60) return "há " + dias + " dias";
+  const meses = Math.floor(dias / 30);
+  return meses < 24 ? "há cerca de " + meses + " meses" : "há mais de 2 anos";
+}
+function dataBr(iso) {
+  return iso ? iso.split("-").reverse().join("/") : "";
+}
+function idCriseDaSessao(pacienteId, sessaoId) {
+  return "s_" + pacienteId + "_" + String(sessaoId).replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
+// Faixa de lembrete: CID/condições/medicações e a última crise.
+function FaixaClinica({
+  perfil,
+  crises
+}) {
+  const texto = textoPerfilClinico(perfil);
+  const comData = (crises || []).filter(c => c.data).sort((a, b) => b.data.localeCompare(a.data));
+  const ultima = comData[0];
+  if (!texto && !ultima) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#F5F0FF",
+      border: "1px solid #D9C7F5",
+      borderRadius: 10,
+      padding: "10px 14px",
+      marginBottom: 14,
+      fontSize: 12.5,
+      color: "#3B1D63",
+      lineHeight: 1.6
+    }
+  }, texto && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Perfil cl\xEDnico:"), " ", texto), ultima && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "\xDAltima crise:"), " ", dataBr(ultima.data), " (", textoHaQuantoTempo(diasDesdeData(ultima.data)), ultima.intensidade ? ", " + ultima.intensidade : "", ")"));
+}
+function PainelPerfilClinico({
+  usuario,
+  paciente,
+  perfil
+}) {
+  const [editando, setEditando] = useState(false);
+  const [cids, setCids] = useState([]);
+  const [condicoes, setCondicoes] = useState([]);
+  const [medicacoes, setMedicacoes] = useState([]);
+  const [ditado, setDitado] = useState("");
+  const [organizando, setOrganizando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  function abrirEdicao() {
+    setCids((perfil?.cids || []).map(c => ({
+      ...c
+    })));
+    setCondicoes([...(perfil?.condicoes || [])]);
+    setMedicacoes((perfil?.medicacoes || []).map(m => ({
+      ...m
+    })));
+    setDitado("");
+    setErro("");
+    setEditando(true);
+  }
+  async function organizarComIA() {
+    if (!ditado.trim()) {
+      setErro("Escreva ou dite as informações antes de organizar.");
+      return;
+    }
+    setOrganizando(true);
+    setErro("");
+    try {
+      const fn = appAdmin.functions("southamerica-east1").httpsCallable("organizarPerfilClinicoIA");
+      const r = (await fn({
+        texto: ditado
+      })).data;
+      const chave = c => ((c.codigo || "") + "|" + (c.descricao || "")).toLowerCase();
+      setCids(prev => [...prev, ...(r.cids || []).filter(n => !prev.some(p => chave(p) === chave(n)))]);
+      setCondicoes(prev => [...prev, ...(r.condicoes || []).filter(n => !prev.some(p => p.toLowerCase() === n.toLowerCase()))]);
+      setMedicacoes(prev => [...prev, ...(r.medicacoes || []).filter(n => !prev.some(p => p.nome.toLowerCase() === n.nome.toLowerCase()))]);
+      setDitado("");
+    } catch (e) {
+      setErro("Erro ao organizar: " + e.message);
+    } finally {
+      setOrganizando(false);
+    }
+  }
+  async function salvar() {
+    setSalvando(true);
+    setErro("");
+    try {
+      await db.collection("clinica_perfil_clinico").doc(paciente.id).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        cids: cids.map(c => ({
+          codigo: (c.codigo || "").trim(),
+          descricao: (c.descricao || "").trim()
+        })).filter(c => c.codigo || c.descricao),
+        condicoes: condicoes.map(c => c.trim()).filter(Boolean),
+        medicacoes: medicacoes.map(m => ({
+          nome: (m.nome || "").trim(),
+          dose: (m.dose || "").trim()
+        })).filter(m => m.nome),
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setEditando(false);
+    } catch (e) {
+      setErro("Erro ao salvar: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+  const rotuloLista = {
+    fontSize: 11,
+    fontWeight: 700,
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: ".5px",
+    margin: "12px 0 6px"
+  };
+  const chip = {
+    display: "inline-block",
+    background: "#F3F4F6",
+    borderRadius: 999,
+    padding: "4px 12px",
+    fontSize: 12.5,
+    marginRight: 6,
+    marginBottom: 6
+  };
+  const vazio = !perfil || !(perfil.cids || []).length && !(perfil.condicoes || []).length && !(perfil.medicacoes || []).length;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "titulo-cartao-secao"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "clipboard-list",
+    tamanho: 16
+  }), " Perfil cl\xEDnico: CID, condi\xE7\xF5es e medica\xE7\xF5es"), /*#__PURE__*/React.createElement("p", {
+    className: "descricao-cartao-secao"
+  }, "Fica vis\xEDvel no topo das anota\xE7\xF5es e \xE9 enviado \xE0 IA como contexto ao organizar cada sess\xE3o."), !editando && /*#__PURE__*/React.createElement("div", null, vazio ? /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nada cadastrado ainda para este paciente.") : /*#__PURE__*/React.createElement("div", null, (perfil.cids || []).length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: rotuloLista
+  }, "CID / diagn\xF3sticos"), perfil.cids.map((c, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    style: chip
+  }, [c.codigo, c.descricao].filter(Boolean).join(" · ")))), (perfil.condicoes || []).length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: rotuloLista
+  }, "Outras condi\xE7\xF5es"), perfil.condicoes.map((c, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    style: chip
+  }, c))), (perfil.medicacoes || []).length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: rotuloLista
+  }, "Medica\xE7\xF5es em uso"), perfil.medicacoes.map((m, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    style: chip
+  }, m.nome, m.dose ? " · " + m.dose : "")))), /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      marginTop: 10
+    },
+    onClick: abrirEdicao
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "pencil",
+    tamanho: 14
+  }), " ", vazio ? "Cadastrar" : "Editar")), editando && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Dite ou escreva e a IA organiza ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional)")), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    value: ditado,
+    onChange: e => setDitado(e.target.value),
+    rows: 3,
+    placeholder: "Ex.: tem transtorno de ansiedade generalizada, F41.1, hipertens\xE3o, usa sertralina 50 mg de manh\xE3"
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    style: {
+      margin: "8px 0 4px"
+    },
+    onClick: organizarComIA,
+    disabled: organizando
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "sparkles",
+    tamanho: 14
+  }), " ", organizando ? "Organizando..." : "Organizar com IA"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11.5,
+      color: "var(--texto-suave)",
+      margin: "2px 0 0"
+    }
+  }, "A IA acrescenta nas listas abaixo. Confira tudo antes de salvar."), /*#__PURE__*/React.createElement("div", {
+    style: rotuloLista
+  }, "CID / diagn\xF3sticos"), cids.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      width: 110
+    },
+    placeholder: "C\xF3digo",
+    value: c.codigo || "",
+    onChange: e => setCids(cids.map((x, j) => j === i ? {
+      ...x,
+      codigo: e.target.value
+    } : x))
+  }), /*#__PURE__*/React.createElement("input", {
+    style: {
+      flex: 1
+    },
+    placeholder: "Descri\xE7\xE3o",
+    value: c.descricao || "",
+    onChange: e => setCids(cids.map((x, j) => j === i ? {
+      ...x,
+      descricao: e.target.value
+    } : x))
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setCids(cids.filter((_, j) => j !== i))
+  }, "Remover"))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setCids([...cids, {
+      codigo: "",
+      descricao: ""
+    }])
+  }, "+ Adicionar CID"), /*#__PURE__*/React.createElement("div", {
+    style: rotuloLista
+  }, "Outras condi\xE7\xF5es"), condicoes.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      flex: 1
+    },
+    placeholder: "Ex.: hipertens\xE3o",
+    value: c,
+    onChange: e => setCondicoes(condicoes.map((x, j) => j === i ? e.target.value : x))
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setCondicoes(condicoes.filter((_, j) => j !== i))
+  }, "Remover"))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setCondicoes([...condicoes, ""])
+  }, "+ Adicionar condi\xE7\xE3o"), /*#__PURE__*/React.createElement("div", {
+    style: rotuloLista
+  }, "Medica\xE7\xF5es em uso"), medicacoes.map((m, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      flex: 1
+    },
+    placeholder: "Medica\xE7\xE3o",
+    value: m.nome || "",
+    onChange: e => setMedicacoes(medicacoes.map((x, j) => j === i ? {
+      ...x,
+      nome: e.target.value
+    } : x))
+  }), /*#__PURE__*/React.createElement("input", {
+    style: {
+      width: 150
+    },
+    placeholder: "Dose",
+    value: m.dose || "",
+    onChange: e => setMedicacoes(medicacoes.map((x, j) => j === i ? {
+      ...x,
+      dose: e.target.value
+    } : x))
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setMedicacoes(medicacoes.filter((_, j) => j !== i))
+  }, "Remover"))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setMedicacoes([...medicacoes, {
+      nome: "",
+      dose: ""
+    }])
+  }, "+ Adicionar medica\xE7\xE3o"), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: 10,
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: () => setEditando(false)
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: salvar,
+    disabled: salvando
+  }, salvando ? "Salvando..." : "Salvar perfil clínico"))), !editando && erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro));
+}
+function PainelCrises({
+  usuario,
+  paciente,
+  crises
+}) {
+  const [formAberto, setFormAberto] = useState(false);
+  const [data, setData] = useState("");
+  const [intensidade, setIntensidade] = useState("");
+  const [obs, setObs] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [verTodas, setVerTodas] = useState(false);
+  const lista = [...crises].filter(c => c.data).sort((a, b) => b.data.localeCompare(a.data));
+  const ultima = lista[0];
+  const diasUltima = ultima ? diasDesdeData(ultima.data) : null;
+  const ate30 = lista.filter(c => diasDesdeData(c.data) <= 30).length;
+  const ate90 = lista.filter(c => diasDesdeData(c.data) <= 90).length;
+  let intervaloMedio = null;
+  if (lista.length >= 2) {
+    const dias = [];
+    for (let i = 0; i < lista.length - 1; i++) dias.push(diasDesdeData(lista[i + 1].data) - diasDesdeData(lista[i].data));
+    intervaloMedio = Math.round(dias.reduce((a, b) => a + b, 0) / dias.length);
+  }
+
+  // Últimos 6 meses, do mais antigo ao mais recente.
+  const meses = [];
+  const ref = new Date();
+  ref.setDate(1);
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+    const chave = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    const doMes = lista.filter(c => c.data.startsWith(chave));
+    meses.push({
+      chave,
+      rotulo: d.toLocaleDateString("pt-BR", {
+        month: "short"
+      }).replace(".", ""),
+      qtd: doMes.length,
+      cor: corDaIntensidade(["intensa", "moderada", "leve"].find(n => doMes.some(c => c.intensidade === n)))
+    });
+  }
+  const maxQtd = Math.max(1, ...meses.map(m => m.qtd));
+  function abrirForm() {
+    setData(new Date().toISOString().slice(0, 10));
+    setIntensidade("");
+    setObs("");
+    setErro("");
+    setFormAberto(true);
+  }
+  async function registrar() {
+    if (!data) {
+      setErro("Informe a data da crise.");
+      return;
+    }
+    if (!intensidade) {
+      setErro("Escolha a intensidade.");
+      return;
+    }
+    setSalvando(true);
+    setErro("");
+    try {
+      await db.collection("clinica_crises").add({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome,
+        data,
+        intensidade,
+        obs: obs.trim(),
+        sessaoId: null,
+        origem: "manual",
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setFormAberto(false);
+    } catch (e) {
+      setErro("Erro ao salvar: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+  async function excluir(c) {
+    if (!confirm("Excluir a crise de " + dataBr(c.data) + "?")) return;
+    try {
+      await db.collection("clinica_crises").doc(c.id).delete();
+    } catch (e) {
+      alert("Erro ao excluir: " + e.message);
+    }
+  }
+  const visiveis = verTodas ? lista : lista.slice(0, 6);
+  const quadro = {
+    background: "#F9FAFB",
+    border: "1px solid var(--borda)",
+    borderRadius: 10,
+    padding: "10px 14px",
+    minWidth: 120
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "titulo-cartao-secao"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "activity",
+    tamanho: 16
+  }), " Evolu\xE7\xE3o das crises"), /*#__PURE__*/React.createElement("p", {
+    className: "descricao-cartao-secao"
+  }, "Marque \"em crise\" dentro de cada anota\xE7\xE3o, ou lance aqui uma crise antiga com a data."), lista.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "texto-vazio"
+  }, "Nenhuma crise registrada para este paciente.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: quadro
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6B7280",
+      fontWeight: 700
+    }
+  }, "\xDALTIMA CRISE"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 15,
+      fontWeight: 700
+    }
+  }, dataBr(ultima.data)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6B7280"
+    }
+  }, textoHaQuantoTempo(diasUltima))), /*#__PURE__*/React.createElement("div", {
+    style: quadro
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6B7280",
+      fontWeight: 700
+    }
+  }, "NOS \xDALTIMOS 30 DIAS"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontWeight: 700
+    }
+  }, ate30)), /*#__PURE__*/React.createElement("div", {
+    style: quadro
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6B7280",
+      fontWeight: 700
+    }
+  }, "NOS \xDALTIMOS 90 DIAS"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontWeight: 700
+    }
+  }, ate90)), /*#__PURE__*/React.createElement("div", {
+    style: quadro
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6B7280",
+      fontWeight: 700
+    }
+  }, "INTERVALO M\xC9DIO"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 15,
+      fontWeight: 700
+    }
+  }, intervaloMedio === null ? "—" : intervaloMedio + " dias"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6B7280"
+    }
+  }, lista.length, " registrada(s)"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#6B7280",
+      textTransform: "uppercase",
+      marginBottom: 6
+    }
+  }, "Crises por m\xEAs (\xFAltimos 6 meses)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-end",
+      gap: 10,
+      height: 90,
+      marginBottom: 16
+    }
+  }, meses.map(m => /*#__PURE__*/React.createElement("div", {
+    key: m.chave,
+    style: {
+      flex: 1,
+      maxWidth: 70,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, m.qtd), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: Math.max(3, Math.round(m.qtd / maxQtd * 56)),
+      background: m.qtd ? m.cor : "#E5E7EB",
+      borderRadius: 4
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6B7280",
+      marginTop: 3
+    }
+  }, m.rotulo)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6
+    }
+  }, visiveis.map(c => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 10,
+      border: "1px solid var(--borda)",
+      borderRadius: 10,
+      padding: "8px 12px",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13
+    }
+  }, dataBr(c.data)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 10,
+      fontSize: 12,
+      fontWeight: 700,
+      color: corDaIntensidade(c.intensidade)
+    }
+  }, c.intensidade), /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 10,
+      fontSize: 11,
+      color: "#6B7280"
+    }
+  }, c.origem === "manual" ? "lançada à mão" : "da anotação da sessão"), c.obs && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#4B5563",
+      marginTop: 2
+    }
+  }, c.obs)), c.origem === "manual" && /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      fontSize: 11,
+      padding: "4px 10px"
+    },
+    onClick: () => excluir(c)
+  }, "Excluir")))), lista.length > 6 && /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      marginTop: 8
+    },
+    onClick: () => setVerTodas(!verTodas)
+  }, verTodas ? "Mostrar menos" : "Ver todas (" + lista.length + ")")), !formAberto ? /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      marginTop: 12
+    },
+    onClick: abrirForm
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "plus",
+    tamanho: 14
+  }), " Registrar crise com data") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      border: "1px solid var(--borda)",
+      borderRadius: 10,
+      padding: "12px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Data da crise"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: data,
+    onChange: e => setData(e.target.value)
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      marginTop: 10
+    }
+  }, "Intensidade"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, INTENSIDADES_CRISE.map(i => /*#__PURE__*/React.createElement("button", {
+    key: i.id,
+    type: "button",
+    onClick: () => setIntensidade(i.id),
+    style: {
+      padding: "6px 14px",
+      borderRadius: 8,
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 12.5,
+      border: "2px solid " + i.cor,
+      background: intensidade === i.id ? i.cor : "white",
+      color: intensidade === i.id ? "white" : i.cor
+    }
+  }, i.rotulo))), /*#__PURE__*/React.createElement("label", {
+    style: {
+      marginTop: 10
+    }
+  }, "Observa\xE7\xE3o ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional)")), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    value: obs,
+    onChange: e => setObs(e.target.value),
+    rows: 2,
+    placeholder: "O que aconteceu, dura\xE7\xE3o, gatilho..."
+  }), erro && /*#__PURE__*/React.createElement("p", {
+    className: "mensagem-erro"
+  }, erro), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: 10,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    onClick: () => setFormAberto(false)
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    onClick: registrar,
+    disabled: salvando
+  }, salvando ? "Salvando..." : "Registrar crise"))));
+}
 function ModalAnotacaoTCC({
   usuario,
   paciente,
   sessao,
   notaExistente,
+  perfil,
+  crises,
+  criseExistente,
   aoFechar
 }) {
   // Rascunho de segurança: guarda o que está sendo escrito no próprio navegador
@@ -2098,6 +2786,10 @@ function ModalAnotacaoTCC({
   const [textoBruto, setTextoBruto] = useState(rascunho?.textoBruto ?? notaExistente?.textoBruto ?? "");
   const [tcc, setTcc] = useState(rascunho?.tcc ?? notaExistente?.tcc ?? {});
   const [notaId, setNotaId] = useState(notaExistente?.id || null);
+  // crise: null = não informado, true = em crise, false = sem crise (apaga o registro, se houver).
+  const [crise, setCrise] = useState(rascunho?.crise ?? (criseExistente ? true : null));
+  const [intensidadeCrise, setIntensidadeCrise] = useState(rascunho?.intensidadeCrise ?? criseExistente?.intensidade ?? "");
+  const [obsCrise, setObsCrise] = useState(rascunho?.obsCrise ?? criseExistente?.obs ?? "");
   const [salvoAuto, setSalvoAuto] = useState(false);
   const [organizando, setOrganizando] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -2106,14 +2798,17 @@ function ModalAnotacaoTCC({
   const cfg = useConfigProntuario(usuario.psiId);
   useEffect(() => {
     try {
-      if (textoBruto.trim() || Object.keys(tcc).length) {
+      if (textoBruto.trim() || Object.keys(tcc).length || crise !== null) {
         sessionStorage.setItem(chaveRascunho, JSON.stringify({
           textoBruto,
-          tcc
+          tcc,
+          crise,
+          intensidadeCrise,
+          obsCrise
         }));
       }
     } catch (e) {}
-  }, [textoBruto, tcc]);
+  }, [textoBruto, tcc, crise, intensidadeCrise, obsCrise]);
 
   // Grava no Firestore sem fechar a janela; usada pelo salvamento automático
   // (ao organizar com IA e ao enviar tarefas por WhatsApp) e pelo botão Salvar.
@@ -2140,6 +2835,25 @@ function ModalAnotacaoTCC({
         criadoEm: firebase.firestore.FieldValue.serverTimestamp()
       });
       setNotaId(ref.id);
+    }
+    // Crise da sessão: um documento por sessão, para poder medir a evolução.
+    const idCrise = idCriseDaSessao(paciente.id, sessao.id);
+    if (crise === true && intensidadeCrise) {
+      await db.collection("clinica_crises").doc(idCrise).set({
+        psi_id: usuario.psiId,
+        pacienteId: paciente.id,
+        pacienteNome: paciente.nome,
+        data: sessao.data || null,
+        intensidade: intensidadeCrise,
+        obs: obsCrise.trim(),
+        sessaoId: sessao.id,
+        origem: "sessao",
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } else if (crise === false) {
+      try {
+        await db.collection("clinica_crises").doc(idCrise).delete();
+      } catch (e) {}
     }
   }
   function salvarAutomatico(textoAtual, tccAtual) {
@@ -2179,7 +2893,8 @@ function ModalAnotacaoTCC({
       const resultado = await fn({
         textoBruto,
         pacienteNome: paciente.nome,
-        dataSessao: sessao.data
+        dataSessao: sessao.data,
+        perfilClinico: textoPerfilClinico(perfil)
       });
       const novoTcc = resultado.data.tcc || {};
       setTcc(novoTcc);
@@ -2193,6 +2908,10 @@ function ModalAnotacaoTCC({
   async function salvar() {
     if (!textoBruto.trim()) {
       setErro("Insira alguma anotação antes de salvar.");
+      return;
+    }
+    if (crise === true && !intensidadeCrise) {
+      setErro("Você marcou que o paciente está em crise. Escolha a intensidade.");
       return;
     }
     setSalvando(true);
@@ -2251,7 +2970,10 @@ function ModalAnotacaoTCC({
       fontSize: 12,
       color: "var(--texto-suave)"
     }
-  }, paciente.nome, " \xB7 ", dataFormatada, sessao.horario ? " · " + sessao.horario : ""), /*#__PURE__*/React.createElement("label", null, "Anota\xE7\xF5es brutas da sess\xE3o ", /*#__PURE__*/React.createElement("span", {
+  }, paciente.nome, " \xB7 ", dataFormatada, sessao.horario ? " · " + sessao.horario : ""), /*#__PURE__*/React.createElement(FaixaClinica, {
+    perfil: perfil,
+    crises: (crises || []).filter(c => c.sessaoId !== sessao.id)
+  }), /*#__PURE__*/React.createElement("label", null, "Anota\xE7\xF5es brutas da sess\xE3o ", /*#__PURE__*/React.createElement("span", {
     className: "opcional"
   }, "(dite ou escreva livremente)")), /*#__PURE__*/React.createElement(TextAreaVoz, {
     value: textoBruto,
@@ -2326,7 +3048,91 @@ function ModalAnotacaoTCC({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "message-circle",
     tamanho: 14
-  }), " Enviar tarefas por WhatsApp")))), rascunho && !notaExistente && /*#__PURE__*/React.createElement("p", {
+  }), " Enviar tarefas por WhatsApp")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      border: "1px solid var(--borda)",
+      borderRadius: 10,
+      padding: "12px 14px",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#6B7280",
+      textTransform: "uppercase",
+      marginBottom: 8
+    }
+  }, "O paciente est\xE1 em crise?"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setCrise(crise === true ? null : true),
+    style: {
+      padding: "6px 16px",
+      borderRadius: 8,
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 12.5,
+      border: "2px solid #DC2626",
+      background: crise === true ? "#DC2626" : "white",
+      color: crise === true ? "white" : "#DC2626"
+    }
+  }, "Sim, em crise"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setCrise(crise === false ? null : false),
+    style: {
+      padding: "6px 16px",
+      borderRadius: 8,
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 12.5,
+      border: "2px solid #059669",
+      background: crise === false ? "#059669" : "white",
+      color: crise === false ? "white" : "#059669"
+    }
+  }, "N\xE3o")), crise === true && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Intensidade"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, INTENSIDADES_CRISE.map(i => /*#__PURE__*/React.createElement("button", {
+    key: i.id,
+    type: "button",
+    onClick: () => setIntensidadeCrise(i.id),
+    style: {
+      padding: "5px 14px",
+      borderRadius: 8,
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 12.5,
+      border: "2px solid " + i.cor,
+      background: intensidadeCrise === i.id ? i.cor : "white",
+      color: intensidadeCrise === i.id ? "white" : i.cor
+    }
+  }, i.rotulo))), /*#__PURE__*/React.createElement("label", null, "Observa\xE7\xE3o da crise ", /*#__PURE__*/React.createElement("span", {
+    className: "opcional"
+  }, "(opcional)")), /*#__PURE__*/React.createElement(TextAreaVoz, {
+    value: obsCrise,
+    onChange: e => setObsCrise(e.target.value),
+    rows: 2,
+    placeholder: "O que aconteceu, gatilho, dura\xE7\xE3o..."
+  })), crise === null && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11.5,
+      color: "var(--texto-suave)",
+      margin: "8px 0 0"
+    }
+  }, "Sem resposta, nada \xE9 registrado sobre crise nesta sess\xE3o.")), rascunho && !notaExistente && /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 12,
       color: "var(--texto-suave)"
@@ -2371,6 +3177,9 @@ function AbaSessoesTCC({
   const [ordem, setOrdem] = useState("recentes");
   const [sessaoModal, setSessaoModal] = useState(null);
   const [notasCarregadas, setNotasCarregadas] = useState(false);
+  const [perfil, setPerfil] = useState(null);
+  const [crises, setCrises] = useState([]);
+  const [crisesCarregadas, setCrisesCarregadas] = useState(false);
   const cfg = useConfigProntuario(usuario.psiId);
 
   // Aberto pelo botão "Prontuário TCC" do sistema antigo: assim que as sessões
@@ -2380,7 +3189,7 @@ function AbaSessoesTCC({
   // anotação para ela, reabre a existente em vez de criar outra.
   useEffect(() => {
     if (!acaoPorLinkPendente() || acaoPorLink.pacienteId !== paciente.id) return;
-    if (carregando || !notasCarregadas) return;
+    if (carregando || !notasCarregadas || !crisesCarregadas) return;
     const sessaoId = "antigo:" + acaoPorLink.sessao;
     setSessaoModal({
       sessao: {
@@ -2395,7 +3204,7 @@ function AbaSessoesTCC({
       nota: notas.find(n => n.sessaoId === sessaoId) || null
     });
     encerrarAcaoPorLink();
-  }, [carregando, notasCarregadas]);
+  }, [carregando, notasCarregadas, crisesCarregadas]);
   useEffect(() => {
     const unsubSess = db.collection("clinica_sessoes").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).onSnapshot(snap => {
       const lista = snap.docs.map(d => ({
@@ -2413,9 +3222,22 @@ function AbaSessoesTCC({
       })));
       setNotasCarregadas(true);
     }, () => setNotasCarregadas(true));
+    const unsubPerfil = db.collection("clinica_perfil_clinico").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).onSnapshot(snap => setPerfil(snap.docs.length ? {
+      id: snap.docs[0].id,
+      ...snap.docs[0].data()
+    } : null), () => setPerfil(null));
+    const unsubCrises = db.collection("clinica_crises").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).onSnapshot(snap => {
+      setCrises(snap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })));
+      setCrisesCarregadas(true);
+    }, () => setCrisesCarregadas(true));
     return () => {
       unsubSess();
       unsubNotas();
+      unsubPerfil();
+      unsubCrises();
     };
   }, [usuario.psiId, paciente.id]);
   const mesesDisponiveis = [...new Set(sessoes.map(s => (s.data || "").slice(0, 7)).filter(Boolean))].sort().reverse();
@@ -2455,9 +3277,9 @@ function AbaSessoesTCC({
         year: "numeric"
       }) : "—";
       const t = n.tcc || {};
-      return "<div style='margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #E5E7EB'>" + "<div style='font-size:13px;font-weight:700;color:" + cor + ";margin-bottom:14px;text-transform:uppercase'>" + dataFmt + "</div>" + TCC_SECOES.filter(s => t[s.key]).map(s => "<div style='margin-bottom:10px'>" + "<div style='font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px'>" + s.rotulo + "</div>" + "<div style='font-size:12.5px;line-height:1.7;color:#1f2937;white-space:pre-wrap'>" + t[s.key] + "</div>" + "</div>").join("") + "</div>";
+      return "<div style='margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #E5E7EB'>" + "<div style='font-size:13px;font-weight:700;color:" + cor + ";margin-bottom:14px;text-transform:uppercase'>" + dataFmt + (crises.find(c => c.sessaoId === n.sessaoId) ? " <span style='color:#DC2626'>· crise " + crises.find(c => c.sessaoId === n.sessaoId).intensidade + "</span>" : "") + "</div>" + TCC_SECOES.filter(s => t[s.key]).map(s => "<div style='margin-bottom:10px'>" + "<div style='font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px'>" + s.rotulo + "</div>" + "<div style='font-size:12.5px;line-height:1.7;color:#1f2937;white-space:pre-wrap'>" + t[s.key] + "</div>" + "</div>").join("") + "</div>";
     }).join("");
-    const html = "<html><head><meta charset='UTF-8'><title>Prontuário TCC — " + paciente.nome + "</title>" + "<style>body{font-family:Arial,sans-serif;margin:40px;color:#1f2937;font-size:13px;line-height:1.6}" + "@media print{body{margin:20px}.no-print{display:none}}</style></head><body>" + "<div style='display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid " + cor + ";padding-bottom:14px;margin-bottom:24px'>" + "<div><div style='font-size:20px;font-weight:700;color:" + cor + "'>" + (cfg.nome || "Clínica") + "</div>" + (linhaCrp ? "<div style='font-size:11px;color:#6B7280'>" + linhaCrp + "</div>" : "") + (cfg.cidade ? "<div style='font-size:11px;color:#6B7280'>" + cfg.cidade + "</div>" : "") + "</div>" + (cfg.logoUrl ? "<img src='" + cfg.logoUrl + "' style='height:48px;object-fit:contain'>" : "") + "</div>" + "<div style='text-align:center;margin-bottom:24px'>" + "<div style='font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1px'>Prontuário de Sessões TCC</div>" + "<div style='font-size:12px;color:#6B7280;margin-top:4px'>" + paciente.nome + " · " + periodo + "</div></div>" + sessoesHtml + "<div style='font-size:10px;color:#9CA3AF;text-align:center;margin-top:24px'>Documento confidencial — Resolução CFP nº 06/2019</div>" + "<div class='no-print' style='text-align:center;margin-top:20px'>" + "<button onclick='window.print()' style='background:" + cor + ";color:white;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer'>Imprimir / Salvar PDF</button></div>" + "</body></html>";
+    const html = "<html><head><meta charset='UTF-8'><title>Prontuário TCC — " + paciente.nome + "</title>" + "<style>body{font-family:Arial,sans-serif;margin:40px;color:#1f2937;font-size:13px;line-height:1.6}" + "@media print{body{margin:20px}.no-print{display:none}}</style></head><body>" + "<div style='display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid " + cor + ";padding-bottom:14px;margin-bottom:24px'>" + "<div><div style='font-size:20px;font-weight:700;color:" + cor + "'>" + (cfg.nome || "Clínica") + "</div>" + (linhaCrp ? "<div style='font-size:11px;color:#6B7280'>" + linhaCrp + "</div>" : "") + (cfg.cidade ? "<div style='font-size:11px;color:#6B7280'>" + cfg.cidade + "</div>" : "") + "</div>" + (cfg.logoUrl ? "<img src='" + cfg.logoUrl + "' style='height:48px;object-fit:contain'>" : "") + "</div>" + "<div style='text-align:center;margin-bottom:24px'>" + "<div style='font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1px'>Prontuário de Sessões TCC</div>" + "<div style='font-size:12px;color:#6B7280;margin-top:4px'>" + paciente.nome + " · " + periodo + "</div>" + (textoPerfilClinico(perfil) ? "<div style='font-size:11px;color:#6B7280;margin-top:4px'>" + textoPerfilClinico(perfil) + "</div>" : "") + "</div>" + sessoesHtml + "<div style='font-size:10px;color:#9CA3AF;text-align:center;margin-top:24px'>Documento confidencial — Resolução CFP nº 06/2019</div>" + "<div class='no-print' style='text-align:center;margin-top:20px'>" + "<button onclick='window.print()' style='background:" + cor + ";color:white;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer'>Imprimir / Salvar PDF</button></div>" + "</body></html>";
     const w = window.open("", "_blank");
     w.document.write(html);
     w.document.close();
@@ -2466,7 +3288,18 @@ function AbaSessoesTCC({
       w.print();
     }, 600);
   }
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(FaixaClinica, {
+    perfil: perfil,
+    crises: crises
+  }), /*#__PURE__*/React.createElement(PainelPerfilClinico, {
+    usuario: usuario,
+    paciente: paciente,
+    perfil: perfil
+  }), /*#__PURE__*/React.createElement(PainelCrises, {
+    usuario: usuario,
+    paciente: paciente,
+    crises: crises
+  }), /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("div", {
     className: "titulo-cartao-secao"
@@ -2714,6 +3547,9 @@ function AbaSessoesTCC({
     paciente: paciente,
     sessao: sessaoModal.sessao,
     notaExistente: sessaoModal.nota,
+    perfil: perfil,
+    crises: crises,
+    criseExistente: crises.find(c => c.sessaoId === sessaoModal.sessao.id) || null,
     aoFechar: () => setSessaoModal(null)
   }));
 }

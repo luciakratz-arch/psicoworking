@@ -989,10 +989,10 @@ function montarEmailAvisoAniversario({ nomeClinica, corMarca, logoUrl, quantidad
 // 7) ORGANIZAR ANOTAÇÃO DE SESSÃO TCC COM IA
 // ─────────────────────────────────────────────────────────────
 exports.organizarProntuarioIA = onCall(
-  { secrets: [GEMINI_API_KEY] },
+  { region: "southamerica-east1", secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Acesso negado.");
-    const { textoBruto, pacienteNome, dataSessao } = request.data || {};
+    const { textoBruto, pacienteNome, dataSessao, perfilClinico } = request.data || {};
     if (!textoBruto || !textoBruto.trim()) {
       throw new HttpsError("invalid-argument", "Texto da sessão é obrigatório.");
     }
@@ -1014,8 +1014,12 @@ exports.organizarProntuarioIA = onCall(
       "2- Tomar um banho relaxante antes de dormir\n" +
       "Se não houver tarefa alguma na sessão, devolva o campo 'tarefas' como string vazia.\n\n" +
       "Paciente: " + (pacienteNome || "não informado") + "\n" +
-      "Data: " + (dataSessao || "não informada") + "\n\n" +
-      "Anotações brutas:\n" + textoBruto.trim();
+      "Data: " + (dataSessao || "não informada") + "\n" +
+      (perfilClinico && String(perfilClinico).trim()
+        ? "Contexto clínico já cadastrado (CID, condições e medicações; use só como contexto, não repita nas seções): " +
+          String(perfilClinico).trim().slice(0, 1500) + "\n"
+        : "") +
+      "\nAnotações brutas:\n" + textoBruto.trim();
 
     let resp;
     try {
@@ -1065,6 +1069,77 @@ exports.organizarProntuarioIA = onCall(
       console.error("organizarProntuarioIA parse error:", parseErr, "texto:", texto.slice(0, 300));
       throw new HttpsError("internal", "Resposta da IA fora do formato JSON. Tente novamente.");
     }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// 8) ORGANIZAR PERFIL CLÍNICO (CID, CONDIÇÕES, MEDICAÇÕES) COM IA
+// A psicóloga dita em texto livre; a IA devolve a lista estruturada
+// para ela revisar antes de salvar. Nada é gravado aqui.
+// ─────────────────────────────────────────────────────────────
+exports.organizarPerfilClinicoIA = onCall(
+  { region: "southamerica-east1", secrets: [GEMINI_API_KEY] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Acesso negado.");
+    const papel = request.auth.token.role;
+    if (papel !== "psi" && papel !== "secretaria") throw new HttpsError("permission-denied", "Sem permissão.");
+    const { texto } = request.data || {};
+    if (!texto || !String(texto).trim()) {
+      throw new HttpsError("invalid-argument", "Escreva ou dite as informações antes de organizar.");
+    }
+    const chave = GEMINI_API_KEY.value();
+    if (!chave || chave === "NAO_CONFIGURADA") {
+      throw new HttpsError("failed-precondition", "Chave do Gemini não configurada.");
+    }
+
+    const prompt =
+      "Você auxilia uma psicóloga a registrar o perfil clínico de um paciente.\n" +
+      "Do texto abaixo, extraia APENAS o que foi dito, sem inventar nada.\n" +
+      "Retorne SOMENTE um JSON válido, sem markdown, com as chaves:\n" +
+      "cids: lista de { codigo, descricao } (diagnósticos; 'codigo' é o código CID-10 ou CID-11 se foi dito ou se o\n" +
+      "diagnóstico tem código inequívoco; caso contrário deixe 'codigo' vazio e preencha só a descrição);\n" +
+      "condicoes: lista de textos curtos (outras doenças ou condições, ex.: hipertensão, TDAH sem laudo);\n" +
+      "medicacoes: lista de { nome, dose } (dose vazia se não informada).\n" +
+      "Listas vazias quando não houver nada. Português do Brasil, com acentos.\n\n" +
+      "Texto:\n" + String(texto).trim().slice(0, 3000);
+
+    let resp;
+    try {
+      resp = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + chave,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json", maxOutputTokens: 3000, temperature: 0.1 },
+          }),
+        }
+      );
+    } catch (fetchErr) {
+      console.error("organizarPerfilClinicoIA fetch error:", fetchErr);
+      throw new HttpsError("internal", "Falha ao conectar com a API de IA.");
+    }
+    if (!resp.ok) {
+      const errTxt = await resp.text();
+      console.error("organizarPerfilClinicoIA API error:", resp.status, errTxt.slice(0, 300));
+      throw new HttpsError("internal", "Erro na API de IA (" + resp.status + ").");
+    }
+    const dados = await resp.json();
+    const partes = dados.candidates?.[0]?.content?.parts || [];
+    const bruto = partes.map((p) => p.text || "").join("").trim()
+      .replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    let obj;
+    try { obj = JSON.parse(bruto); } catch (e) {
+      throw new HttpsError("internal", "Resposta da IA fora do formato. Tente novamente.");
+    }
+    const txt = (v, max) => String(v == null ? "" : v).trim().slice(0, max);
+    const lista = (v) => (Array.isArray(v) ? v : []);
+    return {
+      cids: lista(obj.cids).slice(0, 20).map((c) => ({ codigo: txt(c && c.codigo, 12), descricao: txt(c && c.descricao, 150) })).filter((c) => c.codigo || c.descricao),
+      condicoes: lista(obj.condicoes).slice(0, 30).map((c) => txt(typeof c === "string" ? c : c && c.nome, 150)).filter(Boolean),
+      medicacoes: lista(obj.medicacoes).slice(0, 30).map((m) => ({ nome: txt(m && m.nome, 100), dose: txt(m && m.dose, 80) })).filter((m) => m.nome),
+    };
   }
 );
 

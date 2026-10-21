@@ -320,6 +320,18 @@ service cloud.firestore {
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
     }
 
+    // ── Crises registradas por paciente (medição de evolução) ──
+    match /clinica_crises/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+    }
+
+    // ── Perfil clínico do paciente: CID, condições e medicações (1 doc por paciente) ──
+    match /clinica_perfil_clinico/{id} {
+      allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
+                          || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
+    }
+
     match /clinica_comissoes/{comissaoId} {
       allow read, write: if ehEquipeDaClinica(resource.data.psi_id)
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
