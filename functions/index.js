@@ -8,6 +8,9 @@
 //    2) cadastrar paciente com login de verdade (Firebase Auth);
 //    3) conectar, ler e criar eventos no Google Agenda de cada
 //       psicóloga, sem o token do Google jamais tocar o navegador.
+//
+//  Ambiente de execução: Node.js 22 (definido em firebase.json).
+//  O Node 20 deixa de aceitar deploy em 30/10/2026.
 // ═══════════════════════════════════════════════════════════════
 
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
