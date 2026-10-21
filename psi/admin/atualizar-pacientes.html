@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atualizar Pacientes da Clínica — PsiCoWorking</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+<style>
+  :root{ --marca:#6A2BD9; --escura:#3B0D6F; --lavanda:#EADDFC; --grafite:#1F1B2E; --cinza:#6B7280; --fundo:#F3F4F6;
+         --ok:#059669; --erro:#dc2626; --aviso:#ea580c; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--fundo);color:var(--grafite);padding:24px}
+  .c{max-width:1000px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:4px} h2{font-size:16px;margin-bottom:8px}
+  .sub{font-size:13px;color:var(--cinza);margin-bottom:18px;line-height:1.55}
+  .cartao{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;margin-bottom:16px}
+  .garantias{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;padding:14px 18px;font-size:13px;line-height:1.7;margin-bottom:16px;color:var(--escura)}
+  label{display:block;font-size:13px;font-weight:600;margin-bottom:4px}
+  input[type=text],input[type=email],input[type=password],select{width:100%;padding:9px 11px;border:1px solid #d1d5db;border-radius:9px;font-size:14px;font-family:inherit}
+  button{background:var(--marca);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer}
+  button:disabled{opacity:.45;cursor:not-allowed} button.sec{background:#fff;color:var(--marca);border:1.5px solid var(--marca)}
+  .linha{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .item{border-top:1px solid #f0f0f3;padding:12px 0;font-size:13px}
+  .item:first-child{border-top:none}
+  .nome{font-weight:700;font-size:14px}
+  .meta{color:var(--cinza);font-size:12px;margin-top:2px}
+  .tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 8px;border-radius:20px;margin-left:6px;vertical-align:middle}
+  .t-novo{background:#dcfce7;color:#166534} .t-conf{background:#ffedd5;color:#9a3412} .t-mover{background:#e0e7ff;color:#3730a3}
+  .campo{display:flex;gap:8px;align-items:flex-start;margin:5px 0 0 22px;font-size:13px}
+  .campo .de{color:var(--cinza);text-decoration:line-through} .difere{color:var(--aviso);font-weight:600}
+  .resp{margin:8px 0 0 22px;padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px}
+  .resp .g{display:grid;grid-template-columns:1fr 160px;gap:10px;margin-top:6px}
+  #log{white-space:pre-wrap;font-size:13px;line-height:1.8;max-height:340px;overflow:auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;display:none}
+  .ok{color:var(--ok)} .err{color:var(--erro)} .pulo{color:var(--cinza)}
+  .resumo{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .resumo span{background:#f5f3ff;border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600;color:var(--escura)}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="c">
+  <h1>Atualizar pacientes da clínica no PsiCoWorking</h1>
+  <p class="sub">Compara o cadastro de pacientes do sistema antigo da clínica com o do PsiCoWorking e mostra o que falta
+  trazer ou atualizar. Nada é alterado antes de você conferir a lista e clicar em Executar.</p>
+
+  <div class="garantias">
+    <strong>O que esta ferramenta nunca faz:</strong> não envia e-mail nem WhatsApp para ninguém, não cria sessão,
+    não cria evento no Google Agenda, não apaga nada e não altera o sistema antigo (só lê). Ela cadastra pacientes que
+    faltam, completa campos vazios, atualiza o status e move pacotes para o paciente certo.
+  </div>
+
+  <div class="cartao" id="tela-login">
+    <h2>1. Entrar no PsiCoWorking</h2>
+    <div class="linha">
+      <div style="flex:1;min-width:210px"><label>E-mail</label><input type="email" id="email" autocomplete="username"></div>
+      <div style="flex:1;min-width:210px"><label>Senha</label><input type="password" id="senha" autocomplete="current-password"></div>
+      <button id="btn-entrar">Entrar</button>
+    </div>
+    <p id="erro-login" class="err" style="margin-top:10px;font-size:13px"></p>
+  </div>
+
+  <div id="tela-logada" hidden>
+    <div class="cartao">
+      <div class="linha" style="justify-content:space-between">
+        <span class="sub" style="margin:0" id="msg-usuario"></span>
+        <button id="btn-ler">2. Comparar os dois sistemas</button>
+      </div>
+    </div>
+
+    <div id="area-plano" hidden>
+      <div class="resumo" id="resumo"></div>
+
+      <div class="cartao" id="sec-novos" hidden><h2>Pacientes que faltam no PsiCoWorking</h2><div id="lista-novos"></div></div>
+      <div class="cartao" id="sec-atu" hidden><h2>Pacientes que já existem, com dados a atualizar</h2><div id="lista-atu"></div></div>
+      <div class="cartao" id="sec-mover" hidden><h2>Pacotes no perfil errado, a mover</h2><div id="lista-mover"></div></div>
+      <div class="cartao" id="sec-nada" hidden><h2>Sem nenhuma ação</h2><p class="sub" style="margin:0" id="txt-nada"></p></div>
+
+      <div class="cartao">
+        <button id="btn-exec">3. Executar o que está marcado</button>
+        <span class="sub" style="margin-left:12px">Desmarque o que não quiser aplicar agora.</span>
+      </div>
+    </div>
+
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+// ─── Os dois bancos ────────────────────────────────────────────────
+const appAntigo = firebase.initializeApp({
+  apiKey: "AIzaSyDnrgaY8R0Zetkr18uHQJAZXIUa4EwDnv4", authDomain: "entrevista-inicial.firebaseapp.com",
+  projectId: "entrevista-inicial", storageBucket: "entrevista-inicial.firebasestorage.app",
+  messagingSenderId: "437375609844", appId: "1:437375609844:web:2ed0e16a7da5d46c2e27a1"
+}, "antigo");
+const appNovo = firebase.initializeApp({
+  apiKey: "AIzaSyCJx1RwX5-FM2wcUqzeC_CYAUdkmTKU2u4", authDomain: "psicoworking.firebaseapp.com",
+  projectId: "psicoworking", storageBucket: "psicoworking.firebasestorage.app",
+  messagingSenderId: "176262015536", appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
+}, "novo");
+const dbAntigo = appAntigo.firestore();
+const authNovo = appNovo.auth();
+const dbNovo = appNovo.firestore();
+const chamarCadastrarPaciente = appNovo.functions().httpsCallable("cadastrarPaciente");
+
+let psiId = null;
+let plano = null;
+
+// ─── Utilidades ────────────────────────────────────────────────────
+const NORM = s => String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+const emailNorm = e => String(e == null ? "" : e).trim().toLowerCase();
+const emailReal = e => !!e && !/@interno\.local$/i.test(e) && !/^sem-?email/i.test(e);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const dataNascDe = p => p.dataNasc || p.dataNascimento || "";
+function idadeDe(d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d || "")) return null;
+  const n = new Date(d + "T12:00:00"), h = new Date();
+  let a = h.getFullYear() - n.getFullYear();
+  if (h < new Date(h.getFullYear(), n.getMonth(), n.getDate())) a--;
+  return a;
+}
+function log(msg, cls) {
+  const el = document.getElementById("log");
+  el.hidden = false; el.style.display = "block";
+  const d = document.createElement("div"); d.className = cls || ""; d.textContent = msg;
+  el.appendChild(d); el.scrollTop = el.scrollHeight;
+}
+
+// ─── Login ─────────────────────────────────────────────────────────
+document.getElementById("btn-entrar").onclick = async function () {
+  const b = this, er = document.getElementById("erro-login"); er.textContent = "";
+  b.disabled = true; b.textContent = "Entrando...";
+  try { await authNovo.signInWithEmailAndPassword(document.getElementById("email").value.trim(), document.getElementById("senha").value); }
+  catch (e) { er.textContent = "Não foi possível entrar: " + e.message; b.disabled = false; b.textContent = "Entrar"; }
+};
+authNovo.onAuthStateChanged(async function (u) {
+  document.getElementById("tela-login").hidden = !!u;
+  document.getElementById("tela-logada").hidden = !u;
+  if (!u) return;
+  const t = await u.getIdTokenResult(true);
+  psiId = t.claims.psi_id || null;
+  document.getElementById("msg-usuario").textContent = "Logada como: " + u.email + (psiId ? "" : "  (sem clínica associada)");
+});
+
+// ─── Leitura e comparação ──────────────────────────────────────────
+document.getElementById("btn-ler").onclick = async function () {
+  if (!psiId) { alert("Esta conta não está ligada a uma clínica."); return; }
+  const b = this; b.disabled = true; b.textContent = "Lendo os dois sistemas...";
+  try {
+    const [sAntPac, sAntPct, sNovPac, sNovPct] = await Promise.all([
+      dbAntigo.collection("clinica_pacientes").get(),
+      dbAntigo.collection("clinica_pacotes").get(),
+      dbNovo.collection("clinica_pacientes").where("psi_id", "==", psiId).get(),
+      dbNovo.collection("clinica_pacotes").where("psi_id", "==", psiId).get(),
+    ]);
+    const antigosPac = sAntPac.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    const antigosPct = sAntPct.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    const novosPac = sNovPac.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    const novosPct = sNovPct.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    plano = montarPlano(antigosPac, antigosPct, novosPac, novosPct);
+    desenhar();
+  } catch (e) { alert("Erro ao ler: " + e.message); }
+  b.disabled = false; b.textContent = "2. Comparar os dois sistemas";
+};
+
+const CAMPOS = [["telefone", "Telefone"], ["dataNasc", "Data de nascimento"], ["cpf", "CPF"], ["genero", "Gênero"],
+                ["empresa", "Empresa"], ["setor", "Setor"], ["cargo", "Cargo"], ["objetivos", "Objetivos"]];
+
+function montarPlano(antigosPac, antigosPct, novosPac, novosPct) {
+  const porIdAntigo = {}, porEmail = {}, porNome = {};
+  novosPac.forEach(p => {
+    if (p.idAntigo) porIdAntigo[p.idAntigo] = p;
+    const e = emailNorm(p.email); if (e) (porEmail[e] = porEmail[e] || []).push(p);
+    const n = NORM(p.nome); if (n) (porNome[n] = porNome[n] || []).push(p);
+  });
+  const pctNovoPorIdAntigo = {};
+  novosPct.forEach(p => { if (p.idAntigo) pctNovoPorIdAntigo[p.idAntigo] = p; });
+  const nomeNovoPorId = {}; novosPac.forEach(p => { nomeNovoPorId[p.id] = p.nome; });
+
+  const novos = [], atu = [], mover = [], semAcao = [];
+  const emailsReservadosNoPlano = {};   // e-mail -> nome de quem vai ficar com ele
+  const alvoDoAntigo = {};              // id antigo -> { existente: pacientePW } | { novo: item }
+
+  antigosPac.slice().sort((a, b) => NORM(a.nome).localeCompare(NORM(b.nome))).forEach(a => {
+    const e = emailNorm(a.email);
+    let alvo = porIdAntigo[a.id] || null, como = alvo ? "já ligado ao cadastro antigo" : "";
+    let conflitoCom = null;
+
+    if (!alvo && e) {
+      const cand = porEmail[e] || [];
+      const mesmoNome = cand.filter(c => NORM(c.nome) === NORM(a.nome));
+      if (mesmoNome.length === 1) { alvo = mesmoNome[0]; como = "mesmo e-mail e mesmo nome"; }
+      else if (cand.length) { conflitoCom = { nome: cand[0].nome }; }
+    }
+    if (!alvo && !conflitoCom) {
+      const byNome = porNome[NORM(a.nome)] || [];
+      if (byNome.length === 1) { alvo = byNome[0]; como = "mesmo nome"; }
+    }
+    if (!alvo && !conflitoCom && e && emailReal(e) && emailsReservadosNoPlano[e]) {
+      conflitoCom = { nome: emailsReservadosNoPlano[e] };
+    }
+
+    if (alvo) {
+      alvoDoAntigo[a.id] = { existente: alvo };
+      const campos = [];
+      CAMPOS.forEach(([k, rot]) => {
+        const vAnt = String(k === "dataNasc" ? dataNascDe(a) : (a[k] || "")).trim();
+        const vNov = String(alvo[k] || "").trim();
+        if (vAnt && !vNov) campos.push({ chave: k, rotulo: rot, de: "", para: vAnt, padrao: true, difere: false });
+        else if (vAnt && vNov && NORM(vAnt) !== NORM(vNov)) campos.push({ chave: k, rotulo: rot, de: vNov, para: vAnt, padrao: false, difere: true });
+      });
+      if (a.status && a.status !== alvo.status) campos.push({ chave: "status", rotulo: "Status", de: alvo.status || "", para: a.status, padrao: true, difere: !!alvo.status });
+      if (!alvo.idAntigo) campos.push({ chave: "idAntigo", rotulo: "Ligar ao cadastro antigo", de: "", para: a.id, padrao: true, difere: false, tecnico: true });
+      if (campos.length) atu.push({ a, alvo, como, campos }); else semAcao.push({ a, alvo });
+    } else {
+      const item = { a, conflitoCom, marcado: true, resp: conflitoCom ? { nome: conflitoCom.nome, parentesco: "Mãe", tel: false } : null };
+      novos.push(item);
+      alvoDoAntigo[a.id] = { novo: item };
+      if (e && emailReal(e) && !conflitoCom) emailsReservadosNoPlano[e] = a.nome;
+    }
+  });
+
+  // pacotes do sistema antigo que já existem no PsiCoWorking mas estão no perfil errado
+  let pacotesAusentes = 0;
+  antigosPct.forEach(op => {
+    const pn = pctNovoPorIdAntigo[op.id];
+    const dono = alvoDoAntigo[op.pacienteId];
+    if (!pn) { pacotesAusentes++; return; }
+    if (!dono) return;
+    const donoOk = dono.existente ? pn.pacienteId === dono.existente.id : false;
+    if (!donoOk) {
+      mover.push({ op, pn, dono, deNome: nomeNovoPorId[pn.pacienteId] || "(outro cadastro)", marcado: true });
+    }
+  });
+
+  return { novos, atu, mover, semAcao, pacotesAusentes, totais: { antigos: antigosPac.length, novos: novosPac.length } };
+}
+
+// ─── Tela de conferência ───────────────────────────────────────────
+function desenhar() {
+  const p = plano;
+  document.getElementById("area-plano").hidden = false;
+  document.getElementById("resumo").innerHTML =
+    "<span>Sistema antigo: " + p.totais.antigos + " pacientes</span><span>PsiCoWorking: " + p.totais.novos + " pacientes</span>" +
+    "<span>A cadastrar: " + p.novos.length + "</span><span>A atualizar: " + p.atu.length + "</span><span>Pacotes a mover: " + p.mover.length + "</span>";
+
+  document.getElementById("sec-novos").hidden = !p.novos.length;
+  document.getElementById("lista-novos").innerHTML = p.novos.map((n, i) => {
+    const a = n.a;
+    const conf = n.conflitoCom
+      ? '<div class="resp"><strong>O e-mail deste paciente já pertence a ' + esc(n.conflitoCom.nome) + '.</strong> ' +
+        'Para não misturar os dois, ele será cadastrado com um e-mail interno e o contato vai para o responsável:' +
+        '<div class="g"><div><label>Nome do responsável</label><input type="text" id="rn-' + i + '" value="' + esc(n.resp.nome) + '"></div>' +
+        '<div><label>Parentesco</label><select id="rp-' + i + '">' + ["Mãe", "Pai", "Avó", "Avô", "Tia/Tio", "Outro"].map(x => "<option" + (x === n.resp.parentesco ? " selected" : "") + ">" + x + "</option>").join("") + '</select></div></div>' +
+        '<label style="margin-top:8px;display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="rt-' + i + '"> O telefone cadastrado é do responsável</label></div>'
+      : "";
+    return '<div class="item"><label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="checkbox" id="nv-' + i + '" checked style="margin-top:3px">' +
+      '<span><span class="nome">' + esc(a.nome) + '</span><span class="tag ' + (n.conflitoCom ? "t-conf" : "t-novo") + '">' + (n.conflitoCom ? "e-mail repetido" : "novo") + '</span>' +
+      '<div class="meta">Status: ' + esc(a.status || "—") + ' · ' + (emailReal(a.email) ? "e-mail: " + esc(a.email) : "sem e-mail próprio") + '</div></span></label>' + conf + '</div>';
+  }).join("");
+
+  document.getElementById("sec-atu").hidden = !p.atu.length;
+  document.getElementById("lista-atu").innerHTML = p.atu.map((u, i) =>
+    '<div class="item"><div class="nome">' + esc(u.a.nome) + '</div><div class="meta">Encontrado por: ' + esc(u.como) + '</div>' +
+    u.campos.map((c, j) =>
+      '<label class="campo" style="font-weight:400"><input type="checkbox" id="at-' + i + '-' + j + '"' + (c.padrao ? " checked" : "") + '><span>' +
+      esc(c.rotulo) + ': ' + (c.tecnico ? "" : (c.de ? '<span class="de">' + esc(c.de) + '</span> &rarr; ' : "") + '<strong class="' + (c.difere ? "difere" : "") + '">' + esc(c.para) + '</strong>' + (c.difere && c.chave !== "status" ? " (o PsiCoWorking tem outro valor)" : "")) +
+      '</span></label>').join("") + '</div>').join("");
+
+  document.getElementById("sec-mover").hidden = !p.mover.length;
+  document.getElementById("lista-mover").innerHTML = p.mover.map((m, i) => {
+    const destino = m.dono.existente ? m.dono.existente.nome : m.dono.novo.a.nome + " (a cadastrar)";
+    return '<div class="item"><label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input type="checkbox" id="mv-' + i + '" checked style="margin-top:3px">' +
+      '<span><span class="nome">Pacote de ' + esc(m.pn.totalSessoes || "?") + ' sessões, início ' + esc(m.pn.dataInicio || "—") + '</span><span class="tag t-mover">mover</span>' +
+      '<div class="meta">Do perfil de <strong>' + esc(m.deNome) + '</strong> para o perfil de <strong>' + esc(destino) + '</strong>. As sessões e os lançamentos deste pacote vão junto.</div></span></label></div>';
+  }).join("");
+
+  const nada = p.semAcao.length;
+  document.getElementById("sec-nada").hidden = !nada && !p.pacotesAusentes;
+  document.getElementById("txt-nada").textContent =
+    nada + " paciente(s) já estão iguais nos dois sistemas." +
+    (p.pacotesAusentes ? " " + p.pacotesAusentes + " pacote(s) do sistema antigo ainda não existem no PsiCoWorking; esta ferramenta não cria pacotes nem sessões, para não duplicar a agenda." : "");
+}
+
+// ─── Execução ──────────────────────────────────────────────────────
+document.getElementById("btn-exec").onclick = async function () {
+  const b = this; b.disabled = true;
+  const novosSel = plano.novos.map((n, i) => ({ n, i })).filter(x => document.getElementById("nv-" + x.i).checked);
+  const atuSel = plano.atu.map((u, i) => ({ u, i }));
+  const movSel = plano.mover.map((m, i) => ({ m, i })).filter(x => document.getElementById("mv-" + x.i).checked);
+  const total = novosSel.length + atuSel.length + movSel.length;
+  if (!confirm("Executar agora?\n\n" + novosSel.length + " paciente(s) a cadastrar\n" + atuSel.length + " paciente(s) a atualizar (campos marcados)\n" + movSel.length + " pacote(s) a mover\n\nNada será apagado e nenhum e-mail será enviado.")) { b.disabled = false; return; }
+
+  const uidNovo = {};   // id antigo -> uid criado
+  let criados = 0, atualizados = 0, movidos = 0, falhas = 0;
+
+  for (const { n, i } of novosSel) {
+    const a = n.a;
+    try {
+      const dados = {
+        nome: a.nome, email: n.conflitoCom ? "" : (a.email || ""), telefone: a.telefone || "", dataNasc: dataNascDe(a),
+        cpf: a.cpf || "", genero: a.genero || "", status: a.status || "ativo", empresa: a.empresa || "", setor: a.setor || "",
+        cargo: a.cargo || "", objetivos: a.objetivos || "",
+      };
+      if (n.conflitoCom) {
+        const idade = idadeDe(dataNascDe(a));
+        Object.assign(dados, {
+          usaContatoResponsavel: true, ehMenorDeIdade: idade !== null && idade < 18,
+          responsavelNome: document.getElementById("rn-" + i).value.trim(),
+          responsavelParentesco: document.getElementById("rp-" + i).value,
+          responsavelEmail: a.email || "", telefoneEhDoResponsavel: document.getElementById("rt-" + i).checked,
+        });
+      }
+      const r = await chamarCadastrarPaciente(dados);
+      uidNovo[a.id] = r.data.uid;
+      await dbNovo.collection("clinica_pacientes").doc(r.data.uid).update({
+        idAntigo: a.id, migradoDoSistemaAntigoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      log("cadastrado: " + a.nome + (n.conflitoCom ? " (contato pelo responsável " + dados.responsavelNome + ")" : ""), "ok"); criados++;
+    } catch (e) { log("falhou ao cadastrar " + a.nome + ": " + e.message, "err"); falhas++; }
+  }
+
+  for (const { u, i } of atuSel) {
+    const upd = {};
+    u.campos.forEach((c, j) => { if (document.getElementById("at-" + i + "-" + j).checked) upd[c.chave] = c.para; });
+    if (!Object.keys(upd).length) { log("sem alteração marcada: " + u.a.nome, "pulo"); continue; }
+    try {
+      upd.atualizadoEm = firebase.firestore.FieldValue.serverTimestamp();
+      await dbNovo.collection("clinica_pacientes").doc(u.alvo.id).update(upd);
+      log("atualizado: " + u.a.nome + " (" + Object.keys(upd).filter(k => k !== "atualizadoEm").join(", ") + ")", "ok"); atualizados++;
+    } catch (e) { log("falhou ao atualizar " + u.a.nome + ": " + e.message, "err"); falhas++; }
+  }
+
+  for (const { m } of movSel) {
+    try {
+      const destinoUid = m.dono.existente ? m.dono.existente.id : uidNovo[m.dono.novo.a.id];
+      const destinoNome = m.dono.existente ? m.dono.existente.nome : m.dono.novo.a.nome;
+      if (!destinoUid) { log("pacote não movido: o paciente " + destinoNome + " não foi cadastrado", "err"); falhas++; continue; }
+      const troca = { pacienteId: destinoUid, pacienteNome: destinoNome };
+      await dbNovo.collection("clinica_pacotes").doc(m.pn.id).update(troca);
+      let ns = 0, nl = 0;
+      const sess = await dbNovo.collection("clinica_sessoes").where("psi_id", "==", psiId).where("pacoteId", "==", m.pn.id).get();
+      for (const d of sess.docs) { await d.ref.update(troca); ns++; }
+      const lanc = await dbNovo.collection("clinica_lancamentos").where("psi_id", "==", psiId).where("pacoteId", "==", m.pn.id).get();
+      for (const d of lanc.docs) { await d.ref.update(troca); nl++; }
+      log("pacote movido para " + destinoNome + " (" + ns + " sessões, " + nl + " lançamentos)", "ok"); movidos++;
+    } catch (e) { log("falhou ao mover pacote: " + e.message, "err"); falhas++; }
+  }
+
+  log("Resultado: " + criados + " cadastrado(s), " + atualizados + " atualizado(s), " + movidos + " pacote(s) movido(s), " + falhas + " falha(s).", falhas ? "err" : "ok");
+  b.disabled = false;
+  if (total) log("Clique em 'Comparar os dois sistemas' de novo para ver o que ainda falta.", "pulo");
+};
+</script>
+</body>
+</html>
