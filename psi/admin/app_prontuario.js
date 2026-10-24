@@ -1318,6 +1318,7 @@ function PainelPerfilClinico({ usuario, paciente, perfil }) {
           <label>Dite ou escreva e a IA organiza <span className="opcional">(opcional)</span></label>
           <TextAreaVoz value={ditado} onChange={(e) => setDitado(e.target.value)} rows={3}
             placeholder="Ex.: tem transtorno de ansiedade generalizada, F41.1, hipertensão, usa sertralina 50 mg de manhã" />
+          <AvisoPlanoIA usuario={usuario} />
           <button className="botao-primario" style={{ margin: "8px 0 4px" }} onClick={organizarComIA} disabled={organizando}>
             <Icone nome="sparkles" tamanho={14} /> {organizando ? "Organizando..." : "Organizar com IA"}
           </button>
@@ -1545,7 +1546,7 @@ function escHtmlRel(s) {
 // Relatório resumido: curto, com a identidade da psicóloga, para entregar a
 // terceiros se solicitado. A IA escreve o texto, a psicóloga revisa e só então
 // o PDF é gerado. CID, medicações e crises só entram se ela marcar.
-function ModalRelatorioResumido({ paciente, cfg, perfil, crisesDoPeriodo, notasDoPeriodo, periodoTexto, aoFechar }) {
+function ModalRelatorioResumido({ usuario, paciente, cfg, perfil, crisesDoPeriodo, notasDoPeriodo, periodoTexto, aoFechar }) {
   const [finalidade, setFinalidade] = useState("");
   const [resumo, setResumo] = useState("");
   const [gerando, setGerando] = useState(false);
@@ -1654,6 +1655,7 @@ function ModalRelatorioResumido({ paciente, cfg, perfil, crisesDoPeriodo, notasD
           <input type="checkbox" style={{ width: "auto" }} checked={incluirCrises} onChange={(e) => setIncluirCrises(e.target.checked)} /> Quantidade de crises no período
         </label>
 
+        <AvisoPlanoIA usuario={usuario} />
         <div style={{ display: "flex", gap: 10, margin: "14px 0 8px", alignItems: "center" }}>
           <button className="botao-primario" onClick={gerarTexto} disabled={gerando}>
             <Icone nome="sparkles" tamanho={15} /> {gerando ? "Escrevendo..." : resumo ? "Gerar o texto de novo" : "Gerar texto com IA"}
@@ -1831,6 +1833,7 @@ function ModalAnotacaoTCC({ usuario, paciente, sessao, notaExistente, perfil, cr
         <label>Anotações brutas da sessão <span className="opcional">(dite ou escreva livremente)</span></label>
         <TextAreaVoz value={textoBruto} onChange={e => setTextoBruto(e.target.value)} rows={6} placeholder="Descreva o que aconteceu na sessão, os temas discutidos, técnicas usadas, tarefas combinadas..." />
 
+        <AvisoPlanoIA usuario={usuario} />
         <div style={{ display: "flex", gap: 10, margin: "12px 0 18px", alignItems: "center" }}>
           <button className="botao-primario" onClick={organizarComIA} disabled={organizando}>
             <Icone nome="sparkles" tamanho={15} /> {organizando ? "Organizando..." : "Organizar com IA"}
@@ -2212,6 +2215,7 @@ function AbaSessoesTCC({ usuario, paciente }) {
 
       {resumoAberto && (
         <ModalRelatorioResumido
+          usuario={usuario}
           paciente={paciente}
           cfg={cfg}
           perfil={perfil}

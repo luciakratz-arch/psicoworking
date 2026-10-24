@@ -40,6 +40,167 @@ const GOOGLE_CLIENT_SECRET = defineSecret("GOOGLE_CLIENT_SECRET");
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
 // ─────────────────────────────────────────────────────────────
+// PLANOS E ASSINATURAS (modelo comercial)
+// Essencial (sem IA) e Plus (com IA e cota mensal). Todo cadastro novo começa
+// em teste de 30 dias, sem IA, com 5 usos de IA para experimentar; terminado o
+// teste sem assinar, a clínica fica 15 dias em "somente leitura" (consulta e
+// exporta) e depois "suspensa". Os valores abaixo são o padrão; a administradora
+// os edita em plataforma_config/planos pelo painel da matriz.
+// ─────────────────────────────────────────────────────────────
+const PLANOS_PADRAO = {
+  testeDias: 30,
+  testeIaUsos: 5,
+  somenteLeituraDias: 15,
+  essencial: { nome: "Essencial", precoMensal: 39.9, precoAnual: 399, ia: false },
+  plus: { nome: "Plus", precoMensal: 69.9, precoAnual: 699, ia: true, cotaIaMes: 200 },
+};
+
+async function lerPlanos() {
+  const snap = await db.collection("plataforma_config").doc("planos").get();
+  const c = snap.exists ? snap.data() : {};
+  const numero = (v, padrao) => (v === undefined || v === null || v === "" || isNaN(Number(v)) ? padrao : Number(v));
+  return {
+    testeDias: numero(c.testeDias, PLANOS_PADRAO.testeDias),
+    testeIaUsos: numero(c.testeIaUsos, PLANOS_PADRAO.testeIaUsos),
+    somenteLeituraDias: numero(c.somenteLeituraDias, PLANOS_PADRAO.somenteLeituraDias),
+    essencial: { ...PLANOS_PADRAO.essencial, ...(c.essencial || {}) },
+    plus: { ...PLANOS_PADRAO.plus, ...(c.plus || {}) },
+  };
+}
+
+function montarAssinaturaTeste(planos) {
+  const testeAte = new Date(Date.now() + planos.testeDias * 86400000);
+  return {
+    plano: "essencial",
+    situacao: "teste",
+    ciclo: "mensal",
+    testeAte: admin.firestore.Timestamp.fromDate(testeAte),
+    iaTestesLimite: planos.testeIaUsos,
+    iaTestesUsados: 0,
+    origem: "cadastro",
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
+// Conta um uso de IA da clínica, respeitando o plano. Lança erro (em português,
+// mostrado ao usuário) se não puder usar. Clínica sem assinatura (legado) usa livremente.
+async function consumirUsoIA(psiId) {
+  if (!psiId) throw new HttpsError("failed-precondition", "Clínica não identificada.");
+  const planos = await lerPlanos();
+  const ref = db.collection("psi_assinaturas").doc(psiId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return;
+    const a = snap.data();
+    const bloqueadas = ["somente_leitura", "suspensa", "cancelada"];
+    if (bloqueadas.includes(a.situacao)) {
+      throw new HttpsError("failed-precondition", "Sua assinatura está em modo somente leitura. Assine para voltar a usar a IA.");
+    }
+    if (a.situacao === "teste") {
+      if (a.testeAte && a.testeAte.toMillis() < Date.now()) {
+        throw new HttpsError("failed-precondition", "Seu período de teste terminou. Assine para continuar usando o sistema.");
+      }
+      const limite = a.iaTestesLimite !== undefined ? a.iaTestesLimite : planos.testeIaUsos;
+      const usados = a.iaTestesUsados || 0;
+      if (usados >= limite) {
+        throw new HttpsError("resource-exhausted", "Você usou seus " + limite + " testes de IA. Assine o plano Plus para continuar usando a IA.");
+      }
+      tx.update(ref, { iaTestesUsados: usados + 1 });
+      return;
+    }
+    if (a.plano !== "plus") {
+      throw new HttpsError("permission-denied", "A IA está disponível no plano Plus. Mude de plano para usar.");
+    }
+    const mes = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7);
+    const usosMes = a.iaMes === mes ? (a.iaUsosMes || 0) : 0;
+    const cota = a.iaCotaMes !== undefined ? a.iaCotaMes : planos.plus.cotaIaMes;
+    if (cota !== null && cota !== undefined && usosMes >= cota) {
+      throw new HttpsError("resource-exhausted", "Você chegou ao limite de " + cota + " usos de IA deste mês. Fale conosco para ampliar.");
+    }
+    tx.update(ref, { iaMes: mes, iaUsosMes: usosMes + 1, iaUsosTotal: (a.iaUsosTotal || 0) + 1 });
+  });
+}
+
+// Prepara as clínicas que já existiam antes do sistema de planos: ficam no Plus,
+// ativas e sem limite ("fundadoras"). Pode ser chamada várias vezes sem duplicar.
+exports.garantirAssinaturas = onCall({ region: "southamerica-east1" }, async (request) => {
+  if (!request.auth || request.auth.token.role !== "admin_matriz") {
+    throw new HttpsError("permission-denied", "Só a administradora da plataforma pode fazer isso.");
+  }
+  const configs = await db.collection("psi_config").get();
+  const refs = configs.docs.map((d) => db.collection("psi_assinaturas").doc(d.id));
+  const existentes = refs.length ? await db.getAll(...refs) : [];
+  let criadas = 0;
+  for (let i = 0; i < refs.length; i++) {
+    if (existentes[i].exists) continue;
+    await refs[i].set({
+      plano: "plus",
+      situacao: "ativa",
+      ciclo: "mensal",
+      iaCotaMes: null,
+      origem: "fundadora",
+      observacao: "Clínica anterior ao sistema de planos: acesso integral, sem cobrança.",
+      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    criadas++;
+  }
+  return { ok: true, criadas, total: refs.length };
+});
+
+// Quantos pacientes cada clínica tem (a administradora não lê dados clínicos,
+// só recebe as contagens).
+exports.usoDasClinicas = onCall({ region: "southamerica-east1" }, async (request) => {
+  if (!request.auth || request.auth.token.role !== "admin_matriz") {
+    throw new HttpsError("permission-denied", "Só a administradora da plataforma pode fazer isso.");
+  }
+  const assinaturas = await db.collection("psi_assinaturas").get();
+  const uso = {};
+  for (const d of assinaturas.docs) {
+    const base = db.collection("clinica_pacientes").where("psi_id", "==", d.id);
+    const [total, ativos] = await Promise.all([
+      base.count().get(),
+      base.where("status", "==", "ativo").count().get(),
+    ]);
+    uso[d.id] = { pacientes: total.data().count, ativos: ativos.data().count };
+  }
+  return { uso };
+});
+
+// Todo dia, às 03h (Brasília): o teste vencido vira "somente leitura" por alguns
+// dias e depois "suspensa". Assinatura paga com vencimento passado vira "atrasada"
+// (só aviso; o bloqueio de quem paga fica para quando a cobrança for automática).
+exports.atualizarSituacoesAssinaturas = onSchedule(
+  { schedule: "0 3 * * *", timeZone: "America/Sao_Paulo", region: "southamerica-east1" },
+  async () => {
+    const planos = await lerPlanos();
+    const agora = admin.firestore.Timestamp.now();
+    const snap = await db.collection("psi_assinaturas").get();
+    for (const d of snap.docs) {
+      const a = d.data();
+      let mudanca = null;
+      if (a.situacao === "teste" && a.testeAte && a.testeAte.toMillis() < agora.toMillis()) {
+        mudanca = {
+          situacao: "somente_leitura",
+          leituraAte: admin.firestore.Timestamp.fromMillis(a.testeAte.toMillis() + planos.somenteLeituraDias * 86400000),
+        };
+      } else if (a.situacao === "somente_leitura" && a.leituraAte && a.leituraAte.toMillis() < agora.toMillis()) {
+        mudanca = { situacao: "suspensa" };
+      } else if (a.situacao === "ativa" && a.proximoVencimento && a.proximoVencimento.toMillis() < agora.toMillis()) {
+        mudanca = { situacao: "atrasada" };
+      }
+      if (!mudanca) continue;
+      await d.ref.update(mudanca);
+      await db.collection("clinica_audit_log").add({
+        acao: "assinatura_" + mudanca.situacao,
+        alvoUid: d.id,
+        executadoPor: "sistema",
+        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
 // 1) CARIMBO DE IDENTIDADE (custom claims)
 // ─────────────────────────────────────────────────────────────
 exports.definirCarimboEquipe = onCall(async (request) => {
@@ -361,7 +522,7 @@ exports.cadastrarPsicologa = onCall({ region: "southamerica-east1" }, async (req
     throw new HttpsError("permission-denied", "Só a Admin Matriz pode cadastrar psicólogas.");
   }
 
-  const { nome, email, crp, cidade, titulo } = request.data || {};
+  const { nome, email, crp, cidade, titulo, interesseId } = request.data || {};
   if (!nome || !email) {
     throw new HttpsError("invalid-argument", "Nome e e-mail são obrigatórios.");
   }
@@ -386,6 +547,21 @@ exports.cadastrarPsicologa = onCall({ region: "southamerica-east1" }, async (req
     corPrimaria: "#6A2BD9",
     criadoEm: admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  // Começa em teste de 30 dias, plano Essencial, com 5 usos de IA para experimentar.
+  await db.collection("psi_assinaturas").doc(uid).set(montarAssinaturaTeste(await lerPlanos()));
+
+  if (interesseId) {
+    try {
+      await db.collection("psi_interesse").doc(interesseId).update({
+        status: "aprovado",
+        psiId: uid,
+        resolvidoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      console.error("Não foi possível fechar o pedido de interesse:", interesseId, e.message);
+    }
+  }
 
   const linkDefinirSenha = await auth.generatePasswordResetLink(email);
 
@@ -963,6 +1139,7 @@ exports.organizarProntuarioIA = onCall(
     if (!textoBruto || !textoBruto.trim()) {
       throw new HttpsError("invalid-argument", "Texto da sessão é obrigatório.");
     }
+    await consumirUsoIA(request.auth.token.psi_id);
 
     const chave = GEMINI_API_KEY.value();
     if (!chave || chave === "NAO_CONFIGURADA") {
@@ -1053,6 +1230,7 @@ exports.organizarPerfilClinicoIA = onCall(
     if (!texto || !String(texto).trim()) {
       throw new HttpsError("invalid-argument", "Escreva ou dite as informações antes de organizar.");
     }
+    await consumirUsoIA(request.auth.token.psi_id);
     const chave = GEMINI_API_KEY.value();
     if (!chave || chave === "NAO_CONFIGURADA") {
       throw new HttpsError("failed-precondition", "Chave do Gemini não configurada.");
@@ -1123,6 +1301,7 @@ exports.resumirPeriodoIA = onCall(
     if (!Array.isArray(notas) || notas.length === 0) {
       throw new HttpsError("invalid-argument", "Não há anotações no período para resumir.");
     }
+    await consumirUsoIA(request.auth.token.psi_id);
     const chave = GEMINI_API_KEY.value();
     if (!chave || chave === "NAO_CONFIGURADA") {
       throw new HttpsError("failed-precondition", "Chave do Gemini não configurada.");

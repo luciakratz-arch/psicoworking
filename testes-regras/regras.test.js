@@ -74,6 +74,8 @@ beforeEach(async () => {
     await setDoc(doc(d, "clinica_metas/metaA1"), { psi_id: "clinA", pacienteId: "pacA1", titulo: "Meta", progresso: 10, status: "ativa" });
     await setDoc(doc(d, "fabulas_terapeuticas/fab1"), { titulo: "Fábula", paginas: [] });
     await setDoc(doc(d, "clinica_solicitacoes_lgpd/sol1"), { psi_id: "clinA", uid: "pacA1", tipo: "exclusao", status: "pendente" });
+    await setDoc(doc(d, "psi_interesse/int1"), { nome: "Maria", email: "m@x.com" });
+    await setDoc(doc(d, "plataforma_config/planos"), { testeDias: 30 });
     for (const c of ["clinica_humor", "clinica_gestao_ansiedade", "clinica_tcc", "clinica_reflexoes", "clinica_anamneses", "clinica_registro_abc", "clinica_arvore_decisao", "clinica_relaxamento", "clinica_rastreamento_alimentar", "clinica_treino_auditivo", "clinica_rastreamento_bipolar"]) {
       await setDoc(doc(d, c + "/regA1"), { psi_id: "clinA", pacienteId: "pacA1" });
     }
@@ -329,5 +331,66 @@ describe("Pedidos de privacidade (LGPD)", () => {
   test("a equipe da própria clínica trata o pedido; outra clínica não vê", async () => {
     await assertSucceeds(updateDoc(doc(psiA(), "clinica_solicitacoes_lgpd/sol1"), { status: "atendida" }));
     await assertFails(getDoc(doc(psiB(), "clinica_solicitacoes_lgpd/sol1")));
+  });
+});
+
+async function definirSituacao(psiId, situacao) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "psi_assinaturas/" + psiId), { plano: "essencial", situacao });
+  });
+}
+
+describe("Assinatura, planos e situação da clínica", () => {
+  test("a equipe lê a própria assinatura; outra clínica, paciente e visitante não", async () => {
+    await definirSituacao("clinA", "teste");
+    await assertSucceeds(getDoc(doc(psiA(), "psi_assinaturas/clinA")));
+    await assertSucceeds(getDoc(doc(secA(), "psi_assinaturas/clinA")));
+    await assertFails(getDoc(doc(psiB(), "psi_assinaturas/clinA")));
+    await assertFails(getDoc(doc(pacA1(), "psi_assinaturas/clinA")));
+    await assertFails(getDoc(doc(semLogin(), "psi_assinaturas/clinA")));
+  });
+  test("só a administradora grava a assinatura (a equipe não troca o próprio plano)", async () => {
+    await definirSituacao("clinA", "teste");
+    await assertFails(updateDoc(doc(psiA(), "psi_assinaturas/clinA"), { plano: "plus" }));
+    await assertFails(updateDoc(doc(psiA(), "psi_assinaturas/clinA"), { situacao: "ativa" }));
+    await assertFails(setDoc(doc(psiB(), "psi_assinaturas/clinB"), { plano: "plus", situacao: "ativa" }));
+    await assertSucceeds(updateDoc(doc(matriz(), "psi_assinaturas/clinA"), { plano: "plus" }));
+  });
+  test("planos e preços: a equipe lê, só a administradora grava", async () => {
+    await assertSucceeds(getDoc(doc(psiA(), "plataforma_config/planos")));
+    await assertFails(updateDoc(doc(psiA(), "plataforma_config/planos"), { testeDias: 999 }));
+    await assertFails(getDoc(doc(pacA1(), "plataforma_config/planos")));
+    await assertSucceeds(updateDoc(doc(matriz(), "plataforma_config/planos"), { testeDias: 30 }));
+  });
+  for (const ok of ["teste", "ativa", "atrasada"]) {
+    test("situação " + ok + ": a equipe grava normalmente", async () => {
+      await definirSituacao("clinA", ok);
+      await assertSucceeds(updateDoc(doc(psiA(), "clinica_prontuarios/prontA"), { textoBruto: "ok" }));
+      await assertSucceeds(addDoc(collection(psiA(), "clinica_prontuarios"), { psi_id: "clinA", pacienteId: "pacA1" }));
+      await assertSucceeds(updateDoc(doc(secA(), "clinica_sessoes/sessA1"), { valor: 10 }));
+    });
+  }
+  for (const bloqueada of ["somente_leitura", "suspensa", "cancelada"]) {
+    test("situação " + bloqueada + ": a equipe lê e exporta, mas não grava", async () => {
+      await definirSituacao("clinA", bloqueada);
+      await assertSucceeds(getDoc(doc(psiA(), "clinica_prontuarios/prontA")));
+      await assertSucceeds(getDoc(doc(secA(), "clinica_pacientes/pacA1")));
+      await assertSucceeds(getDocs(query(collection(psiA(), "clinica_prontuarios"), where("psi_id", "==", "clinA"))));
+      await assertFails(updateDoc(doc(psiA(), "clinica_prontuarios/prontA"), { textoBruto: "x" }));
+      await assertFails(addDoc(collection(psiA(), "clinica_prontuarios"), { psi_id: "clinA", pacienteId: "pacA1" }));
+      await assertFails(updateDoc(doc(secA(), "clinica_sessoes/sessA1"), { valor: 10 }));
+      await assertFails(addDoc(collection(secA(), "clinica_lancamentos"), { psi_id: "clinA", valor: 1 }));
+      await assertFails(deleteDoc(doc(psiA(), "clinica_crises/criseA")));
+    });
+  }
+  test("a situação de uma clínica não afeta a outra", async () => {
+    await definirSituacao("clinA", "suspensa");
+    await assertSucceeds(updateDoc(doc(psiB(), "clinica_prontuarios/prontB"), { textoBruto: "livre" }));
+  });
+  test("pedidos de interesse: o público envia, só a administradora lê e responde", async () => {
+    await assertSucceeds(addDoc(collection(semLogin(), "psi_interesse"), { nome: "Ana", email: "a@x.com" }));
+    await assertFails(getDoc(doc(semLogin(), "psi_interesse/int1")));
+    await assertFails(getDoc(doc(psiA(), "psi_interesse/int1")));
+    await assertSucceeds(updateDoc(doc(matriz(), "psi_interesse/int1"), { status: "aprovado" }));
   });
 });

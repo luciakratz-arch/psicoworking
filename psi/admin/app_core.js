@@ -40,6 +40,52 @@ const chamarDefinirCarimboEquipe = functions.httpsCallable("definirCarimboEquipe
 // Publicada em southamerica-east1 (as demais ficam na região padrão).
 const chamarEnviarAcessoPaciente = appAdmin.functions("southamerica-east1").httpsCallable("enviarAcessoPaciente");
 
+// ─── Assinatura da clínica (plano e situação) ──────────────────
+// Só leitura aqui: quem grava é a administradora da plataforma. Serve para os
+// avisos de teste/plano e para mostrar o que a IA permite. O bloqueio de verdade
+// (somente leitura, cota de IA) é feito pelo banco de dados e pelas Cloud Functions.
+function usarAssinatura(psiId) {
+  const [assinatura, setAssinatura] = useState(undefined);
+  useEffect(() => {
+    if (!psiId) return;
+    return db.collection("psi_assinaturas").doc(psiId).onSnapshot(
+      (s) => setAssinatura(s.exists ? s.data() : null),
+      () => setAssinatura(null)
+    );
+  }, [psiId]);
+  return assinatura;
+}
+
+const LINK_PLANO_PLUS = "mailto:contato@luciakratz.com.br?subject=" + encodeURIComponent("Quero o plano Plus do PsiCoWorking");
+
+// Aviso curto junto aos botões de IA: quanto ainda pode usar e onde fica o Plus.
+function AvisoPlanoIA({ usuario }) {
+  const a = usarAssinatura(usuario && usuario.psiId);
+  if (!a) return null;
+  let texto = "";
+  let mostrarLink = false;
+  if (a.situacao === "teste") {
+    const limite = a.iaTestesLimite !== undefined ? a.iaTestesLimite : 5;
+    const restam = Math.max(limite - (a.iaTestesUsados || 0), 0);
+    texto = "Teste de IA: restam " + restam + " de " + limite + " usos. Uso contínuo da IA faz parte do plano Plus.";
+    mostrarLink = true;
+  } else if (a.plano !== "plus") {
+    texto = "A IA está disponível no plano Plus.";
+    mostrarLink = true;
+  } else {
+    const mes = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7);
+    const usos = a.iaMes === mes ? (a.iaUsosMes || 0) : 0;
+    if (a.iaCotaMes === null || a.iaCotaMes === undefined) return null;
+    texto = "IA neste mês: " + usos + " de " + a.iaCotaMes + " usos.";
+  }
+  return (
+    <p style={{ fontSize: 12, color: "var(--texto-suave)", margin: "6px 0" }}>
+      {texto}{" "}
+      {mostrarLink && <a href={LINK_PLANO_PLUS} style={{ color: "var(--cor-marca)", fontWeight: 600 }}>Conhecer o Plus</a>}
+    </p>
+  );
+}
+
 // ─── Contato do paciente ─────────────────────────────────────────
 // Nem todo paciente tem e-mail ou telefone próprios: criança, ou quem
 // divide o e-mail com a mãe. O e-mail do cadastro pode ser um endereço

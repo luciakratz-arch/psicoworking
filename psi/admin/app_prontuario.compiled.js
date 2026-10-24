@@ -2281,6 +2281,8 @@ function PainelPerfilClinico({
     onChange: e => setDitado(e.target.value),
     rows: 3,
     placeholder: "Ex.: tem transtorno de ansiedade generalizada, F41.1, hipertens\xE3o, usa sertralina 50 mg de manh\xE3"
+  }), /*#__PURE__*/React.createElement(AvisoPlanoIA, {
+    usuario: usuario
   }), /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
     style: {
@@ -2771,6 +2773,7 @@ function escHtmlRel(s) {
 // terceiros se solicitado. A IA escreve o texto, a psicóloga revisa e só então
 // o PDF é gerado. CID, medicações e crises só entram se ela marcar.
 function ModalRelatorioResumido({
+  usuario,
   paciente,
   cfg,
   perfil,
@@ -2941,7 +2944,9 @@ function ModalRelatorioResumido({
     },
     checked: incluirCrises,
     onChange: e => setIncluirCrises(e.target.checked)
-  }), " Quantidade de crises no per\xEDodo"), /*#__PURE__*/React.createElement("div", {
+  }), " Quantidade de crises no per\xEDodo"), /*#__PURE__*/React.createElement(AvisoPlanoIA, {
+    usuario: usuario
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10,
@@ -3204,6 +3209,8 @@ function ModalAnotacaoTCC({
     onChange: e => setTextoBruto(e.target.value),
     rows: 6,
     placeholder: "Descreva o que aconteceu na sess\xE3o, os temas discutidos, t\xE9cnicas usadas, tarefas combinadas..."
+  }), /*#__PURE__*/React.createElement(AvisoPlanoIA, {
+    usuario: usuario
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -3793,6 +3800,7 @@ function AbaSessoesTCC({
       tamanho: 13
     }), " Ver / Editar"));
   })))), resumoAberto && /*#__PURE__*/React.createElement(ModalRelatorioResumido, {
+    usuario: usuario,
     paciente: paciente,
     cfg: cfg,
     perfil: perfil,

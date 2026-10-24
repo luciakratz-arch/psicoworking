@@ -46,11 +46,44 @@ function usarConfiguracaoClinica(psiId) {
   return config;
 }
 
+// Faixa no topo conforme a situação da assinatura (teste, somente leitura, etc.).
+function FaixaAssinatura({ assinatura }) {
+  if (!assinatura) return null;
+  const dataBr = (ts) => (ts && ts.toDate ? ts.toDate().toLocaleDateString("pt-BR") : "");
+  let texto = "";
+  let cor = "#F5F0FF";
+  let borda = "#D9C7F5";
+  let link = false;
+  if (assinatura.situacao === "teste") {
+    const dias = assinatura.testeAte && assinatura.testeAte.toDate ? Math.max(Math.ceil((assinatura.testeAte.toDate().getTime() - Date.now()) / 86400000), 0) : null;
+    texto = "Período de teste" + (dias !== null ? ": restam " + dias + " dia(s)" : "") + ". Ao terminar, a clínica fica 15 dias só para consulta e exportação de dados.";
+    link = true;
+  } else if (assinatura.situacao === "atrasada") {
+    texto = "Há um pagamento em atraso. Regularize para evitar a limitação do acesso.";
+    cor = "#FEF3C7"; borda = "#F59E0B";
+  } else if (assinatura.situacao === "somente_leitura") {
+    texto = "Seu teste terminou. Você pode consultar e exportar seus dados até " + dataBr(assinatura.leituraAte) + ", mas não pode gravar novas informações. Assine para continuar.";
+    cor = "#FEF3C7"; borda = "#F59E0B"; link = true;
+  } else if (assinatura.situacao === "suspensa" || assinatura.situacao === "cancelada") {
+    texto = "Sua assinatura está " + (assinatura.situacao === "suspensa" ? "suspensa" : "cancelada") + ". Você pode consultar e exportar seus dados, mas não gravar novas informações. Fale conosco para reativar.";
+    cor = "#FEE2E2"; borda = "#DC2626"; link = true;
+  } else {
+    return null;
+  }
+  return (
+    <div style={{ background: cor, border: "1px solid " + borda, borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#1F1B2E" }}>
+      {texto}{" "}
+      {link && <a href={LINK_PLANO_PLUS} style={{ color: "var(--cor-marca)", fontWeight: 700 }}>Falar sobre o plano</a>}
+    </div>
+  );
+}
+
 function App() {
   const { usuario, carregando } = useUsuarioLogado();
   const [telaAtiva, setTelaAtiva] = useState("dashboard");
   const statusConexaoGoogle = usarConexaoGoogleAgenda(usuario);
   const configClinica = usarConfiguracaoClinica(usuario && usuario.psiId);
+  const assinatura = usarAssinatura(usuario && usuario.psiId);
   const configPreLogin = usarConfiguracaoPreLogin(!usuario ? pegarPsiIdConhecido() : null);
 
   useEffect(() => {
@@ -112,6 +145,7 @@ function App() {
         />
       )}
       <main className="area-principal">
+        {!embutido && <FaixaAssinatura assinatura={assinatura} />}
         {statusConexaoGoogle && statusConexaoGoogle.startsWith("erro") && (
           <p className="mensagem-erro">
             Não foi possível conectar o Google Agenda: {statusConexaoGoogle}

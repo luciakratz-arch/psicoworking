@@ -78,6 +78,13 @@ const estilos = `
   .msg-erro { background: #FEE2E2; color: #991B1B; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
   .link-copia { background: #F3F4F6; border: 1px solid #D1D5DB; border-radius: 8px; padding: 10px 14px;
     font-size: 12px; word-break: break-all; margin-top: 10px; color: #374151; }
+  .badge-teste { background: #EADDFC; color: #3B0D6F; }
+  .badge-aviso { background: #FEF3C7; color: #92400E; }
+  .badge-neutro { background: #F3F4F6; color: #374151; }
+  .campo-busca { padding: 9px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 13px; font-family: inherit; background: white; flex: 1; min-width: 200px; }
+  .grade-detalhe { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+  .subtitulo-painel { font-size: 13px; font-weight: 700; color: #3B0D6F; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .form-grupo select { width: 100%; padding: 9px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; font-family: inherit; background: white; }
   .tela-login { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #3B0D6F; }
   .card-login { background: white; border-radius: 20px; padding: 40px; width: 100%; max-width: 380px; }
   .card-login h1 { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 4px; }
@@ -143,45 +150,214 @@ function TelaLogin({ aoLogar }) {
   );
 }
 
-// ── Dashboard ────────────────────────────────────────────────
-function PaginaDashboard() {
-  const [stats, setStats] = useState({ total: 0, ativas: 0, inativas: 0, recursos: 0 });
-  const [carregando, setCarregando] = useState(true);
+// ── Planos, assinaturas e dados compartilhados entre as telas ──────
+const PLANOS_BASE = {
+  testeDias: 30,
+  testeIaUsos: 5,
+  somenteLeituraDias: 15,
+  essencial: { nome: "Essencial", precoMensal: 39.9, precoAnual: 399 },
+  plus: { nome: "Plus", precoMensal: 69.9, precoAnual: 699, cotaIaMes: 200 },
+};
+
+const SITUACOES = [
+  { id: "teste", rotulo: "Em teste" },
+  { id: "ativa", rotulo: "Ativa" },
+  { id: "atrasada", rotulo: "Atrasada" },
+  { id: "somente_leitura", rotulo: "Somente leitura" },
+  { id: "suspensa", rotulo: "Suspensa" },
+  { id: "cancelada", rotulo: "Cancelada" },
+];
+
+function moeda(v) {
+  return "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function paraData(ts) {
+  if (!ts) return null;
+  if (ts.toDate) return ts.toDate();
+  return new Date(ts);
+}
+
+function dataBr(ts) {
+  const d = paraData(ts);
+  return d ? d.toLocaleDateString("pt-BR") : "—";
+}
+
+function diasAte(ts) {
+  const d = paraData(ts);
+  return d ? Math.ceil((d.getTime() - Date.now()) / 86400000) : null;
+}
+
+function usarPlanos() {
+  const [planos, setPlanos] = useState(PLANOS_BASE);
+  useEffect(() => {
+    return db.collection("plataforma_config").doc("planos").onSnapshot(
+      (s) => {
+        const c = s.exists ? s.data() : {};
+        setPlanos({
+          ...PLANOS_BASE,
+          ...c,
+          essencial: { ...PLANOS_BASE.essencial, ...(c.essencial || {}) },
+          plus: { ...PLANOS_BASE.plus, ...(c.plus || {}) },
+        });
+      },
+      () => {}
+    );
+  }, []);
+  return planos;
+}
+
+// Junta o que existe de cada clínica: assinatura (plano e situação), configuração
+// (nome) e perfil (e-mail, CRP, cidade, ativo). Ao abrir, prepara as clínicas antigas.
+function usarClinicas() {
+  const [assin, setAssin] = useState({});
+  const [conf, setConf] = useState({});
+  const [perf, setPerf] = useState({});
+  const [pronto, setPronto] = useState(false);
+  const tentouPreparar = useRef(false);
 
   useEffect(() => {
-    Promise.all([
-      db.collection("psi_profiles").get(),
-      db.collection("recursos_terapeuticos").get(),
-    ]).then(([profis, recursos]) => {
-      const total = profis.size;
-      const ativas = profis.docs.filter((d) => d.data().ativo !== false).length;
-      setStats({ total, ativas, inativas: total - ativas, recursos: recursos.size });
-      setCarregando(false);
-    });
+    const mapa = (setter, marcar) => (snap) => {
+      const m = {};
+      snap.docs.forEach((d) => { m[d.id] = d.data(); });
+      setter(m);
+      if (marcar) setPronto(true);
+    };
+    const u1 = db.collection("psi_assinaturas").onSnapshot(mapa(setAssin, true), () => setPronto(true));
+    const u2 = db.collection("psi_config").onSnapshot(mapa(setConf), () => {});
+    const u3 = db.collection("psi_profiles").onSnapshot(mapa(setPerf), () => {});
+    return () => { u1(); u2(); u3(); };
   }, []);
 
-  if (carregando) return <p style={{ color: "#6B7280" }}>Carregando...</p>;
+  useEffect(() => {
+    if (!pronto || tentouPreparar.current) return;
+    const faltando = Object.keys(conf).some((id) => !assin[id]);
+    if (!faltando) return;
+    tentouPreparar.current = true;
+    functions.httpsCallable("garantirAssinaturas")().catch(() => {});
+  }, [pronto, conf, assin]);
+
+  const ids = [...new Set([...Object.keys(assin), ...Object.keys(conf), ...Object.keys(perf)])];
+  const lista = ids
+    .map((id) => ({
+      id,
+      nome: (perf[id] && perf[id].nome) || (conf[id] && conf[id].nome) || id,
+      email: (perf[id] && perf[id].email) || "",
+      crp: (perf[id] && perf[id].crp) || "",
+      cidade: (perf[id] && perf[id].cidade) || "",
+      ativo: perf[id] ? perf[id].ativo !== false : true,
+      assinatura: assin[id] || null,
+    }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  return { lista, pronto };
+}
+
+function usarUsoClinicas(quantas) {
+  const [uso, setUso] = useState({});
+  useEffect(() => {
+    if (!quantas) return;
+    functions.httpsCallable("usoDasClinicas")()
+      .then((r) => setUso(r.data.uso || {}))
+      .catch(() => {});
+  }, [quantas]);
+  return uso;
+}
+
+function rotuloPlano(a, planos) {
+  if (!a) return "—";
+  if (a.origem === "fundadora") return "Fundadora (Plus)";
+  return a.plano === "plus" ? planos.plus.nome : planos.essencial.nome;
+}
+
+function EtiquetaSituacao({ a }) {
+  if (!a) return <span className="badge badge-neutro">Sem assinatura</span>;
+  const dias = diasAte(a.testeAte);
+  if (a.situacao === "teste") {
+    return <span className="badge badge-teste">{"Teste até " + dataBr(a.testeAte) + (dias !== null ? " (" + Math.max(dias, 0) + "d)" : "")}</span>;
+  }
+  if (a.situacao === "ativa") return <span className="badge badge-ativo">Ativa</span>;
+  if (a.situacao === "atrasada") return <span className="badge badge-aviso">Atrasada</span>;
+  if (a.situacao === "somente_leitura") return <span className="badge badge-aviso">{"Somente leitura até " + dataBr(a.leituraAte)}</span>;
+  if (a.situacao === "suspensa") return <span className="badge badge-inativo">Suspensa</span>;
+  return <span className="badge badge-neutro">Cancelada</span>;
+}
+
+function textoIA(a, planos) {
+  if (!a) return "—";
+  if (a.situacao === "teste") return (a.iaTestesUsados || 0) + " de " + (a.iaTestesLimite !== undefined ? a.iaTestesLimite : planos.testeIaUsos) + " testes";
+  if (a.plano !== "plus") return "sem IA";
+  const mes = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7);
+  const usos = a.iaMes === mes ? (a.iaUsosMes || 0) : 0;
+  const cota = a.iaCotaMes !== undefined ? a.iaCotaMes : planos.plus.cotaIaMes;
+  return usos + (cota === null || cota === undefined ? " (sem limite)" : " de " + cota);
+}
+
+// ── Painel ───────────────────────────────────────────────────
+function PaginaDashboard({ irPara }) {
+  const planos = usarPlanos();
+  const { lista, pronto } = usarClinicas();
+  const [interesses, setInteresses] = useState([]);
+
+  useEffect(() => {
+    return db.collection("psi_interesse").onSnapshot((snap) => setInteresses(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => {});
+  }, []);
+
+  if (!pronto) return <p style={{ color: "#6B7280" }}>Carregando...</p>;
+
+  const comAssin = lista.filter((c) => c.assinatura);
+  const ativas = comAssin.filter((c) => c.assinatura.situacao === "ativa" || c.assinatura.situacao === "atrasada").length;
+  const emTeste = comAssin.filter((c) => c.assinatura.situacao === "teste").length;
+  const emAtraso = comAssin.filter((c) => c.assinatura.situacao === "atrasada").length;
+  const pendentes = interesses.filter((i) => !i.status || i.status === "pendente").length;
+
+  // Receita mensal estimada: só quem paga (fundadoras e testes não entram).
+  let receita = 0;
+  comAssin.forEach((c) => {
+    const a = c.assinatura;
+    if (a.origem === "fundadora" || (a.situacao !== "ativa" && a.situacao !== "atrasada")) return;
+    const p = a.plano === "plus" ? planos.plus : planos.essencial;
+    receita += a.ciclo === "anual" ? Number(p.precoAnual || 0) / 12 : Number(p.precoMensal || 0);
+  });
+
+  const mes = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7);
+  let usosIA = 0;
+  comAssin.forEach((c) => {
+    const a = c.assinatura;
+    if (a.iaMes === mes) usosIA += a.iaUsosMes || 0;
+  });
+  const recentes = [...comAssin]
+    .filter((c) => c.assinatura.criadoEm)
+    .sort((x, y) => paraData(y.assinatura.criadoEm) - paraData(x.assinatura.criadoEm))
+    .slice(0, 5);
 
   return (
     <div>
-      <div className="pagina-titulo">Dashboard</div>
+      <div className="pagina-titulo">Painel</div>
       <div className="cartoes-stats">
-        <div className="cartao-stat">
-          <div className="valor" style={{ color: "#6A2BD9" }}>{stats.total}</div>
-          <div className="label">Clínicas cadastradas</div>
-        </div>
-        <div className="cartao-stat">
-          <div className="valor" style={{ color: "#059669" }}>{stats.ativas}</div>
-          <div className="label">Clínicas ativas</div>
-        </div>
-        <div className="cartao-stat">
-          <div className="valor" style={{ color: "#DC2626" }}>{stats.inativas}</div>
-          <div className="label">Clínicas inativas</div>
-        </div>
-        <div className="cartao-stat">
-          <div className="valor" style={{ color: "#D97706" }}>{stats.recursos}</div>
-          <div className="label">Recursos no catálogo</div>
-        </div>
+        <div className="cartao-stat"><div className="valor" style={{ color: "#059669" }}>{ativas}</div><div className="label">Clínicas ativas</div></div>
+        <div className="cartao-stat"><div className="valor" style={{ color: "#6A2BD9" }}>{emTeste}</div><div className="label">Em teste</div></div>
+        <div className="cartao-stat" style={{ cursor: "pointer" }} onClick={() => irPara("aprovacoes")}><div className="valor" style={{ color: "#D97706" }}>{pendentes}</div><div className="label">Aguardando aprovação</div></div>
+        <div className="cartao-stat"><div className="valor" style={{ color: "#DC2626" }}>{emAtraso}</div><div className="label">Em atraso</div></div>
+      </div>
+      <div className="cartoes-stats">
+        <div className="cartao-stat"><div className="valor">{moeda(receita)}</div><div className="label">Receita mensal estimada</div></div>
+        <div className="cartao-stat"><div className="valor">{usosIA}</div><div className="label">Usos de IA neste mês (custo estimado {moeda(usosIA * 0.02)})</div></div>
+      </div>
+      <div className="pagina-titulo" style={{ fontSize: 15 }}>Últimas entradas</div>
+      <div className="tabela">
+        <table>
+          <tbody>
+            {recentes.length === 0 && <tr><td style={{ color: "#9CA3AF", textAlign: "center", padding: 24 }}>Nenhuma clínica ainda.</td></tr>}
+            {recentes.map((c) => (
+              <tr key={c.id}>
+                <td style={{ fontWeight: 600 }}>{c.nome}</td>
+                <td>{rotuloPlano(c.assinatura, planos)}</td>
+                <td><EtiquetaSituacao a={c.assinatura} /></td>
+                <td>{dataBr(c.assinatura.criadoEm)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -201,73 +377,55 @@ function PaginaCatalogo() {
   );
 }
 
-// ── Lista de Clínicas ────────────────────────────────────────
+// ── Lista e detalhe das clínicas ─────────────────────────────
 function PaginaClinicas() {
-  const [clinicas, setClinicas] = useState([]);
-  const [carregando, setCarregando] = useState(true);
-  const [processando, setProcessando] = useState(null);
+  const planos = usarPlanos();
+  const { lista, pronto } = usarClinicas();
+  const uso = usarUsoClinicas(lista.length);
+  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState("todas");
+  const [aberta, setAberta] = useState(null);
 
-  useEffect(() => {
-    db.collection("psi_profiles").orderBy("nome").onSnapshot((snap) => {
-      setClinicas(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      setCarregando(false);
-    });
-  }, []);
+  if (!pronto) return <p style={{ color: "#6B7280" }}>Carregando...</p>;
 
-  async function alternarStatus(c) {
-    setProcessando(c.id);
-    try {
-      const fn = functions.httpsCallable("ativarDesativarClinica");
-      await fn({ psiId: c.id, ativo: !c.ativo });
-    } catch (err) {
-      alert("Erro: " + err.message);
-    } finally {
-      setProcessando(null);
-    }
-  }
+  const atual = aberta ? lista.find((c) => c.id === aberta) : null;
+  if (atual) return <DetalheClinica clinica={atual} planos={planos} uso={uso[atual.id]} aoVoltar={() => setAberta(null)} />;
 
-  if (carregando) return <p style={{ color: "#6B7280" }}>Carregando...</p>;
+  const filtradas = lista.filter((c) => {
+    const texto = (c.nome + " " + c.email + " " + c.crp).toLowerCase();
+    if (busca && !texto.includes(busca.toLowerCase())) return false;
+    if (filtro !== "todas" && (!c.assinatura || c.assinatura.situacao !== filtro)) return false;
+    return true;
+  });
 
   return (
     <div>
-      <div className="pagina-titulo">Clínicas Cadastradas</div>
+      <div className="pagina-titulo">Clínicas</div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <input className="campo-busca" placeholder="Buscar por nome, e-mail ou CRP" value={busca} onChange={(e) => setBusca(e.target.value)} />
+        <select className="campo-busca" style={{ maxWidth: 200 }} value={filtro} onChange={(e) => setFiltro(e.target.value)}>
+          <option value="todas">Todas as situações</option>
+          {SITUACOES.map((s) => <option key={s.id} value={s.id}>{s.rotulo}</option>)}
+        </select>
+      </div>
       <div className="tabela">
         <table>
           <thead>
-            <tr>
-              <th>Nome</th>
-              <th>E-mail</th>
-              <th>CRP</th>
-              <th>Cidade</th>
-              <th>Status</th>
-              <th>Acao</th>
-            </tr>
+            <tr><th>Clínica</th><th>Plano</th><th>Situação</th><th>Pacientes</th><th>IA</th><th></th></tr>
           </thead>
           <tbody>
-            {clinicas.length === 0 && (
-              <tr><td colSpan={6} style={{ color: "#9CA3AF", textAlign: "center", padding: 24 }}>Nenhuma clínica cadastrada ainda.</td></tr>
-            )}
-            {clinicas.map((c) => (
+            {filtradas.length === 0 && <tr><td colSpan={6} style={{ color: "#9CA3AF", textAlign: "center", padding: 24 }}>Nenhuma clínica encontrada.</td></tr>}
+            {filtradas.map((c) => (
               <tr key={c.id}>
-                <td style={{ fontWeight: 600 }}>{c.nome}</td>
-                <td>{c.email}</td>
-                <td>{c.crp || "—"}</td>
-                <td>{c.cidade || "—"}</td>
                 <td>
-                  <span className={"badge " + (c.ativo !== false ? "badge-ativo" : "badge-inativo")}>
-                    {c.ativo !== false ? "Ativa" : "Inativa"}
-                  </span>
+                  <div style={{ fontWeight: 600 }}>{c.nome}{c.ativo === false ? " (login bloqueado)" : ""}</div>
+                  <div style={{ fontSize: 11, color: "#6B7280" }}>{c.email}</div>
                 </td>
-                <td>
-                  <button
-                    className={"btn " + (c.ativo !== false ? "btn-perigo" : "btn-sucesso")}
-                    style={{ padding: "5px 12px", fontSize: 12 }}
-                    onClick={() => alternarStatus(c)}
-                    disabled={processando === c.id}
-                  >
-                    {processando === c.id ? "..." : (c.ativo !== false ? "Desativar" : "Ativar")}
-                  </button>
-                </td>
+                <td>{rotuloPlano(c.assinatura, planos)}</td>
+                <td><EtiquetaSituacao a={c.assinatura} /></td>
+                <td>{uso[c.id] ? uso[c.id].ativos + " ativos / " + uso[c.id].pacientes : "—"}</td>
+                <td>{textoIA(c.assinatura, planos)}</td>
+                <td><button className="btn btn-ghost" style={{ padding: "5px 12px", fontSize: 12 }} onClick={() => setAberta(c.id)}>Abrir</button></td>
               </tr>
             ))}
           </tbody>
@@ -277,9 +435,315 @@ function PaginaClinicas() {
   );
 }
 
+function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
+  const a = clinica.assinatura;
+  const ref = db.collection("psi_assinaturas").doc(clinica.id);
+  const [plano, setPlano] = useState((a && a.plano) || "essencial");
+  const [ciclo, setCiclo] = useState((a && a.ciclo) || "mensal");
+  const [situacao, setSituacao] = useState((a && a.situacao) || "teste");
+  const [diasExtra, setDiasExtra] = useState(15);
+  const [valorPg, setValorPg] = useState("");
+  const [formaPg, setFormaPg] = useState("Pix");
+  const [msg, setMsg] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const FV = firebase.firestore.FieldValue;
+  const TS = firebase.firestore.Timestamp;
+
+  async function executar(fn, ok) {
+    setOcupado(true);
+    setMsg("");
+    try { await fn(); setMsg(ok); } catch (e) { setMsg("Erro: " + e.message); } finally { setOcupado(false); }
+  }
+
+  function salvarPlano() {
+    return executar(() => ref.set({
+      plano, ciclo,
+      iaCotaMes: plano === "plus" ? (planos.plus.cotaIaMes === undefined ? null : planos.plus.cotaIaMes) : FV.delete(),
+    }, { merge: true }), "Plano atualizado.");
+  }
+
+  function salvarSituacao() {
+    const extra = {};
+    if (situacao === "somente_leitura") extra.leituraAte = TS.fromMillis(Date.now() + planos.somenteLeituraDias * 86400000);
+    return executar(() => ref.set({ situacao, ...extra }, { merge: true }), "Situação atualizada.");
+  }
+
+  function estenderTeste() {
+    const base = Math.max(Date.now(), paraData(a && a.testeAte) ? paraData(a.testeAte).getTime() : 0);
+    return executar(() => ref.set({
+      situacao: "teste",
+      testeAte: TS.fromMillis(base + Number(diasExtra) * 86400000),
+      leituraAte: FV.delete(),
+    }, { merge: true }), "Teste estendido em " + diasExtra + " dias.");
+  }
+
+  function maisIA() {
+    const limite = a && a.iaTestesLimite !== undefined ? a.iaTestesLimite : planos.testeIaUsos;
+    return executar(() => ref.set({ iaTestesLimite: limite + 5 }, { merge: true }), "Liberados mais 5 usos de IA no teste.");
+  }
+
+  function registrarPagamento() {
+    const p = plano === "plus" ? planos.plus : planos.essencial;
+    const padrao = ciclo === "anual" ? p.precoAnual : p.precoMensal;
+    const valor = Number(String(valorPg).replace(",", ".")) || Number(padrao);
+    const atualVenc = paraData(a && a.proximoVencimento);
+    const inicio = atualVenc && atualVenc.getTime() > Date.now() ? atualVenc : new Date();
+    const novo = new Date(inicio.getTime());
+    novo.setMonth(novo.getMonth() + (ciclo === "anual" ? 12 : 1));
+    return executar(() => ref.set({
+      plano, ciclo,
+      situacao: "ativa",
+      proximoVencimento: TS.fromDate(novo),
+      iaCotaMes: plano === "plus" ? (planos.plus.cotaIaMes === undefined ? null : planos.plus.cotaIaMes) : FV.delete(),
+      pagamentos: FV.arrayUnion({ em: TS.now(), valor, forma: formaPg, ciclo, ate: TS.fromDate(novo) }),
+    }, { merge: true }), "Pagamento registrado. Próximo vencimento: " + novo.toLocaleDateString("pt-BR") + ".");
+  }
+
+  async function alternarLogin() {
+    if (!confirm((clinica.ativo ? "Bloquear" : "Liberar") + " o login desta clínica?")) return;
+    await executar(() => functions.httpsCallable("ativarDesativarClinica")({ psiId: clinica.id, ativo: !clinica.ativo }), clinica.ativo ? "Login bloqueado." : "Login liberado.");
+  }
+
+  const pagamentos = [...((a && a.pagamentos) || [])].reverse();
+
+  return (
+    <div>
+      <button className="btn btn-ghost" style={{ marginBottom: 14 }} onClick={aoVoltar}><Icone nome="arrow-left" tamanho={14} /> Voltar</button>
+      <div className="pagina-titulo" style={{ marginBottom: 6 }}>{clinica.nome}</div>
+      <p style={{ color: "#6B7280", fontSize: 13, marginBottom: 20 }}>
+        {[clinica.email, clinica.crp ? "CRP " + clinica.crp : "", clinica.cidade].filter(Boolean).join(" · ")}
+      </p>
+
+      {!a && <div className="msg-erro">Esta clínica ainda não tem assinatura. Atualize a página; se continuar, me avise.</div>}
+
+      {a && (
+        <div className="grade-detalhe">
+          <div className="painel-form">
+            <div className="subtitulo-painel">Situação</div>
+            <div style={{ marginBottom: 12 }}><EtiquetaSituacao a={a} /> <span style={{ fontSize: 12, color: "#6B7280", marginLeft: 8 }}>{a.origem === "fundadora" ? "Fundadora, sem cobrança" : ""}</span></div>
+            <div style={{ fontSize: 13, lineHeight: 1.8, marginBottom: 10 }}>
+              <div>Pacientes: <strong>{uso ? uso.ativos + " ativos de " + uso.pacientes : "—"}</strong></div>
+              <div>IA: <strong>{textoIA(a, planos)}</strong></div>
+              {a.proximoVencimento && <div>Próximo vencimento: <strong>{dataBr(a.proximoVencimento)}</strong></div>}
+            </div>
+            <div className="form-grupo">
+              <label>Mudar situação para</label>
+              <select value={situacao} onChange={(e) => setSituacao(e.target.value)}>
+                {SITUACOES.map((s) => <option key={s.id} value={s.id}>{s.rotulo}</option>)}
+              </select>
+            </div>
+            <button className="btn btn-ghost" disabled={ocupado} onClick={salvarSituacao}>Salvar situação</button>
+          </div>
+
+          <div className="painel-form">
+            <div className="subtitulo-painel">Plano</div>
+            <div className="form-grupo">
+              <label>Plano</label>
+              <select value={plano} onChange={(e) => setPlano(e.target.value)}>
+                <option value="essencial">{planos.essencial.nome} ({moeda(planos.essencial.precoMensal)}/mês)</option>
+                <option value="plus">{planos.plus.nome} ({moeda(planos.plus.precoMensal)}/mês, com IA)</option>
+              </select>
+            </div>
+            <div className="form-grupo">
+              <label>Cobrança</label>
+              <select value={ciclo} onChange={(e) => setCiclo(e.target.value)}>
+                <option value="mensal">Mensal</option>
+                <option value="anual">Anual (com desconto)</option>
+              </select>
+            </div>
+            <button className="btn btn-ghost" disabled={ocupado} onClick={salvarPlano}>Salvar plano</button>
+          </div>
+
+          <div className="painel-form">
+            <div className="subtitulo-painel">Registrar pagamento</div>
+            <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 10 }}>Enquanto a cobrança automática não está ligada, marque aqui o que a psicóloga pagou. A clínica passa a Ativa e o vencimento avança 1 mês (ou 12, se anual).</p>
+            <div className="form-grupo">
+              <label>Valor recebido (deixe em branco para usar o preço do plano)</label>
+              <input value={valorPg} onChange={(e) => setValorPg(e.target.value)} placeholder="ex: 39,90" />
+            </div>
+            <div className="form-grupo">
+              <label>Forma</label>
+              <select value={formaPg} onChange={(e) => setFormaPg(e.target.value)}>
+                {["Pix", "Cartão de crédito", "Boleto", "Dinheiro", "Outra"].map((f) => <option key={f}>{f}</option>)}
+              </select>
+            </div>
+            <button className="btn btn-sucesso" disabled={ocupado} onClick={registrarPagamento}>Registrar pagamento</button>
+          </div>
+
+          <div className="painel-form">
+            <div className="subtitulo-painel">Teste e IA</div>
+            <div className="form-grupo">
+              <label>Estender o teste em (dias)</label>
+              <input type="number" min="1" value={diasExtra} onChange={(e) => setDiasExtra(e.target.value)} />
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btn-ghost" disabled={ocupado} onClick={estenderTeste}>Estender teste</button>
+              <button className="btn btn-ghost" disabled={ocupado} onClick={maisIA}>Liberar +5 usos de IA no teste</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {msg && <div className={msg.startsWith("Erro") ? "msg-erro" : "msg-ok"}>{msg}</div>}
+
+      {a && (
+        <div style={{ marginTop: 24 }}>
+          <div className="pagina-titulo" style={{ fontSize: 15 }}>Pagamentos registrados</div>
+          <div className="tabela">
+            <table>
+              <thead><tr><th>Data</th><th>Valor</th><th>Forma</th><th>Cobre até</th></tr></thead>
+              <tbody>
+                {pagamentos.length === 0 && <tr><td colSpan={4} style={{ color: "#9CA3AF", textAlign: "center", padding: 18 }}>Nenhum pagamento registrado.</td></tr>}
+                {pagamentos.map((p, i) => (
+                  <tr key={i}><td>{dataBr(p.em)}</td><td>{moeda(p.valor)}</td><td>{p.forma}</td><td>{dataBr(p.ate)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 24 }}>
+        <button className={"btn " + (clinica.ativo ? "btn-perigo" : "btn-sucesso")} disabled={ocupado} onClick={alternarLogin}>
+          {clinica.ativo ? "Bloquear login desta clínica" : "Liberar login desta clínica"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Aprovações de cadastro ───────────────────────────────────
+function PaginaAprovacoes({ irPara }) {
+  const [itens, setItens] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [verResolvidos, setVerResolvidos] = useState(false);
+
+  useEffect(() => {
+    return db.collection("psi_interesse").onSnapshot(
+      (snap) => { setItens(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); setCarregando(false); },
+      () => setCarregando(false)
+    );
+  }, []);
+
+  async function recusar(i) {
+    if (!confirm("Recusar o pedido de " + i.nome + "?")) return;
+    try {
+      await db.collection("psi_interesse").doc(i.id).update({ status: "recusado", resolvidoEm: firebase.firestore.FieldValue.serverTimestamp() });
+    } catch (e) { alert("Erro: " + e.message); }
+  }
+
+  if (carregando) return <p style={{ color: "#6B7280" }}>Carregando...</p>;
+
+  const pendentes = itens.filter((i) => !i.status || i.status === "pendente")
+    .sort((a, b) => ((b.criadoEm && b.criadoEm.seconds) || 0) - ((a.criadoEm && a.criadoEm.seconds) || 0));
+  const resolvidos = itens.filter((i) => i.status && i.status !== "pendente");
+
+  return (
+    <div>
+      <div className="pagina-titulo">Aprovações de cadastro</div>
+      <p style={{ color: "#4B5563", fontSize: 13, maxWidth: 620, lineHeight: 1.6, marginBottom: 18 }}>
+        Pedidos enviados pelo site. Antes de aprovar, confira o CRP no site do Conselho Federal de Psicologia (cadastro nacional de psicólogas). Ao aprovar, a conta é criada e ela entra em teste de 30 dias.
+      </p>
+      {pendentes.length === 0 && <p style={{ color: "#9CA3AF" }}>Nenhum pedido aguardando aprovação.</p>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {pendentes.map((i) => (
+          <div key={i.id} className="painel-form" style={{ maxWidth: 720, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontWeight: 700 }}>{i.nome}</div>
+              <div style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.7 }}>
+                {[i.email, i.telefone, i.cidade, i.crp ? "CRP " + i.crp : "", i.origem ? "origem: " + i.origem : "", i.criadoEm ? "em " + dataBr(i.criadoEm) : ""].filter(Boolean).join(" · ")}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <a className="btn btn-ghost" style={{ textDecoration: "none" }} href="https://cadastro.cfp.org.br/" target="_blank" rel="noopener">Conferir CRP</a>
+              <button className="btn btn-ghost" onClick={() => recusar(i)}>Recusar</button>
+              <button className="btn btn-primario" onClick={() => irPara("nova", { nome: i.nome, email: i.email, cidade: i.cidade || "", crp: i.crp || "", interesseId: i.id })}>Aprovar e cadastrar</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {resolvidos.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <button className="btn btn-ghost" onClick={() => setVerResolvidos(!verResolvidos)}>{verResolvidos ? "Esconder" : "Ver"} pedidos já resolvidos ({resolvidos.length})</button>
+          {verResolvidos && (
+            <div className="tabela" style={{ marginTop: 12 }}>
+              <table>
+                <tbody>
+                  {resolvidos.map((i) => (
+                    <tr key={i.id}><td style={{ fontWeight: 600 }}>{i.nome}</td><td>{i.email}</td><td><span className={"badge " + (i.status === "aprovado" ? "badge-ativo" : "badge-inativo")}>{i.status}</span></td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Planos e preços ──────────────────────────────────────────
+function PaginaPlanos() {
+  const planos = usarPlanos();
+  const [f, setF] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (f === null) {
+      setF({
+        essMensal: planos.essencial.precoMensal, essAnual: planos.essencial.precoAnual,
+        plusMensal: planos.plus.precoMensal, plusAnual: planos.plus.precoAnual, plusCota: planos.plus.cotaIaMes,
+        testeDias: planos.testeDias, testeIaUsos: planos.testeIaUsos, leituraDias: planos.somenteLeituraDias,
+      });
+    }
+  }, [planos]);
+
+  if (!f) return null;
+  const campo = (k) => ({ value: f[k], onChange: (e) => setF({ ...f, [k]: e.target.value }) });
+  const num = (v) => Number(String(v).replace(",", "."));
+
+  async function salvar() {
+    setSalvando(true);
+    setMsg("");
+    try {
+      await db.collection("plataforma_config").doc("planos").set({
+        testeDias: num(f.testeDias), testeIaUsos: num(f.testeIaUsos), somenteLeituraDias: num(f.leituraDias),
+        essencial: { nome: "Essencial", precoMensal: num(f.essMensal), precoAnual: num(f.essAnual) },
+        plus: { nome: "Plus", precoMensal: num(f.plusMensal), precoAnual: num(f.plusAnual), cotaIaMes: num(f.plusCota) },
+      }, { merge: true });
+      setMsg("Planos salvos. Valem para novos cadastros e para as próximas mudanças de plano; quem já assina mantém o que foi gravado.");
+    } catch (e) { setMsg("Erro: " + e.message); } finally { setSalvando(false); }
+  }
+
+  return (
+    <div>
+      <div className="pagina-titulo">Planos e preços</div>
+      <div className="painel-form" style={{ maxWidth: 560 }}>
+        <div className="subtitulo-painel">Essencial (sem IA)</div>
+        <div className="form-grupo"><label>Mensal (R$)</label><input {...campo("essMensal")} /></div>
+        <div className="form-grupo"><label>Anual (R$)</label><input {...campo("essAnual")} /></div>
+        <div className="subtitulo-painel" style={{ marginTop: 18 }}>Plus (com IA)</div>
+        <div className="form-grupo"><label>Mensal (R$)</label><input {...campo("plusMensal")} /></div>
+        <div className="form-grupo"><label>Anual (R$)</label><input {...campo("plusAnual")} /></div>
+        <div className="form-grupo"><label>Usos de IA por mês</label><input {...campo("plusCota")} /></div>
+        <div className="subtitulo-painel" style={{ marginTop: 18 }}>Teste</div>
+        <div className="form-grupo"><label>Dias de teste</label><input {...campo("testeDias")} /></div>
+        <div className="form-grupo"><label>Usos de IA durante o teste</label><input {...campo("testeIaUsos")} /></div>
+        <div className="form-grupo"><label>Dias em somente leitura depois do teste</label><input {...campo("leituraDias")} /></div>
+        <button className="btn btn-primario" onClick={salvar} disabled={salvando}>{salvando ? "Salvando..." : "Salvar planos"}</button>
+        {msg && <div className={msg.startsWith("Erro") ? "msg-erro" : "msg-ok"}>{msg}</div>}
+      </div>
+    </div>
+  );
+}
+
 // ── Nova Psicóloga ───────────────────────────────────────────
-function PaginaNovaPsicologa() {
-  const [form, setForm] = useState({ nome: "", email: "", crp: "", cidade: "", titulo: "Psicóloga" });
+function PaginaNovaPsicologa({ prefill }) {
+  const [form, setForm] = useState({
+    nome: (prefill && prefill.nome) || "", email: (prefill && prefill.email) || "",
+    crp: (prefill && prefill.crp) || "", cidade: (prefill && prefill.cidade) || "", titulo: "Psicóloga",
+  });
   const [salvando, setSalvando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [copiado, setCopiado] = useState(false);
@@ -294,7 +758,7 @@ function PaginaNovaPsicologa() {
     setSalvando(true);
     try {
       const fn = functions.httpsCallable("cadastrarPsicologa");
-      const { data } = await fn(form);
+      const { data } = await fn({ ...form, interesseId: (prefill && prefill.interesseId) || undefined });
       setResultado({ ok: true, link: data.linkDefinirSenha });
       setForm({ nome: "", email: "", crp: "", cidade: "", titulo: "Psicóloga" });
     } catch (err) {
@@ -364,6 +828,12 @@ function PaginaNovaPsicologa() {
 function App() {
   const [usuario, setUsuario] = useState(undefined);
   const [pagina, setPagina] = useState("dashboard");
+  const [dadosNova, setDadosNova] = useState(null);
+
+  function irPara(destino, dados) {
+    setDadosNova(destino === "nova" ? (dados || null) : null);
+    setPagina(destino);
+  }
 
   useEffect(() => {
     return auth.onAuthStateChanged(async (u) => {
@@ -382,16 +852,20 @@ function App() {
   if (!usuario) return <TelaLogin aoLogar={setUsuario} />;
 
   const NAV = [
-    { id: "dashboard", label: "Dashboard", icone: "layout-dashboard" },
+    { id: "dashboard", label: "Painel", icone: "layout-dashboard" },
     { id: "clinicas", label: "Clínicas", icone: "building-2" },
+    { id: "aprovacoes", label: "Aprovações", icone: "user-check" },
+    { id: "planos", label: "Planos", icone: "credit-card" },
     { id: "nova", label: "Nova Psicóloga", icone: "user-plus" },
     { id: "catalogo", label: "Fábulas e ferramentas", icone: "book-open" },
   ];
 
   const paginas = {
-    dashboard: <PaginaDashboard />,
+    dashboard: <PaginaDashboard irPara={irPara} />,
     clinicas: <PaginaClinicas />,
-    nova: <PaginaNovaPsicologa />,
+    aprovacoes: <PaginaAprovacoes irPara={irPara} />,
+    planos: <PaginaPlanos />,
+    nova: <PaginaNovaPsicologa key={(dadosNova && dadosNova.interesseId) || "novo"} prefill={dadosNova} />,
     catalogo: <PaginaCatalogo />,
   };
 
@@ -409,7 +883,7 @@ function App() {
               <button
                 key={item.id}
                 className={"nav-item" + (pagina === item.id ? " ativo" : "")}
-                onClick={() => setPagina(item.id)}
+                onClick={() => irPara(item.id)}
               >
                 <Icone nome={item.icone} tamanho={16} />
                 {item.label}
