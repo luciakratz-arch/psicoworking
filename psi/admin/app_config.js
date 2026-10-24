@@ -24,6 +24,7 @@ function TelaConfiguracoes({ usuario }) {
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [linkEquipeCopiado, setLinkEquipeCopiado] = useState(false);
   const [statusEmailTeste, setStatusEmailTeste] = useState("");
 
   async function enviarEmailTeste() {
@@ -109,6 +110,19 @@ function TelaConfiguracoes({ usuario }) {
     }
   }
 
+  // Link de entrada da equipe (psicóloga e secretária): abre o login já com a
+  // logo, o nome e a cor da clínica, em vez da tela genérica do PsiCoWorking.
+  function copiarLinkEquipe() {
+    const url = `${window.location.origin}/psi/admin/?psi=${usuario.psiId}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setLinkEquipeCopiado(true);
+        setTimeout(() => setLinkEquipeCopiado(false), 2500);
+      })
+      .catch(() => prompt("Copie o link:", url));
+  }
+
   function copiarLinkPortal() {
     const url = `${window.location.origin}/psi/paciente/?psi=${usuario.psiId}`;
     navigator.clipboard
@@ -191,6 +205,17 @@ function TelaConfiguracoes({ usuario }) {
         </p>
         <button type="button" className="botao-secundario" onClick={copiarLinkPortal}>
           <Icone nome="link" tamanho={15} /> {linkCopiado ? "Copiado!" : "Copiar Link do Portal"}
+        </button>
+      </div>
+
+      <div className="cartao-config" style={{ marginTop: 16 }}>
+        <label>Link de entrada da equipe</label>
+        <p className="dica-campo">
+          Envie esse link para você e para a sua secretária entrarem no painel. A tela de login já abre
+          com o nome, a logo e a cor da sua clínica.
+        </p>
+        <button type="button" className="botao-secundario" onClick={copiarLinkEquipe}>
+          <Icone nome="link" tamanho={15} /> {linkEquipeCopiado ? "Copiado!" : "Copiar Link da Equipe"}
         </button>
       </div>
 

@@ -37,7 +37,7 @@ function Icone({ nome, tamanho = 18, cor }) {
 // ── CSS inline ────────────────────────────────────────────────
 const estilos = `
   .layout { display: flex; min-height: 100vh; }
-  .sidebar { width: 220px; background: #1E1B4B; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar { width: 220px; background: #3B0D6F; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
   .sidebar-logo { padding: 24px 20px 16px; border-bottom: 1px solid rgba(255,255,255,.1); }
   .sidebar-logo h1 { font-size: 15px; font-weight: 700; color: white; }
   .sidebar-logo p { font-size: 11px; color: rgba(255,255,255,.5); margin-top: 2px; }
@@ -45,7 +45,7 @@ const estilos = `
   .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer;
     font-size: 13px; color: rgba(255,255,255,.7); transition: background .15s; border: none;
     background: none; width: 100%; text-align: left; }
-  .nav-item:hover, .nav-item.ativo { background: rgba(255,255,255,.1); color: white; }
+  .nav-item:hover, .nav-item.ativo { background: rgba(169,123,239,.28); color: white; }
   .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.1); }
   .conteudo { flex: 1; overflow-y: auto; padding: 32px; }
   .pagina-titulo { font-size: 20px; font-weight: 700; margin-bottom: 24px; }
@@ -65,20 +65,20 @@ const estilos = `
   .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px;
     font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity .15s; }
   .btn:hover { opacity: .85; }
-  .btn-primario { background: #4F46E5; color: white; }
+  .btn-primario { background: #6A2BD9; color: white; }
   .btn-perigo { background: #DC2626; color: white; }
   .btn-sucesso { background: #059669; color: white; }
   .btn-ghost { background: #F3F4F6; color: #374151; }
   .form-grupo { margin-bottom: 16px; }
   .form-grupo label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 6px; }
   .form-grupo input { width: 100%; padding: 9px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; font-family: inherit; }
-  .form-grupo input:focus { outline: none; border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79,70,229,.1); }
+  .form-grupo input:focus { outline: none; border-color: #6A2BD9; box-shadow: 0 0 0 3px rgba(106,43,217,.14); }
   .painel-form { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.06); max-width: 520px; }
   .msg-ok { background: #D1FAE5; color: #065F46; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
   .msg-erro { background: #FEE2E2; color: #991B1B; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-top: 12px; }
   .link-copia { background: #F3F4F6; border: 1px solid #D1D5DB; border-radius: 8px; padding: 10px 14px;
     font-size: 12px; word-break: break-all; margin-top: 10px; color: #374151; }
-  .tela-login { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #1E1B4B; }
+  .tela-login { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #3B0D6F; }
   .card-login { background: white; border-radius: 20px; padding: 40px; width: 100%; max-width: 380px; }
   .card-login h1 { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 4px; }
   .card-login p { font-size: 13px; color: #6B7280; text-align: center; margin-bottom: 28px; }
@@ -167,7 +167,7 @@ function PaginaDashboard() {
       <div className="pagina-titulo">Dashboard</div>
       <div className="cartoes-stats">
         <div className="cartao-stat">
-          <div className="valor" style={{ color: "#4F46E5" }}>{stats.total}</div>
+          <div className="valor" style={{ color: "#6A2BD9" }}>{stats.total}</div>
           <div className="label">Clínicas cadastradas</div>
         </div>
         <div className="cartao-stat">

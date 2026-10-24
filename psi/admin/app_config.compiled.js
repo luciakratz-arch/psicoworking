@@ -25,6 +25,7 @@ function TelaConfiguracoes({
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [linkEquipeCopiado, setLinkEquipeCopiado] = useState(false);
   const [statusEmailTeste, setStatusEmailTeste] = useState("");
   async function enviarEmailTeste() {
     setStatusEmailTeste("Enviando...");
@@ -96,6 +97,16 @@ function TelaConfiguracoes({
     } finally {
       setSalvando(false);
     }
+  }
+
+  // Link de entrada da equipe (psicóloga e secretária): abre o login já com a
+  // logo, o nome e a cor da clínica, em vez da tela genérica do PsiCoWorking.
+  function copiarLinkEquipe() {
+    const url = `${window.location.origin}/psi/admin/?psi=${usuario.psiId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkEquipeCopiado(true);
+      setTimeout(() => setLinkEquipeCopiado(false), 2500);
+    }).catch(() => prompt("Copie o link:", url));
   }
   function copiarLinkPortal() {
     const url = `${window.location.origin}/psi/paciente/?psi=${usuario.psiId}`;
@@ -196,6 +207,20 @@ function TelaConfiguracoes({
     nome: "link",
     tamanho: 15
   }), " ", linkCopiado ? "Copiado!" : "Copiar Link do Portal")), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-config",
+    style: {
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Link de entrada da equipe"), /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo"
+  }, "Envie esse link para voc\xEA e para a sua secret\xE1ria entrarem no painel. A tela de login j\xE1 abre com o nome, a logo e a cor da sua cl\xEDnica."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: copiarLinkEquipe
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "link",
+    tamanho: 15
+  }), " ", linkEquipeCopiado ? "Copiado!" : "Copiar Link da Equipe")), /*#__PURE__*/React.createElement("div", {
     className: "cartao-config",
     style: {
       marginTop: 16
