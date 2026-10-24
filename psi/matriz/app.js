@@ -191,18 +191,13 @@ function PaginaDashboard() {
 // A edição fica no gerenciador do painel principal; só esta conta
 // (administradora da plataforma) consegue gravar nele.
 function PaginaCatalogo() {
+  // O gerenciador abre aqui dentro, na mesma sessão da administradora.
   return (
-    <div>
-      <div className="pagina-titulo">Fábulas e ferramentas</div>
-      <p style={{ color: "#4B5563", maxWidth: 560, lineHeight: 1.6, marginBottom: 18 }}>
-        O catálogo de fábulas terapêuticas, ferramentas e psicoeducação é compartilhado por todas as clínicas.
-        Só a administradora da plataforma cria, edita e apaga itens. As psicólogas apenas visualizam e enviam aos pacientes.
-      </p>
-      <a href="/psi/admin/?plataforma=1" target="_blank" rel="noopener"
-        style={{ display: "inline-block", background: "#4F46E5", color: "white", padding: "10px 18px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 14 }}>
-        Abrir o gerenciador do catálogo
-      </a>
-    </div>
+    <iframe
+      title="Fábulas e ferramentas"
+      src="/psi/admin/?plataforma=1&embutido=1"
+      style={{ width: "100%", height: "calc(100vh - 64px)", border: "none", borderRadius: 12, background: "white" }}
+    />
   );
 }
 

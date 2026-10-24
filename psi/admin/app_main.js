@@ -86,6 +86,8 @@ function App() {
   // (fábulas, ferramentas e psicoeducação). As psicólogas apenas usam o catálogo.
   const ehAdminPlataforma = usuario.role === "admin_matriz";
   const telaEfetiva = ehAdminPlataforma ? "recursos" : telaAtiva;
+  // Dentro do painel da plataforma (iframe) o menu lateral não aparece: o catálogo ocupa a tela.
+  const embutido = ehAdminPlataforma && new URLSearchParams(window.location.search).get("embutido") === "1";
   const podeAcessarAdmin = usuario.role === "psi" || usuario.role === "secretaria" || ehAdminPlataforma;
   if (!podeAcessarAdmin) {
     return (
@@ -101,12 +103,14 @@ function App() {
 
   return (
     <div className="layout-admin">
-      <Sidebar
-        usuario={usuario}
-        telaAtiva={telaEfetiva}
-        aoTrocarTela={setTelaAtiva}
-        configClinica={configClinica}
-      />
+      {!embutido && (
+        <Sidebar
+          usuario={usuario}
+          telaAtiva={telaEfetiva}
+          aoTrocarTela={setTelaAtiva}
+          configClinica={configClinica}
+        />
+      )}
       <main className="area-principal">
         {statusConexaoGoogle && statusConexaoGoogle.startsWith("erro") && (
           <p className="mensagem-erro">
