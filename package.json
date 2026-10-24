@@ -3,7 +3,8 @@
   "description": "Build script para pré-compilar os arquivos JSX/Babel do admin do psicólogo",
   "private": true,
   "scripts": {
-    "build": "node build-admin.js"
+    "build": "node build-admin.js",
+    "testar-regras": "firebase emulators:exec --only firestore --project demo-psicoworking \"node --test testes-regras/regras.test.js\""
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

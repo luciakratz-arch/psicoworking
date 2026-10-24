@@ -1,0 +1,223 @@
+// ═══════════════════════════════════════════════════════════════
+//  Testes das regras de segurança do Firestore — PsiCoWorking
+//
+//  Simula pessoas diferentes (duas clínicas, secretária, pacientes,
+//  administradora e visitante sem login) tentando ler e escrever
+//  dados, e confere se o banco permite ou recusa como deveria.
+//
+//  Como rodar (na pasta psicoworking):  npm run testar-regras
+//  Usa um banco de mentira no computador; não toca nos dados reais.
+// ═══════════════════════════════════════════════════════════════
+
+const { test, before, after, beforeEach, describe } = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
+const {
+  initializeTestEnvironment,
+  assertSucceeds,
+  assertFails,
+} = require("@firebase/rules-unit-testing");
+const {
+  doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc,
+  collection, query, where, getDocs,
+} = require("firebase/firestore");
+
+let env;
+
+before(async () => {
+  const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080").split(":");
+  env = await initializeTestEnvironment({
+    projectId: "demo-psicoworking",
+    firestore: {
+      rules: fs.readFileSync(path.join(__dirname, "..", "firestore.rules"), "utf8"),
+      host,
+      port: Number(port),
+    },
+  });
+});
+
+after(async () => { if (env) await env.cleanup(); });
+
+// Pessoas
+const psiA = () => env.authenticatedContext("psiA", { psi_id: "clinA", role: "psi" }).firestore();
+const secA = () => env.authenticatedContext("secA", { psi_id: "clinA", role: "secretaria" }).firestore();
+const psiB = () => env.authenticatedContext("psiB", { psi_id: "clinB", role: "psi" }).firestore();
+const pacA1 = () => env.authenticatedContext("pacA1", { psi_id: "clinA", role: "paciente" }).firestore();
+const pacA2 = () => env.authenticatedContext("pacA2", { psi_id: "clinA", role: "paciente" }).firestore();
+const pacB1 = () => env.authenticatedContext("pacB1", { psi_id: "clinB", role: "paciente" }).firestore();
+const matriz = () => env.authenticatedContext("matriz", { role: "admin_matriz" }).firestore();
+const semLogin = () => env.unauthenticatedContext().firestore();
+const logadoSemCarimbo = () => env.authenticatedContext("intruso").firestore();
+
+// Dados de partida (gravados sem regras)
+beforeEach(async () => {
+  await env.clearFirestore();
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const d = ctx.firestore();
+    await setDoc(doc(d, "clinica_pacientes/pacA1"), { psi_id: "clinA", nome: "Paciente A1", fotoUrl: "" });
+    await setDoc(doc(d, "clinica_pacientes/pacA2"), { psi_id: "clinA", nome: "Paciente A2" });
+    await setDoc(doc(d, "clinica_pacientes/pacB1"), { psi_id: "clinB", nome: "Paciente B1" });
+    await setDoc(doc(d, "clinica_sessoes/sessA1"), { psi_id: "clinA", pacienteId: "pacA1", status: "agendado" });
+    await setDoc(doc(d, "clinica_prontuarios/prontA"), { psi_id: "clinA", pacienteId: "pacA1", textoBruto: "sigiloso A" });
+    await setDoc(doc(d, "clinica_prontuarios/prontB"), { psi_id: "clinB", pacienteId: "pacB1", textoBruto: "sigiloso B" });
+    await setDoc(doc(d, "clinica_crises/criseA"), { psi_id: "clinA", pacienteId: "pacA1", intensidade: "leve" });
+    await setDoc(doc(d, "clinica_perfil_clinico/pacA1"), { psi_id: "clinA", pacienteId: "pacA1", cids: [] });
+    await setDoc(doc(d, "clinica_laudos/laudoA"), { psi_id: "clinA", pacienteId: "pacA1", visivelPaciente: false });
+    await setDoc(doc(d, "clinica_laudos/laudoVisivel"), { psi_id: "clinA", pacienteId: "pacA1", visivelPaciente: true });
+    await setDoc(doc(d, "clinica_diario/diarioA1"), { psi_id: "clinA", pacienteId: "pacA1", texto: "diario" });
+    await setDoc(doc(d, "clinica_lancamentos/lancA"), { psi_id: "clinA", valor: 100 });
+    await setDoc(doc(d, "clinica_config/clinA"), { segredo: "x" });
+    await setDoc(doc(d, "clinica_audit_log/log1"), { acao: "x" });
+    await setDoc(doc(d, "psi_depoimentos/depAprovado"), { psi_id: "clinA", aprovado: true, texto: "ótimo" });
+    await setDoc(doc(d, "psi_depoimentos/depPendente"), { psi_id: "clinA", aprovado: false, texto: "pendente" });
+    await setDoc(doc(d, "clinica_links_partilhados/tokenA"), { psi_id: "clinA", nome: "x" });
+  });
+});
+
+describe("Visitante sem login", () => {
+  for (const caminho of [
+    "clinica_pacientes/pacA1", "clinica_sessoes/sessA1", "clinica_prontuarios/prontA",
+    "clinica_crises/criseA", "clinica_perfil_clinico/pacA1", "clinica_laudos/laudoA",
+    "clinica_diario/diarioA1", "clinica_lancamentos/lancA", "clinica_config/clinA",
+    "clinica_audit_log/log1",
+  ]) {
+    test("não lê " + caminho, async () => { await assertFails(getDoc(doc(semLogin(), caminho))); });
+  }
+  test("não grava em prontuários", async () => {
+    await assertFails(setDoc(doc(semLogin(), "clinica_prontuarios/novo"), { psi_id: "clinA" }));
+  });
+  test("lê a vitrine pública (psi_config e depoimento aprovado)", async () => {
+    await assertSucceeds(getDoc(doc(semLogin(), "psi_config/clinA")));
+    await assertSucceeds(getDoc(doc(semLogin(), "psi_depoimentos/depAprovado")));
+  });
+  test("não lê depoimento ainda não aprovado", async () => {
+    await assertFails(getDoc(doc(semLogin(), "psi_depoimentos/depPendente")));
+  });
+  test("consegue abrir um link compartilhado pelo código, mas não listar todos", async () => {
+    await assertSucceeds(getDoc(doc(semLogin(), "clinica_links_partilhados/tokenA")));
+    await assertFails(getDocs(collection(semLogin(), "clinica_links_partilhados")));
+  });
+  test("coleção que não existe nas regras é bloqueada", async () => {
+    await assertFails(getDoc(doc(semLogin(), "qualquer_coisa/x")));
+  });
+});
+
+describe("Logado, mas sem carimbo de clínica", () => {
+  test("não lê paciente nem prontuário", async () => {
+    await assertFails(getDoc(doc(logadoSemCarimbo(), "clinica_pacientes/pacA1")));
+    await assertFails(getDoc(doc(logadoSemCarimbo(), "clinica_prontuarios/prontA")));
+  });
+});
+
+describe("Equipe da clínica A", () => {
+  test("lê e grava os próprios dados", async () => {
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_pacientes/pacA1")));
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_prontuarios/prontA")));
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_crises/criseA")));
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_perfil_clinico/pacA1")));
+    await assertSucceeds(updateDoc(doc(psiA(), "clinica_prontuarios/prontA"), { textoBruto: "editado" }));
+    await assertSucceeds(addDoc(collection(psiA(), "clinica_prontuarios"), { psi_id: "clinA", pacienteId: "pacA1" }));
+  });
+  test("lista só os documentos da própria clínica", async () => {
+    await assertSucceeds(getDocs(query(collection(psiA(), "clinica_prontuarios"), where("psi_id", "==", "clinA"))));
+  });
+  test("a secretária também acessa os dados da própria clínica", async () => {
+    await assertSucceeds(getDoc(doc(secA(), "clinica_pacientes/pacA1")));
+    await assertSucceeds(getDoc(doc(secA(), "clinica_lancamentos/lancA")));
+  });
+  test("não cria documento carimbado para outra clínica", async () => {
+    await assertFails(addDoc(collection(psiA(), "clinica_prontuarios"), { psi_id: "clinB", pacienteId: "pacB1" }));
+    await assertFails(setDoc(doc(psiA(), "clinica_pacientes/novoB"), { psi_id: "clinB", nome: "x" }));
+  });
+  test("não consegue passar um documento seu para outra clínica (trocando o psi_id)", async () => {
+    await assertFails(updateDoc(doc(psiA(), "clinica_prontuarios/prontA"), { psi_id: "clinB" }));
+    await assertFails(updateDoc(doc(psiA(), "clinica_pacientes/pacA1"), { psi_id: "clinB" }));
+  });
+  test("não escreve no registro de auditoria", async () => {
+    await assertFails(setDoc(doc(psiA(), "clinica_audit_log/novo"), { acao: "x" }));
+  });
+});
+
+describe("Isolamento: equipe da clínica B não vê a clínica A", () => {
+  for (const caminho of [
+    "clinica_pacientes/pacA1", "clinica_sessoes/sessA1", "clinica_prontuarios/prontA",
+    "clinica_crises/criseA", "clinica_perfil_clinico/pacA1", "clinica_laudos/laudoA",
+    "clinica_diario/diarioA1", "clinica_lancamentos/lancA", "clinica_config/clinA",
+  ]) {
+    test("não lê " + caminho, async () => { await assertFails(getDoc(doc(psiB(), caminho))); });
+  }
+  test("não edita nem apaga dados da clínica A", async () => {
+    await assertFails(updateDoc(doc(psiB(), "clinica_prontuarios/prontA"), { textoBruto: "invadido" }));
+    await assertFails(deleteDoc(doc(psiB(), "clinica_prontuarios/prontA")));
+    await assertFails(updateDoc(doc(psiB(), "clinica_pacientes/pacA1"), { nome: "invadido" }));
+  });
+  test("não consegue listar a clínica A mesmo pedindo pelo psi_id dela", async () => {
+    await assertFails(getDocs(query(collection(psiB(), "clinica_prontuarios"), where("psi_id", "==", "clinA"))));
+    await assertFails(getDocs(query(collection(psiB(), "clinica_pacientes"), where("psi_id", "==", "clinA"))));
+  });
+  test("não lista tudo sem filtro", async () => {
+    await assertFails(getDocs(collection(psiB(), "clinica_prontuarios")));
+  });
+  test("lê os próprios dados normalmente", async () => {
+    await assertSucceeds(getDoc(doc(psiB(), "clinica_prontuarios/prontB")));
+  });
+});
+
+describe("Paciente", () => {
+  test("lê a própria ficha, mas não a de outro paciente nem de outra clínica", async () => {
+    await assertSucceeds(getDoc(doc(pacA1(), "clinica_pacientes/pacA1")));
+    await assertFails(getDoc(doc(pacA1(), "clinica_pacientes/pacA2")));
+    await assertFails(getDoc(doc(pacA1(), "clinica_pacientes/pacB1")));
+    await assertFails(getDoc(doc(pacB1(), "clinica_pacientes/pacA1")));
+  });
+  test("não lê prontuário, crises nem perfil clínico (nem os dele)", async () => {
+    await assertFails(getDoc(doc(pacA1(), "clinica_prontuarios/prontA")));
+    await assertFails(getDoc(doc(pacA1(), "clinica_crises/criseA")));
+    await assertFails(getDoc(doc(pacA1(), "clinica_perfil_clinico/pacA1")));
+  });
+  test("não lê financeiro nem configurações da clínica", async () => {
+    await assertFails(getDoc(doc(pacA1(), "clinica_lancamentos/lancA")));
+    await assertFails(getDoc(doc(pacA1(), "clinica_config/clinA")));
+  });
+  test("só altera foto na própria ficha; nome e clínica não", async () => {
+    await assertSucceeds(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { fotoUrl: "https://x/foto.png" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { nome: "Outro nome" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { psi_id: "clinB" }));
+    await assertFails(updateDoc(doc(pacA2(), "clinica_pacientes/pacA1"), { fotoUrl: "https://x/foto.png" }));
+  });
+  test("não apaga a própria ficha", async () => {
+    await assertFails(deleteDoc(doc(pacA1(), "clinica_pacientes/pacA1")));
+  });
+  test("lê o laudo só se a psicóloga liberou", async () => {
+    await assertFails(getDoc(doc(pacA1(), "clinica_laudos/laudoA")));
+    await assertSucceeds(getDoc(doc(pacA1(), "clinica_laudos/laudoVisivel")));
+    await assertFails(getDoc(doc(pacA2(), "clinica_laudos/laudoVisivel")));
+  });
+  test("o diário é dele: a equipe lê, outro paciente não", async () => {
+    await assertSucceeds(getDoc(doc(pacA1(), "clinica_diario/diarioA1")));
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_diario/diarioA1")));
+    await assertFails(getDoc(doc(pacA2(), "clinica_diario/diarioA1")));
+    await assertFails(getDoc(doc(psiB(), "clinica_diario/diarioA1")));
+  });
+  test("não escreve registro em nome de outro paciente", async () => {
+    await assertFails(setDoc(doc(pacA2(), "clinica_humor/x"), { psi_id: "clinA", pacienteId: "pacA1" }));
+  });
+  test("escreve registro de humor em nome próprio", async () => {
+    await assertSucceeds(setDoc(doc(pacA1(), "clinica_humor/meu"), { psi_id: "clinA", pacienteId: "pacA1", nota: 3 }));
+  });
+  test("não escreve registro carimbado para outra clínica", async () => {
+    await assertFails(setDoc(doc(pacA1(), "clinica_humor/x"), { psi_id: "clinB", pacienteId: "pacA1" }));
+  });
+});
+
+describe("Administradora da plataforma (admin_matriz)", () => {
+  test("não lê dados clínicos de nenhuma clínica", async () => {
+    await assertFails(getDoc(doc(matriz(), "clinica_prontuarios/prontA")));
+    await assertFails(getDoc(doc(matriz(), "clinica_pacientes/pacA1")));
+    await assertFails(getDoc(doc(matriz(), "clinica_crises/criseA")));
+  });
+  test("lê o registro de auditoria, mas ninguém escreve nele", async () => {
+    await assertSucceeds(getDoc(doc(matriz(), "clinica_audit_log/log1")));
+    await assertFails(setDoc(doc(matriz(), "clinica_audit_log/novo"), { acao: "x" }));
+  });
+});

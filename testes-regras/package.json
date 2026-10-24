@@ -1,0 +1,12 @@
+{
+  "name": "psicoworking-testes-regras",
+  "description": "Testes automáticos das regras de segurança do Firestore (isolamento entre clínicas)",
+  "private": true,
+  "scripts": {
+    "test": "node --test regras.test.js"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.14.1"
+  }
+}
