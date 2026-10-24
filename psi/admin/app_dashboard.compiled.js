@@ -20,6 +20,90 @@ const COLECOES_ATIVIDADE = [{
   rotulo: "Árvore Decisão",
   icone: "trees"
 }];
+
+// Pedidos de privacidade feitos pelos pacientes (LGPD): exclusão de dados, etc.
+// Nada é apagado automaticamente: a psicóloga decide, respeitando o prazo legal
+// de guarda do prontuário (CFP 001/2009: 5 anos após o fim do atendimento).
+function CartaoSolicitacoesLGPD({
+  usuario
+}) {
+  const [lista, setLista] = useState([]);
+  const [salvando, setSalvando] = useState(null);
+  useEffect(() => {
+    const cancelar = db.collection("clinica_solicitacoes_lgpd").where("psi_id", "==", usuario.psiId).onSnapshot(snap => setLista(snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })).filter(s => s.status === "pendente").sort((a, b) => (a.solicitadoEm && a.solicitadoEm.seconds || 0) - (b.solicitadoEm && b.solicitadoEm.seconds || 0))), () => setLista([]));
+    return cancelar;
+  }, [usuario.psiId]);
+  async function resolver(s, status, pergunta) {
+    if (!confirm(pergunta)) return;
+    setSalvando(s.id);
+    try {
+      await db.collection("clinica_solicitacoes_lgpd").doc(s.id).update({
+        status,
+        resolvidoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        resolvidoPor: usuario.email
+      });
+    } catch (e) {
+      alert("Não foi possível registrar: " + e.message);
+    } finally {
+      setSalvando(null);
+    }
+  }
+  if (lista.length === 0) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "cartao-secao"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "titulo-cartao-secao"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "shield",
+    tamanho: 17
+  }), " Pedidos de privacidade (LGPD)"), /*#__PURE__*/React.createElement("p", {
+    className: "descricao-cartao-secao"
+  }, "Pacientes pediram a exclus\xE3o dos dados. O sistema n\xE3o apaga nada sozinho. Dados cl\xEDnicos t\xEAm prazo legal de guarda (5 anos ap\xF3s o fim do atendimento). Atenda, ou registre que ser\xE3o mantidos por obriga\xE7\xE3o legal."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, lista.map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.id,
+    style: {
+      border: "1px solid var(--borda)",
+      borderRadius: 10,
+      padding: "10px 14px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 600,
+      fontSize: 13
+    }
+  }, s.pacienteNome || "Paciente"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11.5,
+      color: "var(--texto-suave)"
+    }
+  }, s.pacienteEmail, s.solicitadoEm && s.solicitadoEm.seconds ? " · pedido em " + new Date(s.solicitadoEm.seconds * 1000).toLocaleDateString("pt-BR") : "")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    disabled: salvando === s.id,
+    onClick: () => resolver(s, "mantida_prazo_legal", "Registrar que os dados de " + (s.pacienteNome || "este paciente") + " serão mantidos por obrigação legal?")
+  }, "Manter por prazo legal"), /*#__PURE__*/React.createElement("button", {
+    className: "botao-primario",
+    disabled: salvando === s.id,
+    onClick: () => resolver(s, "atendida", "Registrar que o pedido de " + (s.pacienteNome || "este paciente") + " foi atendido? (Isso não apaga dados. Apague antes, se for o caso.)")
+  }, "Marcar como atendido"))))));
+}
 function TelaDashboard({
   usuario,
   aoAbrirPaciente
@@ -141,7 +225,9 @@ function TelaDashboard({
     valor: carregandoPacientes ? "..." : pendentes,
     legenda: "via autocadastro",
     icone: "user-plus"
-  })), !carregandoPacientes && (aniversariantesHoje.length > 0 || proximosAniv.length > 0 || semDataNasc.length > 0) && /*#__PURE__*/React.createElement("div", {
+  })), usuario.role === "psi" && /*#__PURE__*/React.createElement(CartaoSolicitacoesLGPD, {
+    usuario: usuario
+  }), !carregandoPacientes && (aniversariantesHoje.length > 0 || proximosAniv.length > 0 || semDataNasc.length > 0) && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("div", {
     className: "titulo-cartao-secao"

@@ -73,6 +73,7 @@ beforeEach(async () => {
     await setDoc(doc(d, "clinica_links_partilhados/tokenA"), { psi_id: "clinA", nome: "x" });
     await setDoc(doc(d, "clinica_metas/metaA1"), { psi_id: "clinA", pacienteId: "pacA1", titulo: "Meta", progresso: 10, status: "ativa" });
     await setDoc(doc(d, "fabulas_terapeuticas/fab1"), { titulo: "Fábula", paginas: [] });
+    await setDoc(doc(d, "clinica_solicitacoes_lgpd/sol1"), { psi_id: "clinA", uid: "pacA1", tipo: "exclusao", status: "pendente" });
     for (const c of ["clinica_humor", "clinica_gestao_ansiedade", "clinica_tcc", "clinica_reflexoes", "clinica_anamneses", "clinica_registro_abc", "clinica_arvore_decisao", "clinica_relaxamento", "clinica_rastreamento_alimentar", "clinica_treino_auditivo", "clinica_rastreamento_bipolar"]) {
       await setDoc(doc(d, c + "/regA1"), { psi_id: "clinA", pacienteId: "pacA1" });
     }
@@ -312,5 +313,21 @@ describe("Paciente lê os próprios registros (histórico no portal e exportaç�
   test("a avaliação clínica (rastreamento diagnóstico) continua só com a psicóloga", async () => {
     await assertFails(getDoc(doc(pacA1(), "clinica_rastreamento_bipolar/regA1")));
     await assertSucceeds(getDoc(doc(psiA(), "clinica_rastreamento_bipolar/regA1")));
+  });
+});
+
+describe("Pedidos de privacidade (LGPD)", () => {
+  test("o paciente cria o próprio pedido e lê só o dele", async () => {
+    await assertSucceeds(setDoc(doc(pacA1(), "clinica_solicitacoes_lgpd/novo"), { uid: "pacA1", psi_id: "clinA", tipo: "exclusao", status: "pendente" }));
+    await assertSucceeds(getDoc(doc(pacA1(), "clinica_solicitacoes_lgpd/sol1")));
+    await assertFails(getDoc(doc(pacA2(), "clinica_solicitacoes_lgpd/sol1")));
+  });
+  test("o paciente não cria pedido em nome de outro nem altera o status", async () => {
+    await assertFails(setDoc(doc(pacA1(), "clinica_solicitacoes_lgpd/falso"), { uid: "pacA2", psi_id: "clinA", tipo: "exclusao", status: "pendente" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_solicitacoes_lgpd/sol1"), { status: "atendida" }));
+  });
+  test("a equipe da própria clínica trata o pedido; outra clínica não vê", async () => {
+    await assertSucceeds(updateDoc(doc(psiA(), "clinica_solicitacoes_lgpd/sol1"), { status: "atendida" }));
+    await assertFails(getDoc(doc(psiB(), "clinica_solicitacoes_lgpd/sol1")));
   });
 });
