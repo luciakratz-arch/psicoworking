@@ -1135,7 +1135,7 @@ function ModalSessoesPacote({
     db.collection("psi_config").doc(usuario.psiId).get().then(d => d.exists ? setConfigPsi(d.data()) : null).catch(() => null);
   }, [usuario?.psiId]);
   useEffect(() => {
-    if (!usuario?.psiId || !pacote?.pacienteId) return;
+    if (!usuario?.psiId || !pacote?.pacienteId || usuario.role !== "psi") return;
     const unsub = db.collection("clinica_prontuarios").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", pacote.pacienteId).onSnapshot(snap => setNotas(snap.docs.map(d => ({
       id: d.id,
       ...d.data()

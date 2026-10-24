@@ -923,7 +923,7 @@ function ModalSessoesPacote({ usuario, pacote, sessoes, pacienteNome, aoFechar }
   }, [usuario?.psiId]);
 
   useEffect(() => {
-    if (!usuario?.psiId || !pacote?.pacienteId) return;
+    if (!usuario?.psiId || !pacote?.pacienteId || usuario.role !== "psi") return;
     const unsub = db.collection("clinica_prontuarios")
       .where("psi_id", "==", usuario.psiId)
       .where("pacienteId", "==", pacote.pacienteId)

@@ -71,6 +71,8 @@ beforeEach(async () => {
     await setDoc(doc(d, "psi_depoimentos/depAprovado"), { psi_id: "clinA", aprovado: true, texto: "ótimo" });
     await setDoc(doc(d, "psi_depoimentos/depPendente"), { psi_id: "clinA", aprovado: false, texto: "pendente" });
     await setDoc(doc(d, "clinica_links_partilhados/tokenA"), { psi_id: "clinA", nome: "x" });
+    await setDoc(doc(d, "clinica_metas/metaA1"), { psi_id: "clinA", pacienteId: "pacA1", titulo: "Meta", progresso: 10, status: "ativa" });
+    await setDoc(doc(d, "fabulas_terapeuticas/fab1"), { titulo: "Fábula", paginas: [] });
   });
 });
 
@@ -219,5 +221,71 @@ describe("Administradora da plataforma (admin_matriz)", () => {
   test("lê o registro de auditoria, mas ninguém escreve nele", async () => {
     await assertSucceeds(getDoc(doc(matriz(), "clinica_audit_log/log1")));
     await assertFails(setDoc(doc(matriz(), "clinica_audit_log/novo"), { acao: "x" }));
+  });
+});
+
+describe("Secretária não acessa o prontuário (sigilo profissional)", () => {
+  for (const caminho of ["clinica_prontuarios/prontA", "clinica_crises/criseA", "clinica_perfil_clinico/pacA1"]) {
+    test("não lê " + caminho, async () => { await assertFails(getDoc(doc(secA(), caminho))); });
+  }
+  test("não grava prontuário, crise nem perfil clínico", async () => {
+    await assertFails(addDoc(collection(secA(), "clinica_prontuarios"), { psi_id: "clinA", pacienteId: "pacA1" }));
+    await assertFails(addDoc(collection(secA(), "clinica_crises"), { psi_id: "clinA", pacienteId: "pacA1" }));
+    await assertFails(updateDoc(doc(secA(), "clinica_perfil_clinico/pacA1"), { cids: [] }));
+  });
+  test("a psicóloga continua acessando normalmente", async () => {
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_prontuarios/prontA")));
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_crises/criseA")));
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_perfil_clinico/pacA1")));
+  });
+  test("a secretária segue acessando cadastro, agenda e financeiro", async () => {
+    await assertSucceeds(getDoc(doc(secA(), "clinica_pacientes/pacA1")));
+    await assertSucceeds(getDoc(doc(secA(), "clinica_sessoes/sessA1")));
+    await assertSucceeds(getDoc(doc(secA(), "clinica_lancamentos/lancA")));
+  });
+});
+
+describe("Paciente: só confirma presença e atualiza o andamento das metas", () => {
+  test("confirma presença na própria sessão", async () => {
+    await assertSucceeds(updateDoc(doc(pacA1(), "clinica_sessoes/sessA1"), { statusConfirmacao: "confirmado", confirmadoEm: new Date() }));
+  });
+  test("não altera status, valor, data nem dono da sessão", async () => {
+    await assertFails(updateDoc(doc(pacA1(), "clinica_sessoes/sessA1"), { status: "realizado" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_sessoes/sessA1"), { valor: 0 }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_sessoes/sessA1"), { pacienteId: "pacA2" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_sessoes/sessA1"), { statusConfirmacao: "confirmado", status: "realizado" }));
+  });
+  test("outro paciente não confirma a sessão alheia", async () => {
+    await assertFails(updateDoc(doc(pacA2(), "clinica_sessoes/sessA1"), { statusConfirmacao: "confirmado" }));
+  });
+  test("atualiza o progresso da própria meta, mas não o título nem valores fora de 0 a 100", async () => {
+    await assertSucceeds(updateDoc(doc(pacA1(), "clinica_metas/metaA1"), { progresso: 50, status: "ativa", atualizadoPor: "paciente", atualizadoEm: new Date() }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_metas/metaA1"), { titulo: "Outra" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_metas/metaA1"), { progresso: 500 }));
+    await assertFails(updateDoc(doc(pacA2(), "clinica_metas/metaA1"), { progresso: 20 }));
+  });
+  test("a equipe continua editando sessão e meta", async () => {
+    await assertSucceeds(updateDoc(doc(psiA(), "clinica_sessoes/sessA1"), { status: "realizado" }));
+    await assertSucceeds(updateDoc(doc(secA(), "clinica_sessoes/sessA1"), { valor: 150 }));
+    await assertSucceeds(updateDoc(doc(psiA(), "clinica_metas/metaA1"), { titulo: "Nova meta" }));
+  });
+});
+
+describe("Fábulas: só a administradora da plataforma altera", () => {
+  test("psicóloga e secretária leem, mas não gravam nem apagam", async () => {
+    await assertSucceeds(getDoc(doc(psiA(), "fabulas_terapeuticas/fab1")));
+    await assertFails(updateDoc(doc(psiA(), "fabulas_terapeuticas/fab1"), { titulo: "Alterada" }));
+    await assertFails(addDoc(collection(psiA(), "fabulas_terapeuticas"), { titulo: "Nova" }));
+    await assertFails(deleteDoc(doc(psiB(), "fabulas_terapeuticas/fab1")));
+    await assertFails(updateDoc(doc(secA(), "fabulas_terapeuticas/fab1"), { titulo: "Alterada" }));
+  });
+  test("paciente e visitante não gravam", async () => {
+    await assertFails(updateDoc(doc(pacA1(), "fabulas_terapeuticas/fab1"), { titulo: "x" }));
+    await assertFails(updateDoc(doc(semLogin(), "fabulas_terapeuticas/fab1"), { titulo: "x" }));
+  });
+  test("a administradora da plataforma grava e apaga", async () => {
+    await assertSucceeds(updateDoc(doc(matriz(), "fabulas_terapeuticas/fab1"), { titulo: "Revisada" }));
+    await assertSucceeds(addDoc(collection(matriz(), "fabulas_terapeuticas"), { titulo: "Nova" }));
+    await assertSucceeds(deleteDoc(doc(matriz(), "fabulas_terapeuticas/fab1")));
   });
 });

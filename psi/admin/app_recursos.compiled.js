@@ -678,6 +678,9 @@ function MigradorCarousel({
 function TelaRecursos({
   usuario
 }) {
+  // Só a administradora da plataforma cria, edita, apaga e converte itens do
+  // catálogo; as psicólogas visualizam e enviam aos pacientes.
+  const ehAdmin = usuario?.role === "admin_matriz";
   const [aba, setAba] = useState("ferramentas");
   const [itensPorColecao, setItensPorColecao] = useState({
     recursos_terapeuticos: [],
@@ -794,7 +797,7 @@ function TelaRecursos({
       alignItems: "center",
       flexWrap: "wrap"
     }
-  }, aba === "fabulas" && /*#__PURE__*/React.createElement("button", {
+  }, ehAdmin && aba === "fabulas" && /*#__PURE__*/React.createElement("button", {
     className: "botao-secundario",
     onClick: () => setMostrarMigrador(true),
     style: {
@@ -803,13 +806,13 @@ function TelaRecursos({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "image",
     tamanho: 15
-  }), " Converter para Carousel"), /*#__PURE__*/React.createElement("button", {
+  }), " Converter para Carousel"), !ehAdmin && /*#__PURE__*/React.createElement("button", {
     className: "botao-secundario",
     onClick: () => setBuscaIA(true)
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "sparkles",
     tamanho: 16
-  }), " Busca por sintoma"), /*#__PURE__*/React.createElement("button", {
+  }), " Busca por sintoma"), ehAdmin && /*#__PURE__*/React.createElement("button", {
     className: "botao-primario",
     onClick: abrirNovoItem
   }, /*#__PURE__*/React.createElement(Icone, {
@@ -887,7 +890,7 @@ function TelaRecursos({
     }, /*#__PURE__*/React.createElement(Icone, {
       nome: "eye",
       tamanho: 14
-    }), " Visualizar"), /*#__PURE__*/React.createElement("button", {
+    }), " Visualizar"), ehAdmin && /*#__PURE__*/React.createElement("button", {
       className: "botao-icone",
       onClick: () => {
         setItemEditando(item);
@@ -897,14 +900,14 @@ function TelaRecursos({
     }, /*#__PURE__*/React.createElement(Icone, {
       nome: "pencil",
       tamanho: 14
-    })), /*#__PURE__*/React.createElement("button", {
+    })), ehAdmin && /*#__PURE__*/React.createElement("button", {
       className: "botao-icone botao-icone-perigo",
       onClick: () => excluirItem(item),
       title: "Excluir"
     }, /*#__PURE__*/React.createElement(Icone, {
       nome: "trash-2",
       tamanho: 14
-    }))), /*#__PURE__*/React.createElement("button", {
+    }))), !ehAdmin && /*#__PURE__*/React.createElement("button", {
       className: "botao-primario botao-enviar-recurso",
       onClick: () => setEnviarItem(item)
     }, /*#__PURE__*/React.createElement(Icone, {

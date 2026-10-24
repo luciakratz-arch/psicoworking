@@ -82,7 +82,11 @@ function App() {
     return <TelaLogin configClinica={configPreLogin} />;
   }
 
-  const podeAcessarAdmin = usuario.role === "psi" || usuario.role === "secretaria";
+  // A administradora da plataforma entra aqui só para gerenciar o catálogo
+  // (fábulas, ferramentas e psicoeducação). As psicólogas apenas usam o catálogo.
+  const ehAdminPlataforma = usuario.role === "admin_matriz";
+  const telaEfetiva = ehAdminPlataforma ? "recursos" : telaAtiva;
+  const podeAcessarAdmin = usuario.role === "psi" || usuario.role === "secretaria" || ehAdminPlataforma;
   if (!podeAcessarAdmin) {
     return (
       <div className="tela-central">
@@ -99,7 +103,7 @@ function App() {
     <div className="layout-admin">
       <Sidebar
         usuario={usuario}
-        telaAtiva={telaAtiva}
+        telaAtiva={telaEfetiva}
         aoTrocarTela={setTelaAtiva}
         configClinica={configClinica}
       />
@@ -109,14 +113,14 @@ function App() {
             Não foi possível conectar o Google Agenda: {statusConexaoGoogle}
           </p>
         )}
-        {telaAtiva === "dashboard" && (
+        {telaEfetiva === "dashboard" && (
           <TelaDashboard usuario={usuario} aoAbrirPaciente={() => setTelaAtiva("pacientes")} />
         )}
-        {telaAtiva === "pacientes" && <TelaPacientes usuario={usuario} />}
-        {telaAtiva === "financeiro" && <TelaFinanceiro usuario={usuario} />}
-        {telaAtiva === "recursos" && <TelaRecursos usuario={usuario} />}
-        {telaAtiva === "agenda" && <TelaAgenda usuario={usuario} />}
-        {telaAtiva === "configuracoes" && <TelaConfiguracoes usuario={usuario} />}
+        {telaEfetiva === "pacientes" && <TelaPacientes usuario={usuario} />}
+        {telaEfetiva === "financeiro" && <TelaFinanceiro usuario={usuario} />}
+        {telaEfetiva === "recursos" && <TelaRecursos usuario={usuario} />}
+        {telaEfetiva === "agenda" && <TelaAgenda usuario={usuario} />}
+        {telaEfetiva === "configuracoes" && <TelaConfiguracoes usuario={usuario} />}
       </main>
     </div>
   );
@@ -126,7 +130,7 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
   const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl);
   const inicial = (configClinica?.nome || usuario.email || "?").trim().charAt(0).toUpperCase();
 
-  const itens = [
+  const todosItens = [
     { id: "dashboard", rotulo: "Dashboard", icone: "layout-dashboard" },
     { id: "pacientes", rotulo: "Pacientes", icone: "users" },
     { id: "financeiro", rotulo: "Financeiro", icone: "circle-dollar-sign" },
@@ -134,6 +138,8 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
     { id: "agenda", rotulo: "Agenda", icone: "calendar-days" },
     { id: "configuracoes", rotulo: "Configurações", icone: "settings" },
   ];
+  const ehAdminPlataforma = usuario.role === "admin_matriz";
+  const itens = ehAdminPlataforma ? todosItens.filter((i) => i.id === "recursos") : todosItens;
 
   return (
     <aside className="barra-lateral">
@@ -161,6 +167,12 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
             {item.rotulo}
           </a>
         ))}
+        {ehAdminPlataforma && (
+          <a className="item-menu" href="/psi/matriz/">
+            <Icone nome="building-2" tamanho={17} />
+            Painel da plataforma
+          </a>
+        )}
       </nav>
       <div className="rodape-barra-lateral">
         {configClinica?.fotoUrl ? (

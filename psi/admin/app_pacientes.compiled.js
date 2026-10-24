@@ -607,7 +607,9 @@ function PerfilPaciente({
   aoExcluir
 }) {
   // Aberto pelo botão "Prontuário TCC" do sistema antigo: cai direto na aba de anotações.
-  const [aba, setAba] = useState(acaoPorLinkPendente() && acaoPorLink.pacienteId === paciente.id ? "sessoes-tcc" : "perfil");
+  // Prontuário é sigilo da psicóloga: a secretária não vê a aba (e o banco também recusa).
+  const podeVerProntuario = usuario.role === "psi";
+  const [aba, setAba] = useState(podeVerProntuario && acaoPorLinkPendente() && acaoPorLink.pacienteId === paciente.id ? "sessoes-tcc" : "perfil");
   const [excluindo, setExcluindo] = useState(false);
   async function excluirPaciente() {
     if (!confirm(`Excluir ${paciente.nome}? Isso remove o cadastro clínico dele — não pode ser desfeito.`)) return;
@@ -643,7 +645,7 @@ function PerfilPaciente({
     tamanho: 15
   }), " ", excluindo ? "Excluindo..." : "Excluir paciente")), /*#__PURE__*/React.createElement("div", {
     className: "abas-financeiro abas-perfil-paciente"
-  }, ABAS_PACIENTE.map(a => /*#__PURE__*/React.createElement("button", {
+  }, ABAS_PACIENTE.filter(a => a.id !== "sessoes-tcc" || podeVerProntuario).map(a => /*#__PURE__*/React.createElement("button", {
     key: a.id,
     className: "aba-financeiro" + (aba === a.id ? " aba-financeiro-ativa" : ""),
     onClick: () => setAba(a.id)
@@ -671,7 +673,7 @@ function PerfilPaciente({
   }), aba === "links" && /*#__PURE__*/React.createElement(AbaLinksPaciente, {
     usuario: usuario,
     paciente: paciente
-  }), aba === "sessoes-tcc" && /*#__PURE__*/React.createElement(AbaSessoesTCC, {
+  }), aba === "sessoes-tcc" && podeVerProntuario && /*#__PURE__*/React.createElement(AbaSessoesTCC, {
     usuario: usuario,
     paciente: paciente
   }));

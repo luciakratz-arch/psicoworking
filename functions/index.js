@@ -957,6 +957,8 @@ exports.organizarProntuarioIA = onCall(
   { region: "southamerica-east1", secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Acesso negado.");
+    // Prontuário é da psicóloga; secretária e paciente não usam esta IA.
+    if (request.auth.token.role !== "psi") throw new HttpsError("permission-denied", "Sem permissão.");
     const { textoBruto, pacienteNome, dataSessao, perfilClinico } = request.data || {};
     if (!textoBruto || !textoBruto.trim()) {
       throw new HttpsError("invalid-argument", "Texto da sessão é obrigatório.");
@@ -1046,8 +1048,7 @@ exports.organizarPerfilClinicoIA = onCall(
   { region: "southamerica-east1", secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Acesso negado.");
-    const papel = request.auth.token.role;
-    if (papel !== "psi" && papel !== "secretaria") throw new HttpsError("permission-denied", "Sem permissão.");
+    if (request.auth.token.role !== "psi") throw new HttpsError("permission-denied", "Sem permissão.");
     const { texto } = request.data || {};
     if (!texto || !String(texto).trim()) {
       throw new HttpsError("invalid-argument", "Escreva ou dite as informações antes de organizar.");
@@ -1117,8 +1118,7 @@ exports.resumirPeriodoIA = onCall(
   { region: "southamerica-east1", secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Acesso negado.");
-    const papel = request.auth.token.role;
-    if (papel !== "psi" && papel !== "secretaria") throw new HttpsError("permission-denied", "Sem permissão.");
+    if (request.auth.token.role !== "psi") throw new HttpsError("permission-denied", "Sem permissão.");
     const { notas, pacienteNome, periodo, finalidade } = request.data || {};
     if (!Array.isArray(notas) || notas.length === 0) {
       throw new HttpsError("invalid-argument", "Não há anotações no período para resumir.");

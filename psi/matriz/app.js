@@ -187,6 +187,25 @@ function PaginaDashboard() {
   );
 }
 
+// ── Catálogo (fábulas, ferramentas, psicoeducação) ───────────
+// A edição fica no gerenciador do painel principal; só esta conta
+// (administradora da plataforma) consegue gravar nele.
+function PaginaCatalogo() {
+  return (
+    <div>
+      <div className="pagina-titulo">Fábulas e ferramentas</div>
+      <p style={{ color: "#4B5563", maxWidth: 560, lineHeight: 1.6, marginBottom: 18 }}>
+        O catálogo de fábulas terapêuticas, ferramentas e psicoeducação é compartilhado por todas as clínicas.
+        Só a administradora da plataforma cria, edita e apaga itens. As psicólogas apenas visualizam e enviam aos pacientes.
+      </p>
+      <a href="/psi/admin/" target="_blank" rel="noopener"
+        style={{ display: "inline-block", background: "#4F46E5", color: "white", padding: "10px 18px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 14 }}>
+        Abrir o gerenciador do catálogo
+      </a>
+    </div>
+  );
+}
+
 // ── Lista de Clínicas ────────────────────────────────────────
 function PaginaClinicas() {
   const [clinicas, setClinicas] = useState([]);
@@ -371,12 +390,14 @@ function App() {
     { id: "dashboard", label: "Dashboard", icone: "layout-dashboard" },
     { id: "clinicas", label: "Clínicas", icone: "building-2" },
     { id: "nova", label: "Nova Psicóloga", icone: "user-plus" },
+    { id: "catalogo", label: "Fábulas e ferramentas", icone: "book-open" },
   ];
 
   const paginas = {
     dashboard: <PaginaDashboard />,
     clinicas: <PaginaClinicas />,
     nova: <PaginaNovaPsicologa />,
+    catalogo: <PaginaCatalogo />,
   };
 
   return (

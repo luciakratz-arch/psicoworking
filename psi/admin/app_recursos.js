@@ -376,6 +376,9 @@ function MigradorCarousel({ fabulas, aoFechar }) {
 }
 
 function TelaRecursos({ usuario }) {
+  // Só a administradora da plataforma cria, edita, apaga e converte itens do
+  // catálogo; as psicólogas visualizam e enviam aos pacientes.
+  const ehAdmin = usuario?.role === "admin_matriz";
   const [aba, setAba] = useState("ferramentas");
   const [itensPorColecao, setItensPorColecao] = useState({
     recursos_terapeuticos: [],
@@ -500,17 +503,21 @@ function TelaRecursos({ usuario }) {
           <p className="subtitulo-pagina">Catálogo de ferramentas, fábulas e psicoeducação — compartilhado com toda a plataforma</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {aba === "fabulas" && (
+          {ehAdmin && aba === "fabulas" && (
             <button className="botao-secundario" onClick={() => setMostrarMigrador(true)} style={{ fontSize: 13 }}>
               <Icone nome="image" tamanho={15} /> Converter para Carousel
             </button>
           )}
-          <button className="botao-secundario" onClick={() => setBuscaIA(true)}>
-            <Icone nome="sparkles" tamanho={16} /> Busca por sintoma
-          </button>
-          <button className="botao-primario" onClick={abrirNovoItem}>
-            <Icone nome="plus" tamanho={16} /> {abaAtual.id === "ferramentas" ? "Nova Ferramenta" : abaAtual.id === "fabulas" ? "Nova Fábula" : "Nova Psicoeducação"}
-          </button>
+          {!ehAdmin && (
+            <button className="botao-secundario" onClick={() => setBuscaIA(true)}>
+              <Icone nome="sparkles" tamanho={16} /> Busca por sintoma
+            </button>
+          )}
+          {ehAdmin && (
+            <button className="botao-primario" onClick={abrirNovoItem}>
+              <Icone nome="plus" tamanho={16} /> {abaAtual.id === "ferramentas" ? "Nova Ferramenta" : abaAtual.id === "fabulas" ? "Nova Fábula" : "Nova Psicoeducação"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -573,16 +580,22 @@ function TelaRecursos({ usuario }) {
                     <button className="botao-secundario" onClick={() => setVisualizando(item)} title="Visualizar">
                       <Icone nome="eye" tamanho={14} /> Visualizar
                     </button>
-                    <button className="botao-icone" onClick={() => { setItemEditando(item); setMostrarForm(true); }} title="Editar">
-                      <Icone nome="pencil" tamanho={14} />
-                    </button>
-                    <button className="botao-icone botao-icone-perigo" onClick={() => excluirItem(item)} title="Excluir">
-                      <Icone nome="trash-2" tamanho={14} />
-                    </button>
+                    {ehAdmin && (
+                      <button className="botao-icone" onClick={() => { setItemEditando(item); setMostrarForm(true); }} title="Editar">
+                        <Icone nome="pencil" tamanho={14} />
+                      </button>
+                    )}
+                    {ehAdmin && (
+                      <button className="botao-icone botao-icone-perigo" onClick={() => excluirItem(item)} title="Excluir">
+                        <Icone nome="trash-2" tamanho={14} />
+                      </button>
+                    )}
                   </div>
-                  <button className="botao-primario botao-enviar-recurso" onClick={() => setEnviarItem(item)}>
-                    <Icone nome="send" tamanho={14} /> Enviar para paciente
-                  </button>
+                  {!ehAdmin && (
+                    <button className="botao-primario botao-enviar-recurso" onClick={() => setEnviarItem(item)}>
+                      <Icone nome="send" tamanho={14} /> Enviar para paciente
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

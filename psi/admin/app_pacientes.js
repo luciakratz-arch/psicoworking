@@ -525,7 +525,9 @@ function FormNovoPaciente({ usuario, aoFechar }) {
 // (perfil_paciente.js: cabeçalho com nome/ID/Excluir + barra de abas).
 function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
   // Aberto pelo botão "Prontuário TCC" do sistema antigo: cai direto na aba de anotações.
-  const [aba, setAba] = useState(acaoPorLinkPendente() && acaoPorLink.pacienteId === paciente.id ? "sessoes-tcc" : "perfil");
+  // Prontuário é sigilo da psicóloga: a secretária não vê a aba (e o banco também recusa).
+  const podeVerProntuario = usuario.role === "psi";
+  const [aba, setAba] = useState(podeVerProntuario && acaoPorLinkPendente() && acaoPorLink.pacienteId === paciente.id ? "sessoes-tcc" : "perfil");
   const [excluindo, setExcluindo] = useState(false);
 
   async function excluirPaciente() {
@@ -556,7 +558,7 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
       </div>
 
       <div className="abas-financeiro abas-perfil-paciente">
-        {ABAS_PACIENTE.map((a) => (
+        {ABAS_PACIENTE.filter((a) => a.id !== "sessoes-tcc" || podeVerProntuario).map((a) => (
           <button
             key={a.id}
             className={"aba-financeiro" + (aba === a.id ? " aba-financeiro-ativa" : "")}
@@ -576,7 +578,7 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
       {aba === "evolucao" && <AbaEvolucaoPaciente usuario={usuario} paciente={paciente} />}
       {aba === "saude-ocupacional" && <AbaSaudeOcupacionalPaciente usuario={usuario} paciente={paciente} />}
       {aba === "links" && <AbaLinksPaciente usuario={usuario} paciente={paciente} />}
-      {aba === "sessoes-tcc" && <AbaSessoesTCC usuario={usuario} paciente={paciente} />}
+      {aba === "sessoes-tcc" && podeVerProntuario && <AbaSessoesTCC usuario={usuario} paciente={paciente} />}
     </div>
   );
 }

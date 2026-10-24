@@ -77,7 +77,12 @@ function App() {
       configClinica: configPreLogin
     });
   }
-  const podeAcessarAdmin = usuario.role === "psi" || usuario.role === "secretaria";
+
+  // A administradora da plataforma entra aqui só para gerenciar o catálogo
+  // (fábulas, ferramentas e psicoeducação). As psicólogas apenas usam o catálogo.
+  const ehAdminPlataforma = usuario.role === "admin_matriz";
+  const telaEfetiva = ehAdminPlataforma ? "recursos" : telaAtiva;
+  const podeAcessarAdmin = usuario.role === "psi" || usuario.role === "secretaria" || ehAdminPlataforma;
   if (!podeAcessarAdmin) {
     return /*#__PURE__*/React.createElement("div", {
       className: "tela-central"
@@ -92,25 +97,25 @@ function App() {
     className: "layout-admin"
   }, /*#__PURE__*/React.createElement(Sidebar, {
     usuario: usuario,
-    telaAtiva: telaAtiva,
+    telaAtiva: telaEfetiva,
     aoTrocarTela: setTelaAtiva,
     configClinica: configClinica
   }), /*#__PURE__*/React.createElement("main", {
     className: "area-principal"
   }, statusConexaoGoogle && statusConexaoGoogle.startsWith("erro") && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
-  }, "N\xE3o foi poss\xEDvel conectar o Google Agenda: ", statusConexaoGoogle), telaAtiva === "dashboard" && /*#__PURE__*/React.createElement(TelaDashboard, {
+  }, "N\xE3o foi poss\xEDvel conectar o Google Agenda: ", statusConexaoGoogle), telaEfetiva === "dashboard" && /*#__PURE__*/React.createElement(TelaDashboard, {
     usuario: usuario,
     aoAbrirPaciente: () => setTelaAtiva("pacientes")
-  }), telaAtiva === "pacientes" && /*#__PURE__*/React.createElement(TelaPacientes, {
+  }), telaEfetiva === "pacientes" && /*#__PURE__*/React.createElement(TelaPacientes, {
     usuario: usuario
-  }), telaAtiva === "financeiro" && /*#__PURE__*/React.createElement(TelaFinanceiro, {
+  }), telaEfetiva === "financeiro" && /*#__PURE__*/React.createElement(TelaFinanceiro, {
     usuario: usuario
-  }), telaAtiva === "recursos" && /*#__PURE__*/React.createElement(TelaRecursos, {
+  }), telaEfetiva === "recursos" && /*#__PURE__*/React.createElement(TelaRecursos, {
     usuario: usuario
-  }), telaAtiva === "agenda" && /*#__PURE__*/React.createElement(TelaAgenda, {
+  }), telaEfetiva === "agenda" && /*#__PURE__*/React.createElement(TelaAgenda, {
     usuario: usuario
-  }), telaAtiva === "configuracoes" && /*#__PURE__*/React.createElement(TelaConfiguracoes, {
+  }), telaEfetiva === "configuracoes" && /*#__PURE__*/React.createElement(TelaConfiguracoes, {
     usuario: usuario
   })));
 }
@@ -122,7 +127,7 @@ function Sidebar({
 }) {
   const temMarca = configClinica && (configClinica.nome || configClinica.logoUrl);
   const inicial = (configClinica?.nome || usuario.email || "?").trim().charAt(0).toUpperCase();
-  const itens = [{
+  const todosItens = [{
     id: "dashboard",
     rotulo: "Dashboard",
     icone: "layout-dashboard"
@@ -147,6 +152,8 @@ function Sidebar({
     rotulo: "Configurações",
     icone: "settings"
   }];
+  const ehAdminPlataforma = usuario.role === "admin_matriz";
+  const itens = ehAdminPlataforma ? todosItens.filter(i => i.id === "recursos") : todosItens;
   return /*#__PURE__*/React.createElement("aside", {
     className: "barra-lateral"
   }, temMarca ? /*#__PURE__*/React.createElement("div", {
@@ -170,7 +177,13 @@ function Sidebar({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: item.icone,
     tamanho: 17
-  }), item.rotulo))), /*#__PURE__*/React.createElement("div", {
+  }), item.rotulo)), ehAdminPlataforma && /*#__PURE__*/React.createElement("a", {
+    className: "item-menu",
+    href: "/psi/matriz/"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "building-2",
+    tamanho: 17
+  }), "Painel da plataforma")), /*#__PURE__*/React.createElement("div", {
     className: "rodape-barra-lateral"
   }, configClinica?.fotoUrl ? /*#__PURE__*/React.createElement("img", {
     src: configClinica.fotoUrl,
