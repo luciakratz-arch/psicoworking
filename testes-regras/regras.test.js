@@ -181,9 +181,14 @@ describe("Paciente", () => {
     await assertFails(getDoc(doc(pacA1(), "clinica_lancamentos/lancA")));
     await assertFails(getDoc(doc(pacA1(), "clinica_config/clinA")));
   });
-  test("só altera foto na própria ficha; nome e clínica não", async () => {
+  test("edita os próprios dados pessoais e a foto; e-mail, status e clínica não", async () => {
     await assertSucceeds(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { fotoUrl: "https://x/foto.png" }));
-    await assertFails(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { nome: "Outro nome" }));
+    await assertSucceeds(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { nome: "Nome Corrigido", telefone: "11999990000", dataNasc: "1990-05-01", cpf: "000.000.000-00", genero: "Feminino" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { nome: "" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { nome: 123 }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { email: "novo@x.com" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { status: "inativo" }));
+    await assertFails(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { responsavelEmail: "x@x.com" }));
     await assertFails(updateDoc(doc(pacA1(), "clinica_pacientes/pacA1"), { psi_id: "clinB" }));
     await assertFails(updateDoc(doc(pacA2(), "clinica_pacientes/pacA1"), { fotoUrl: "https://x/foto.png" }));
   });

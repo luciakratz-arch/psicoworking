@@ -26,7 +26,10 @@ const firebaseConfig = {
 // Firebase, mesma origem) disputem a mesma sessão salva no navegador.
 // Sem isso, entrar como paciente numa aba podia "roubar" a sessão da
 // psicóloga logada em outra aba do mesmo navegador.
-const appAdmin = firebase.apps.find((a) => a.name === "psicoworking-admin") || firebase.initializeApp(firebaseConfig, "psicoworking-admin");
+// Com ?plataforma=1 (link do painel da administradora) usa a MESMA sessão do
+// painel /psi/matriz/, para ela não cair na conta da psicóloga.
+const nomeAppAdmin = new URLSearchParams(window.location.search).get("plataforma") === "1" ? "psicoworking-matriz" : "psicoworking-admin";
+const appAdmin = firebase.apps.find((a) => a.name === nomeAppAdmin) || firebase.initializeApp(firebaseConfig, nomeAppAdmin);
 const auth = appAdmin.auth();
 const db = appAdmin.firestore();
 const functions = appAdmin.functions();

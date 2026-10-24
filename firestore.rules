@@ -100,8 +100,17 @@ service cloud.firestore {
       allow read, write: if ehEquipeMantendoClinica()
                           || (request.method == 'create' && ehEquipeDaClinica(request.resource.data.psi_id));
       allow read: if ehDonoPaciente(resource.data.psi_id, pacienteId);
+      // O paciente edita só os próprios dados pessoais e a foto. E-mail, status,
+      // clínica, responsável e vínculos continuam sendo da equipe.
       allow update: if ehDonoPaciente(resource.data.psi_id, pacienteId)
-                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fotoUrl', 'atualizadoEm']);
+                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fotoUrl', 'atualizadoEm', 'nome', 'telefone', 'dataNasc', 'cpf', 'genero'])
+                     && request.resource.data.nome is string
+                     && request.resource.data.nome.size() >= 2
+                     && request.resource.data.nome.size() <= 120
+                     && request.resource.data.get('telefone', '') is string
+                     && request.resource.data.get('telefone', '').size() <= 40
+                     && request.resource.data.get('cpf', '') is string
+                     && request.resource.data.get('cpf', '').size() <= 20;
     }
 
     match /clinica_sessoes/{sessaoId} {

@@ -1029,7 +1029,45 @@ function TelaMinhaConta({ usuario, paciente }) {
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [erroFoto, setErroFoto] = useState("");
   const inputFotoRef = useRef(null);
+  const [dados, setDados] = useState(null);
+  const [salvandoDados, setSalvandoDados] = useState(false);
+  const [msgDados, setMsgDados] = useState("");
   const [exportando, setExportando] = useState(false);
+
+  // Carrega os dados atuais no formulário (uma vez), sem apagar o que ela já digitou.
+  useEffect(() => {
+    if (paciente && dados === null) {
+      setDados({
+        nome: paciente.nome || "",
+        telefone: paciente.telefone || "",
+        dataNasc: paciente.dataNasc || "",
+        cpf: paciente.cpf || "",
+        genero: paciente.genero || "",
+      });
+    }
+  }, [paciente]);
+
+  async function salvarDados() {
+    const nome = (dados.nome || "").trim();
+    if (nome.length < 2) { setMsgDados("Informe seu nome completo."); return; }
+    setSalvandoDados(true);
+    setMsgDados("");
+    try {
+      await db.collection("clinica_pacientes").doc(usuario.uid).update({
+        nome,
+        telefone: (dados.telefone || "").trim(),
+        dataNasc: dados.dataNasc || "",
+        cpf: (dados.cpf || "").trim(),
+        genero: dados.genero || "",
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setMsgDados("Dados salvos.");
+    } catch (e) {
+      setMsgDados("Não foi possível salvar: " + e.message);
+    } finally {
+      setSalvandoDados(false);
+    }
+  }
   const [confirmacaoExclusao, setConfirmacaoExclusao] = useState("");
   const [solicitandoExclusao, setSolicitandoExclusao] = useState(false);
   const [msgPrivacidade, setMsgPrivacidade] = useState("");
@@ -1147,16 +1185,31 @@ function TelaMinhaConta({ usuario, paciente }) {
         </div>
       </div>
       {erroFoto && <p className="erro-p">{erroFoto}</p>}
-      <div style={{ marginTop: 14 }}>
-        <label>Nome completo</label>
-        <input value={paciente?.nome || ""} disabled />
-        <label>E-mail</label>
-        <input value={usuario.email || ""} disabled />
-        <label>Telefone</label>
-        <input value={paciente?.telefone || "—"} disabled />
-      </div>
+      {dados && (
+        <div style={{ marginTop: 14 }}>
+          <label>Nome completo</label>
+          <input value={dados.nome} onChange={(e) => setDados({ ...dados, nome: e.target.value })} />
+          <label>Telefone</label>
+          <input value={dados.telefone} onChange={(e) => setDados({ ...dados, telefone: e.target.value })} />
+          <label>Data de nascimento</label>
+          <input type="date" value={dados.dataNasc} onChange={(e) => setDados({ ...dados, dataNasc: e.target.value })} />
+          <label>CPF</label>
+          <input value={dados.cpf} onChange={(e) => setDados({ ...dados, cpf: e.target.value })} />
+          <label>Gênero</label>
+          <select value={dados.genero} onChange={(e) => setDados({ ...dados, genero: e.target.value })}>
+            <option value="">Selecione</option>
+            {["Feminino", "Masculino", "Não-binário", "Não informar"].map((g) => <option key={g}>{g}</option>)}
+          </select>
+          <label>E-mail de acesso</label>
+          <input value={/@interno\.local$/i.test(usuario.email || "") ? "—" : (usuario.email || "")} disabled />
+          <button className="botao-secundario-p" style={{ marginTop: 14 }} onClick={salvarDados} disabled={salvandoDados}>
+            {salvandoDados ? "Salvando..." : "Salvar meus dados"}
+          </button>
+          {msgDados && <p className="erro-p" style={msgDados === "Dados salvos." ? { background: "#DCFCE7", color: "#166534" } : undefined}>{msgDados}</p>}
+        </div>
+      )}
       <p className="texto-vazio-p" style={{ marginTop: 10 }}>
-        Pra corrigir algum desses dados, fale com sua psicóloga.
+        Para trocar o e-mail de acesso, fale com sua psicóloga.
       </p>
       <button className="botao-secundario-p" style={{ marginTop: 14 }} onClick={alterarSenha}>
         <Icone nome="key" tamanho={14} /> Alterar minha senha

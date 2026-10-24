@@ -198,7 +198,7 @@ function PaginaCatalogo() {
         O catálogo de fábulas terapêuticas, ferramentas e psicoeducação é compartilhado por todas as clínicas.
         Só a administradora da plataforma cria, edita e apaga itens. As psicólogas apenas visualizam e enviam aos pacientes.
       </p>
-      <a href="/psi/admin/" target="_blank" rel="noopener"
+      <a href="/psi/admin/?plataforma=1" target="_blank" rel="noopener"
         style={{ display: "inline-block", background: "#4F46E5", color: "white", padding: "10px 18px", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: 14 }}>
         Abrir o gerenciador do catálogo
       </a>
