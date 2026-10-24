@@ -269,7 +269,7 @@ function ModalAniversario({ nome, nomeClinica, corMarca, onClose }) {
 }
 
 // ─── Tela de Consentimento LGPD ──────────────────────────────────
-const VERSAO_LGPD = "1.0";
+const VERSAO_LGPD = "1.1";
 
 function TelaConsentimento({ usuario, paciente, aoAceitar }) {
   const [aceitando, setAceitando] = useState(false);
@@ -305,7 +305,8 @@ function TelaConsentimento({ usuario, paciente, aoAceitar }) {
         <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "14px 16px", marginBottom: 20, fontSize: 12.5, color: "#4B5563", lineHeight: 1.7 }}>
           <strong style={{ display: "block", marginBottom: 8, color: "#111827" }}>O que coletamos e para quê:</strong>
           <p style={{ marginBottom: 6 }}>Dados de saúde mental registrados nas sessões, formulários e ferramentas desta plataforma — exclusivamente para apoio ao acompanhamento terapêutico.</p>
-          <p style={{ marginBottom: 6 }}>Seus dados ficam armazenados com segurança e só podem ser acessados pela sua psicóloga e por você.</p>
+          <p style={{ marginBottom: 6 }}>Seus dados ficam armazenados com segurança, em servidores em São Paulo, e só podem ser acessados pela sua psicóloga e por você.</p>
+          <p style={{ marginBottom: 6 }}>Sua psicóloga pode usar inteligência artificial (Google Gemini) para organizar anotações e redigir resumos. Para isso, o texto das anotações é enviado ao serviço, que pode processá-lo fora do Brasil. Tudo é revisado por ela.</p>
           <p>Base legal: <strong>consentimento</strong> (LGPD art. 11, inciso I — dado de saúde).</p>
         </div>
         <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 20 }}>

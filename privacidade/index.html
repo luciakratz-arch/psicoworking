@@ -29,7 +29,7 @@
   <div class="topo">
     <h1>Política de Privacidade</h1>
     <p>PsiCoWorking &mdash; Plataforma de Apoio ao Atendimento Psicológico</p>
-    <p>Versão 1.0 &mdash; Vigente a partir de setembro de 2026</p>
+    <p>Versão 1.1 &mdash; Vigente a partir de outubro de 2026</p>
   </div>
 
   <div class="conteudo">
@@ -72,8 +72,9 @@
       <li><strong>Apoio ao acompanhamento terapêutico:</strong> armazenar e organizar os registros clínicos para uso exclusivo da psicóloga responsável e do próprio paciente.</li>
       <li><strong>Comunicação clínica:</strong> envio de links de questionários e formulários por WhatsApp ou e-mail, sempre com finalidade exclusivamente terapêutica.</li>
       <li><strong>Segurança e integridade:</strong> manter registros de auditoria para proteger o paciente e a profissional contra uso indevido.</li>
+      <li><strong>Apoio da inteligência artificial à psicóloga:</strong> para organizar anotações de sessão e redigir resumos de acompanhamento, a psicóloga pode usar um serviço de inteligência artificial (Google Gemini). Nesse caso, são enviados ao serviço o texto das anotações e, em alguns recursos, o nome do paciente e as informações clínicas já cadastradas (como CID e medicações). A inteligência artificial não toma decisões clínicas: tudo o que ela produz é revisado e assinado pela psicóloga, que é a responsável pelo conteúdo.</li>
     </ul>
-    <p>Os dados <strong>nunca são vendidos, compartilhados com terceiros ou usados para fins de marketing</strong>.</p>
+    <p>Os dados <strong>nunca são vendidos nem usados para fins de marketing</strong>, e só são compartilhados com os prestadores de serviço de tecnologia listados na seção &ldquo;Operadores e transferência internacional de dados&rdquo;, necessários para o funcionamento da plataforma.</p>
 
     <h2>4. Base Legal</h2>
     <p>O tratamento de dados de saúde mental tem como base legal o <strong>consentimento explícito do titular</strong> (LGPD art. 11, inciso I), coletado antes do primeiro acesso ao portal do paciente. O consentimento pode ser revogado a qualquer momento — veja a seção de Direitos do Titular.</p>
@@ -84,10 +85,12 @@
 
     <h2>6. Segurança dos Dados</h2>
     <ul>
-      <li>Todos os dados são armazenados no <strong>Google Firebase (Firestore)</strong>, com criptografia em trânsito (TLS) e em repouso.</li>
+      <li>Todos os dados são armazenados no <strong>Google Firebase (Firestore)</strong>, em servidores localizados em São Paulo (Brasil), com criptografia em trânsito (TLS) e em repouso.</li>
       <li>O acesso é restrito por autenticação Firebase Auth (login com e-mail e senha) e por regras de segurança que isolam os dados de cada clínica.</li>
       <li>Nenhuma senha de paciente é armazenada em texto legível — o Firebase cuida do hash das senhas.</li>
-      <li>O acesso a prontuários é registrado em log de auditoria.</li>
+      <li>O prontuário (anotações de sessão, crises e perfil clínico) é acessível apenas pela psicóloga responsável. A secretaria da clínica não tem acesso a esse conteúdo.</li>
+      <li>Ações sensíveis, como cadastro de pacientes, envio de acessos e alterações de contas, são registradas em log de auditoria.</li>
+      <li>São feitas cópias de segurança automáticas diárias do banco de dados, mantidas por 7 dias, para recuperar os dados em caso de falha ou perda acidental.</li>
     </ul>
 
     <h2>7. Direitos do Titular (LGPD art. 18)</h2>
@@ -108,13 +111,25 @@
     <h2>9. Menores de Idade</h2>
     <p>Para pacientes menores de 18 anos, o consentimento deve ser concedido pelo responsável legal, que também tem acesso aos direitos previstos nesta política.</p>
 
-    <h2>10. Alterações nesta Política</h2>
+    <h2>10. Operadores e Transferência Internacional de Dados</h2>
+    <p>Para funcionar, a plataforma utiliza prestadores de serviço (operadores) que tratam dados em nome do controlador:</p>
+    <ul>
+      <li><strong>Google (Firebase e Google Cloud):</strong> banco de dados, login, armazenamento de arquivos e execução do sistema. Os dados ficam em servidores em São Paulo.</li>
+      <li><strong>Google (Gemini):</strong> inteligência artificial usada pela psicóloga, conforme descrito na seção 3. O processamento pode ocorrer em servidores fora do Brasil, o que caracteriza transferência internacional de dados, realizada com fundamento no seu consentimento e em cláusulas dos termos do prestador.</li>
+      <li><strong>Gmail (Google):</strong> envio de e-mails da plataforma, como acesso ao portal, avisos e lembretes.</li>
+      <li><strong>WhatsApp:</strong> quando a psicóloga envia um link ou mensagem ao paciente, o envio é feito a partir do aparelho dela, e o conteúdo da conversa passa a seguir as regras desse aplicativo.</li>
+    </ul>
+
+    <h2>11. Incidentes de Segurança</h2>
+    <p>Em caso de incidente que possa acarretar risco ou dano relevante aos titulares, a encarregada de dados comunicará a Autoridade Nacional de Proteção de Dados (ANPD) e os titulares afetados, em prazo razoável, informando a natureza dos dados envolvidos, os riscos e as medidas adotadas (LGPD art. 48).</p>
+
+    <h2>12. Alterações nesta Política</h2>
     <p>Esta política pode ser atualizada. Em caso de alterações relevantes, os pacientes serão informados no próximo acesso ao portal e precisarão consentir novamente.</p>
 
     <div class="rodape">
       <p>A!Equipe Desenvolvimento Humano e Cultural &mdash; CNPJ 07.242.408/0001-19</p>
       <p>DPO: Dra. Lucia Kratz &mdash; <a href="mailto:contato@luciakratz.com.br">contato@luciakratz.com.br</a></p>
-      <p style="margin-top: 6px;">Versão 1.0 &mdash; Setembro de 2026</p>
+      <p style="margin-top: 6px;">Versão 1.1 &mdash; Outubro de 2026</p>
     </div>
 
   </div>
