@@ -73,6 +73,9 @@ beforeEach(async () => {
     await setDoc(doc(d, "clinica_links_partilhados/tokenA"), { psi_id: "clinA", nome: "x" });
     await setDoc(doc(d, "clinica_metas/metaA1"), { psi_id: "clinA", pacienteId: "pacA1", titulo: "Meta", progresso: 10, status: "ativa" });
     await setDoc(doc(d, "fabulas_terapeuticas/fab1"), { titulo: "Fábula", paginas: [] });
+    for (const c of ["clinica_humor", "clinica_gestao_ansiedade", "clinica_tcc", "clinica_reflexoes", "clinica_anamneses", "clinica_registro_abc", "clinica_arvore_decisao", "clinica_relaxamento", "clinica_rastreamento_alimentar", "clinica_treino_auditivo", "clinica_rastreamento_bipolar"]) {
+      await setDoc(doc(d, c + "/regA1"), { psi_id: "clinA", pacienteId: "pacA1" });
+    }
   });
 });
 
@@ -292,5 +295,22 @@ describe("Fábulas: só a administradora da plataforma altera", () => {
     await assertSucceeds(updateDoc(doc(matriz(), "fabulas_terapeuticas/fab1"), { titulo: "Revisada" }));
     await assertSucceeds(addDoc(collection(matriz(), "fabulas_terapeuticas"), { titulo: "Nova" }));
     await assertSucceeds(deleteDoc(doc(matriz(), "fabulas_terapeuticas/fab1")));
+  });
+});
+
+describe("Paciente lê os próprios registros (histórico no portal e exportação LGPD)", () => {
+  const MEUS = ["clinica_humor", "clinica_gestao_ansiedade", "clinica_tcc", "clinica_reflexoes", "clinica_anamneses", "clinica_registro_abc", "clinica_arvore_decisao", "clinica_relaxamento", "clinica_rastreamento_alimentar", "clinica_treino_auditivo"];
+  for (const c of MEUS) {
+    test("lê o próprio registro em " + c + ", mas outro paciente e outra clínica não", async () => {
+      await assertSucceeds(getDoc(doc(pacA1(), c + "/regA1")));
+      await assertSucceeds(getDocs(query(collection(pacA1(), c), where("psi_id", "==", "clinA"), where("pacienteId", "==", "pacA1"))));
+      await assertFails(getDoc(doc(pacA2(), c + "/regA1")));
+      await assertFails(getDoc(doc(pacB1(), c + "/regA1")));
+      await assertFails(getDoc(doc(psiB(), c + "/regA1")));
+    });
+  }
+  test("a avaliação clínica (rastreamento diagnóstico) continua só com a psicóloga", async () => {
+    await assertFails(getDoc(doc(pacA1(), "clinica_rastreamento_bipolar/regA1")));
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_rastreamento_bipolar/regA1")));
   });
 });

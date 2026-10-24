@@ -1098,11 +1098,17 @@ function TelaMinhaConta({ usuario, paciente }) {
       ];
       const resultado = { paciente: paciente || {}, dados: {} };
       await Promise.all(colecoes.map(async (col) => {
-        const snap = await db.collection(col)
-          .where("psi_id", "==", psi)
-          .where("pacienteId", "==", uid)
-          .get();
-        resultado.dados[col] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Se alguma área não puder ser lida (ex.: avaliações clínicas, que ficam com a
+        // psicóloga), segue com as demais em vez de derrubar a exportação inteira.
+        try {
+          const snap = await db.collection(col)
+            .where("psi_id", "==", psi)
+            .where("pacienteId", "==", uid)
+            .get();
+          resultado.dados[col] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        } catch (e) {
+          resultado.dados[col] = [];
+        }
       }));
       const blob = new Blob([JSON.stringify(resultado, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);

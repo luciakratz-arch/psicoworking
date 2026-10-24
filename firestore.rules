@@ -164,6 +164,8 @@ service cloud.firestore {
 
     match /clinica_anamneses/{registroId} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica()
                            && request.resource.data.pacienteId == request.auth.uid;
@@ -184,6 +186,8 @@ service cloud.firestore {
     }
     match /clinica_rastreamento_alimentar/{registroId} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
     }
     match /clinica_rastreamento_sexual/{registroId} {
       allow read, write: if ehEquipeMantendoClinica();
@@ -194,6 +198,8 @@ service cloud.firestore {
 
     match /clinica_tcc/{registroId} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica()
                            && request.resource.data.pacienteId == request.auth.uid;
@@ -201,6 +207,8 @@ service cloud.firestore {
 
     match /clinica_humor/{registroId} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica()
                            && request.resource.data.pacienteId == request.auth.uid;
@@ -235,36 +243,48 @@ service cloud.firestore {
 
     match /clinica_gestao_ansiedade/{id} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica();
     }
 
     match /clinica_arvore_decisao/{id} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica();
     }
 
     match /clinica_registro_abc/{id} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica();
     }
 
     match /clinica_relaxamento/{id} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica();
     }
 
     match /clinica_rastreamento_alimentar/{id} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica();
     }
 
     match /clinica_treino_auditivo/{id} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica();
     }
@@ -406,6 +426,8 @@ service cloud.firestore {
     // ── Reflexões escritas pelo paciente ao final de uma fábula ──
     match /clinica_reflexoes/{id} {
       allow read, write: if ehEquipeMantendoClinica();
+      // O paciente lê só os próprios registros (exportação e histórico no portal).
+      allow read: if ehDonoPaciente(resource.data.psi_id, resource.data.pacienteId);
       allow read, create: if estaLogado() && carimboPapel() == 'paciente'
                            && request.resource.data.psi_id == carimboClinica();
     }
