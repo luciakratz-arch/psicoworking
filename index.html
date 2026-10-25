@@ -12,8 +12,8 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --marca: #6A2BD9;
-      --marca-escuro: #4C1FA3;
-      --marca-claro: #F5F3FF;
+      --marca-escuro: #3B0D6F;
+      --marca-claro: #F6EFFD;
       --texto: #111827;
       --texto-suave: #6B7280;
       --borda: #E5E7EB;
@@ -26,8 +26,10 @@
       border-bottom: 1px solid var(--borda); padding: 0 24px; }
     .nav-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center;
       justify-content: space-between; height: 60px; }
-    .nav-logo { font-size: 17px; font-weight: 700; color: var(--marca); letter-spacing: -.3px; }
-    .nav-logo span { color: var(--texto); font-weight: 400; }
+    .nav-logo { font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+    .nav-logo .l-psi { color: #3B0D6F; }
+    .nav-logo .l-co { color: #A97BEF; }
+    .nav-logo .l-wk { color: #6A2BD9; }
     .nav-links { display: flex; gap: 8px; align-items: center; }
     .nav-links a { font-size: 13px; font-weight: 500; color: var(--texto-suave); padding: 6px 12px;
       border-radius: 8px; transition: color .15s; }
@@ -37,7 +39,7 @@
     .btn-nav:hover { opacity: .9; color: white !important; }
 
     /* ── Hero ── */
-    .hero { background: linear-gradient(135deg, #2D1B69 0%, #6A2BD9 60%, #8B5CF6 100%);
+    .hero { background: linear-gradient(135deg, #3B0D6F 0%, #6A2BD9 60%, #A97BEF 100%);
       color: white; padding: 80px 24px 100px; text-align: center; }
     .hero-inner { max-width: 760px; margin: 0 auto; }
     .hero-badge { display: inline-block; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
@@ -45,7 +47,7 @@
       letter-spacing: .3px; }
     .hero h1 { font-size: clamp(28px, 5vw, 48px); font-weight: 700; line-height: 1.15;
       margin-bottom: 20px; letter-spacing: -.5px; }
-    .hero h1 em { font-style: normal; color: #C4B5FD; }
+    .hero h1 em { font-style: normal; color: #EADDFC; }
     .hero p { font-size: 17px; opacity: .85; line-height: 1.65; margin-bottom: 36px; }
     .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
     .btn-hero { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px;
@@ -75,7 +77,7 @@
     .grid-3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
     .cartao { border: 1px solid var(--borda); border-radius: 16px; padding: 24px;
       background: white; transition: box-shadow .2s; }
-    .cartao:hover { box-shadow: 0 4px 20px rgba(106,43,217,.1); border-color: #C4B5FD; }
+    .cartao:hover { box-shadow: 0 4px 20px rgba(106,43,217,.1); border-color: #EADDFC; }
     .cartao-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--marca-claro);
       display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px; }
     .cartao h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
@@ -138,7 +140,7 @@
 <!-- ── Nav ── -->
 <nav class="nav">
   <div class="nav-inner">
-    <div class="nav-logo">Psi<span>Co</span>Working</div>
+    <div class="nav-logo"><span class="l-psi">Psi</span><span class="l-co">Co</span><span class="l-wk">Working</span></div>
     <div class="nav-links">
       <a href="#funcionalidades">Funcionalidades</a>
       <a href="#interesse">Para psicólogas</a>
