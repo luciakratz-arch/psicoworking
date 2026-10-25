@@ -425,6 +425,19 @@ service cloud.firestore {
       allow write: if ehAdminMatriz();
     }
 
+    // ── Pedido de mudança de plano feito pela psicóloga (um por clínica) ──
+    // Ela só consegue pedir; quem aplica o plano e registra o pagamento é a administradora.
+    match /psi_pedidos_plano/{psiId} {
+      allow read: if ehAdminMatriz() || ehEquipeDaClinica(psiId);
+      allow create, update: if ehPsicologaDaClinica(psiId)
+                            && request.resource.data.keys().hasOnly(['psi_id', 'nomeClinica', 'de', 'para', 'ciclo', 'status', 'pedidoEm'])
+                            && request.resource.data.psi_id == psiId
+                            && request.resource.data.status == 'pendente'
+                            && request.resource.data.para in ['essencial', 'plus']
+                            && request.resource.data.ciclo in ['mensal', 'anual'];
+      allow update, delete: if ehAdminMatriz();
+    }
+
     match /clinica_comissoes/{comissaoId} {
       allow read, write: if ehEquipeMantendoClinica()
                           || (request.method == 'create' && ehEquipeEscrevendo(request.resource.data.psi_id));
@@ -474,7 +487,16 @@ service cloud.firestore {
     // ── Formulário de interesse (site institucional) ─────────────
     // Qualquer pessoa pode criar (sem login) — só a Admin Matriz lê.
     match /psi_interesse/{docId} {
-      allow create: if true;
+      // Qualquer pessoa envia o pedido, mas só com os campos esperados e tamanhos
+      // razoáveis (sem status, sem campos extras): evita lixo e preenchimento malicioso.
+      allow create: if request.resource.data.keys().hasOnly(['nome', 'email', 'telefone', 'cidade', 'origem', 'crp', 'indicadoPor', 'aceitouPoliticaEm', 'criadoEm'])
+                    && request.resource.data.nome is string && request.resource.data.nome.size() >= 2 && request.resource.data.nome.size() <= 120
+                    && request.resource.data.email is string && request.resource.data.email.size() <= 160
+                    && request.resource.data.email.matches('.+@.+[.].+')
+                    && request.resource.data.get('crp', '') is string && request.resource.data.get('crp', '').size() <= 20
+                    && request.resource.data.get('telefone', '') is string && request.resource.data.get('telefone', '').size() <= 40
+                    && request.resource.data.get('cidade', '') is string && request.resource.data.get('cidade', '').size() <= 80
+                    && request.resource.data.get('indicadoPor', '') is string && request.resource.data.get('indicadoPor', '').size() <= 120;
       allow read, update, delete: if ehAdminMatriz();
     }
 

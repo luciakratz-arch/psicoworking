@@ -8,6 +8,108 @@
 
 const storage = appAdmin.storage();
 
+// Plano da clínica: situação, vencimento, uso da IA e pedido de mudança de plano.
+// O pedido só avisa a administradora; ela aplica o plano e registra o pagamento.
+function CartaoMeuPlano({ usuario }) {
+  const a = usarAssinatura(usuario.psiId);
+  const [planos, setPlanos] = useState(null);
+  const [pedido, setPedido] = useState(null);
+  const [para, setPara] = useState("plus");
+  const [ciclo, setCiclo] = useState("mensal");
+  const [enviando, setEnviando] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    return db.collection("plataforma_config").doc("planos").onSnapshot(
+      (s) => setPlanos(s.exists ? s.data() : {}),
+      () => setPlanos({})
+    );
+  }, []);
+  useEffect(() => {
+    return db.collection("psi_pedidos_plano").doc(usuario.psiId).onSnapshot(
+      (s) => setPedido(s.exists ? s.data() : null),
+      () => setPedido(null)
+    );
+  }, [usuario.psiId]);
+
+  if (!a) return null;
+
+  const padrao = {
+    essencial: { nome: "Essencial", precoMensal: 39.9, precoAnual: 399 },
+    plus: { nome: "Plus", precoMensal: 69.9, precoAnual: 699 },
+  };
+  const p = (id) => ({ ...padrao[id], ...((planos && planos[id]) || {}) });
+  const moeda = (v) => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dataBr = (ts) => (ts && ts.toDate ? ts.toDate().toLocaleDateString("pt-BR") : "");
+
+  const fundadora = a.origem === "fundadora";
+  const nomePlano = fundadora ? "Fundadora (acesso integral, sem cobrança)" : p(a.plano).nome;
+  const situacaoTxt = {
+    teste: "Em teste até " + dataBr(a.testeAte),
+    ativa: "Ativa" + (a.proximoVencimento ? ", próximo vencimento em " + dataBr(a.proximoVencimento) : ""),
+    atrasada: "Pagamento em atraso",
+    somente_leitura: "Somente leitura até " + dataBr(a.leituraAte),
+    suspensa: "Suspensa",
+    cancelada: "Cancelada",
+  }[a.situacao] || a.situacao;
+  const pendente = pedido && pedido.status === "pendente";
+  const jaEhEsse = !fundadora && a.situacao !== "teste" && a.plano === para;
+
+  async function pedirMudanca() {
+    setEnviando(true);
+    setMsg("");
+    try {
+      await db.collection("psi_pedidos_plano").doc(usuario.psiId).set({
+        psi_id: usuario.psiId,
+        nomeClinica: usuario.email,
+        de: a.plano || "essencial",
+        para,
+        ciclo,
+        status: "pendente",
+        pedidoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setMsg("Pedido enviado. Entraremos em contato para combinar o pagamento e liberar o plano.");
+    } catch (e) {
+      setMsg("Não foi possível enviar: " + e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="cartao-config" style={{ marginBottom: 16 }}>
+      <label>Meu plano</label>
+      <p className="dica-campo">
+        <strong>{nomePlano}</strong> · {situacaoTxt}
+      </p>
+      <AvisoPlanoIA usuario={usuario} />
+      {!fundadora && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <select value={para} onChange={(e) => setPara(e.target.value)}>
+              <option value="essencial">{p("essencial").nome}: {moeda(p("essencial").precoMensal)}/mês, sem IA</option>
+              <option value="plus">{p("plus").nome}: {moeda(p("plus").precoMensal)}/mês, com IA</option>
+            </select>
+            <select value={ciclo} onChange={(e) => setCiclo(e.target.value)}>
+              <option value="mensal">Pagamento mensal</option>
+              <option value="anual">Pagamento anual ({moeda(p(para).precoAnual)}, com desconto)</option>
+            </select>
+            <button type="button" className="botao-secundario" onClick={pedirMudanca} disabled={enviando || pendente || jaEhEsse}>
+              {pendente ? "Pedido já enviado" : jaEhEsse ? "Este já é o seu plano" : enviando ? "Enviando..." : "Quero este plano"}
+            </button>
+          </div>
+          {pendente && (
+            <p className="dica-campo" style={{ marginTop: 8 }}>
+              Você já pediu {p(pedido.para).nome} ({pedido.ciclo}) em {dataBr(pedido.pedidoEm)}. Aguarde o nosso contato.
+            </p>
+          )}
+          {msg && <p className="dica-campo" style={{ marginTop: 8 }}>{msg}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TelaConfiguracoes({ usuario }) {
   const [nome, setNome] = useState("");
   const [corPrimaria, setCorPrimaria] = useState("#6A2BD9");
@@ -143,6 +245,8 @@ function TelaConfiguracoes({ usuario }) {
       <div className="cabecalho-secao">
         <h2>Configurações</h2>
       </div>
+
+      {usuario.role === "psi" && <CartaoMeuPlano usuario={usuario} />}
 
       <form className="cartao-config" onSubmit={aoSalvar}>
         <label>Nome da clínica (ou seu nome)</label>

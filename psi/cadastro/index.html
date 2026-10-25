@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadastro de psicóloga — PsiCoWorking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "DM Sans", system-ui, sans-serif; background: linear-gradient(150deg, #EADDFC 0%, #F3F4F6 60%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; color: #1F1B2E; }
+    .cartao { background: white; border-radius: 20px; padding: 34px; width: 100%; max-width: 480px; box-shadow: 0 8px 40px rgba(106,43,217,0.14); }
+    .marca { font-size: 15px; font-weight: 700; margin-bottom: 18px; }
+    h1 { font-size: 22px; margin-bottom: 6px; }
+    .sub { font-size: 13.5px; color: #6B7280; line-height: 1.6; margin-bottom: 8px; }
+    .destaque { background: #F5F0FF; border-left: 3px solid #6A2BD9; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13px; color: #374151; line-height: 1.6; margin: 14px 0 6px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 5px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 11px 14px; border: 1.5px solid #E5E7EB; border-radius: 10px; font-size: 14px; font-family: inherit; }
+    input:focus { outline: none; border-color: #6A2BD9; }
+    .linha-aceite { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; font-size: 13px; color: #374151; line-height: 1.5; }
+    .linha-aceite input { margin-top: 3px; }
+    .linha-aceite label { margin: 0; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 13px; color: #374151; }
+    a { color: #6A2BD9; font-weight: 600; }
+    button { width: 100%; margin-top: 22px; padding: 14px; background: #6A2BD9; color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: default; }
+    .erro { background: #FEE2E2; color: #B91C1C; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-top: 14px; display: none; }
+    .sucesso { display: none; text-align: center; }
+    .sucesso h2 { font-size: 20px; color: #3B0D6F; margin-bottom: 10px; }
+    .sucesso p { font-size: 14px; color: #6B7280; line-height: 1.7; }
+    .oculto { position: absolute; left: -9999px; height: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div class="cartao">
+    <div class="marca"><span style="color:#3B0D6F">Psi</span><span style="color:#A97BEF">Co</span><span style="color:#6A2BD9">Working</span></div>
+
+    <div id="formulario">
+      <h1>Cadastro de psicóloga</h1>
+      <p class="sub">Peça seu acesso ao PsiCoWorking: prontuário, agenda, financeiro, portal do paciente e ferramentas terapêuticas em um só lugar.</p>
+      <div class="destaque">Teste gratuito por <strong>30 dias</strong>, sem cartão. Antes de liberar o acesso, conferimos o seu CRP.</div>
+
+      <form id="form" novalidate>
+        <label for="nome">Nome completo *</label>
+        <input type="text" id="nome" autocomplete="name" maxlength="120" />
+        <label for="email">E-mail *</label>
+        <input type="email" id="email" autocomplete="email" maxlength="160" />
+        <label for="crp">CRP *</label>
+        <input type="text" id="crp" placeholder="ex: 09/12345" maxlength="20" />
+        <label for="telefone">Telefone / WhatsApp</label>
+        <input type="tel" id="telefone" autocomplete="tel" maxlength="40" />
+        <label for="cidade">Cidade</label>
+        <input type="text" id="cidade" maxlength="80" />
+        <label for="indicadoPor">Quem indicou (opcional)</label>
+        <input type="text" id="indicadoPor" maxlength="120" />
+
+        <div class="oculto"><label for="site">Não preencha</label><input type="text" id="site" tabindex="-1" autocomplete="off" /></div>
+
+        <div class="linha-aceite">
+          <input type="checkbox" id="aceite" />
+          <label for="aceite">Li e concordo com o tratamento dos meus dados para análise do cadastro, conforme a <a href="/privacidade/" target="_blank" rel="noopener">Política de Privacidade</a>.</label>
+        </div>
+
+        <div class="erro" id="erro"></div>
+        <button type="submit" id="enviar">Solicitar acesso</button>
+      </form>
+    </div>
+
+    <div class="sucesso" id="sucesso">
+      <h2>Pedido recebido</h2>
+      <p>Obrigada pelo interesse. Vamos conferir o seu CRP e, assim que for aprovado, você receberá um e-mail com o link para criar a sua senha e começar o teste de 30 dias.</p>
+    </div>
+  </div>
+
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyCJx1RwX5-FM2wcUqzeC_CYAUdkmTKU2u4",
+      authDomain: "psicoworking.firebaseapp.com",
+      projectId: "psicoworking",
+      storageBucket: "psicoworking.firebasestorage.app",
+      messagingSenderId: "176262015536",
+      appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
+    });
+    const db = firebase.firestore();
+    const $ = (id) => document.getElementById(id);
+
+    // Link de indicação: ?ind=Nome preenche o campo "quem indicou".
+    try {
+      const ind = new URLSearchParams(window.location.search).get("ind");
+      if (ind) $("indicadoPor").value = ind.slice(0, 120);
+    } catch (e) {}
+
+    function mostrarErro(texto) {
+      const el = $("erro");
+      el.textContent = texto;
+      el.style.display = "block";
+    }
+
+    $("form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      $("erro").style.display = "none";
+      if ($("site").value) return; // campo-armadilha contra robôs
+      const nome = $("nome").value.trim();
+      const email = $("email").value.trim();
+      const crp = $("crp").value.trim();
+      if (nome.length < 3) return mostrarErro("Informe o seu nome completo.");
+      if (!/^\S+@\S+\.\S+$/.test(email)) return mostrarErro("Informe um e-mail válido.");
+      if (crp.length < 4) return mostrarErro("Informe o seu CRP.");
+      if (!$("aceite").checked) return mostrarErro("Marque o aceite da Política de Privacidade para continuar.");
+      $("enviar").disabled = true;
+      $("enviar").textContent = "Enviando...";
+      try {
+        const agora = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection("psi_interesse").add({
+          nome, email, crp,
+          telefone: $("telefone").value.trim(),
+          cidade: $("cidade").value.trim(),
+          indicadoPor: $("indicadoPor").value.trim(),
+          origem: "autocadastro",
+          aceitouPoliticaEm: agora,
+          criadoEm: agora,
+        });
+        $("formulario").style.display = "none";
+        $("sucesso").style.display = "block";
+      } catch (e) {
+        mostrarErro("Não foi possível enviar agora. Tente de novo em instantes ou escreva para contato@luciakratz.com.br.");
+        $("enviar").disabled = false;
+        $("enviar").textContent = "Solicitar acesso";
+      }
+    });
+  </script>
+</body>
+</html>

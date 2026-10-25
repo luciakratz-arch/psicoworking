@@ -394,3 +394,36 @@ describe("Assinatura, planos e situação da clínica", () => {
     await assertSucceeds(updateDoc(doc(matriz(), "psi_interesse/int1"), { status: "aprovado" }));
   });
 });
+
+describe("Autocadastro de psicóloga e pedido de mudança de plano", () => {
+  const valido = () => ({ nome: "Ana Souza", email: "ana@exemplo.com", crp: "06/12345", telefone: "11999990000", cidade: "Goiânia", indicadoPor: "Lucia", origem: "autocadastro", criadoEm: new Date() });
+  test("o público envia um pedido válido", async () => {
+    await assertSucceeds(addDoc(collection(semLogin(), "psi_interesse"), valido()));
+    await assertSucceeds(addDoc(collection(semLogin(), "psi_interesse"), { nome: "Maria", email: "m@x.com", origem: "site", criadoEm: new Date() }));
+  });
+  test("o público não consegue enviar status, campos extras, e-mail inválido ou nome enorme", async () => {
+    await assertFails(addDoc(collection(semLogin(), "psi_interesse"), { ...valido(), status: "aprovado" }));
+    await assertFails(addDoc(collection(semLogin(), "psi_interesse"), { ...valido(), role: "admin_matriz" }));
+    await assertFails(addDoc(collection(semLogin(), "psi_interesse"), { ...valido(), email: "sem-arroba" }));
+    await assertFails(addDoc(collection(semLogin(), "psi_interesse"), { ...valido(), nome: "x".repeat(500) }));
+    await assertFails(addDoc(collection(semLogin(), "psi_interesse"), { ...valido(), nome: "A" }));
+  });
+  const pedido = (o) => ({ psi_id: "clinA", nomeClinica: "Clínica A", de: "essencial", para: "plus", ciclo: "mensal", status: "pendente", pedidoEm: new Date(), ...o });
+  test("a psicóloga pede mudança de plano na própria clínica", async () => {
+    await assertSucceeds(setDoc(doc(psiA(), "psi_pedidos_plano/clinA"), pedido()));
+    await assertSucceeds(getDoc(doc(psiA(), "psi_pedidos_plano/clinA")));
+    await assertSucceeds(getDoc(doc(matriz(), "psi_pedidos_plano/clinA")));
+  });
+  test("não pede em nome de outra clínica, não se autoaprova e a secretária não pede", async () => {
+    await assertFails(setDoc(doc(psiA(), "psi_pedidos_plano/clinB"), pedido({ psi_id: "clinB" })));
+    await assertFails(setDoc(doc(psiA(), "psi_pedidos_plano/clinA"), pedido({ status: "atendido" })));
+    await assertFails(setDoc(doc(psiA(), "psi_pedidos_plano/clinA"), pedido({ para: "premium" })));
+    await assertFails(setDoc(doc(secA(), "psi_pedidos_plano/clinA"), pedido()));
+    await assertFails(setDoc(doc(pacA1(), "psi_pedidos_plano/clinA"), pedido()));
+    await assertFails(getDoc(doc(psiB(), "psi_pedidos_plano/clinA")));
+  });
+  test("a administradora marca o pedido como atendido", async () => {
+    await assertSucceeds(setDoc(doc(psiA(), "psi_pedidos_plano/clinA"), pedido()));
+    await assertSucceeds(updateDoc(doc(matriz(), "psi_pedidos_plano/clinA"), { status: "atendido" }));
+  });
+});

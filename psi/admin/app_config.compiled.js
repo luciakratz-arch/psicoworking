@@ -7,6 +7,130 @@
 // ═══════════════════════════════════════════════════════════════
 
 const storage = appAdmin.storage();
+
+// Plano da clínica: situação, vencimento, uso da IA e pedido de mudança de plano.
+// O pedido só avisa a administradora; ela aplica o plano e registra o pagamento.
+function CartaoMeuPlano({
+  usuario
+}) {
+  const a = usarAssinatura(usuario.psiId);
+  const [planos, setPlanos] = useState(null);
+  const [pedido, setPedido] = useState(null);
+  const [para, setPara] = useState("plus");
+  const [ciclo, setCiclo] = useState("mensal");
+  const [enviando, setEnviando] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    return db.collection("plataforma_config").doc("planos").onSnapshot(s => setPlanos(s.exists ? s.data() : {}), () => setPlanos({}));
+  }, []);
+  useEffect(() => {
+    return db.collection("psi_pedidos_plano").doc(usuario.psiId).onSnapshot(s => setPedido(s.exists ? s.data() : null), () => setPedido(null));
+  }, [usuario.psiId]);
+  if (!a) return null;
+  const padrao = {
+    essencial: {
+      nome: "Essencial",
+      precoMensal: 39.9,
+      precoAnual: 399
+    },
+    plus: {
+      nome: "Plus",
+      precoMensal: 69.9,
+      precoAnual: 699
+    }
+  };
+  const p = id => ({
+    ...padrao[id],
+    ...(planos && planos[id] || {})
+  });
+  const moeda = v => "R$ " + Number(v || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  const dataBr = ts => ts && ts.toDate ? ts.toDate().toLocaleDateString("pt-BR") : "";
+  const fundadora = a.origem === "fundadora";
+  const nomePlano = fundadora ? "Fundadora (acesso integral, sem cobrança)" : p(a.plano).nome;
+  const situacaoTxt = {
+    teste: "Em teste até " + dataBr(a.testeAte),
+    ativa: "Ativa" + (a.proximoVencimento ? ", próximo vencimento em " + dataBr(a.proximoVencimento) : ""),
+    atrasada: "Pagamento em atraso",
+    somente_leitura: "Somente leitura até " + dataBr(a.leituraAte),
+    suspensa: "Suspensa",
+    cancelada: "Cancelada"
+  }[a.situacao] || a.situacao;
+  const pendente = pedido && pedido.status === "pendente";
+  const jaEhEsse = !fundadora && a.situacao !== "teste" && a.plano === para;
+  async function pedirMudanca() {
+    setEnviando(true);
+    setMsg("");
+    try {
+      await db.collection("psi_pedidos_plano").doc(usuario.psiId).set({
+        psi_id: usuario.psiId,
+        nomeClinica: usuario.email,
+        de: a.plano || "essencial",
+        para,
+        ciclo,
+        status: "pendente",
+        pedidoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setMsg("Pedido enviado. Entraremos em contato para combinar o pagamento e liberar o plano.");
+    } catch (e) {
+      setMsg("Não foi possível enviar: " + e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "cartao-config",
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Meu plano"), /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo"
+  }, /*#__PURE__*/React.createElement("strong", null, nomePlano), " \xB7 ", situacaoTxt), /*#__PURE__*/React.createElement(AvisoPlanoIA, {
+    usuario: usuario
+  }), !fundadora && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("select", {
+    value: para,
+    onChange: e => setPara(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "essencial"
+  }, p("essencial").nome, ": ", moeda(p("essencial").precoMensal), "/m\xEAs, sem IA"), /*#__PURE__*/React.createElement("option", {
+    value: "plus"
+  }, p("plus").nome, ": ", moeda(p("plus").precoMensal), "/m\xEAs, com IA")), /*#__PURE__*/React.createElement("select", {
+    value: ciclo,
+    onChange: e => setCiclo(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "mensal"
+  }, "Pagamento mensal"), /*#__PURE__*/React.createElement("option", {
+    value: "anual"
+  }, "Pagamento anual (", moeda(p(para).precoAnual), ", com desconto)")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: pedirMudanca,
+    disabled: enviando || pendente || jaEhEsse
+  }, pendente ? "Pedido já enviado" : jaEhEsse ? "Este já é o seu plano" : enviando ? "Enviando..." : "Quero este plano")), pendente && /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo",
+    style: {
+      marginTop: 8
+    }
+  }, "Voc\xEA j\xE1 pediu ", p(pedido.para).nome, " (", pedido.ciclo, ") em ", dataBr(pedido.pedidoEm), ". Aguarde o nosso contato."), msg && /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo",
+    style: {
+      marginTop: 8
+    }
+  }, msg)));
+}
 function TelaConfiguracoes({
   usuario
 }) {
@@ -124,7 +248,9 @@ function TelaConfiguracoes({
     className: "conteudo"
   }, /*#__PURE__*/React.createElement("div", {
     className: "cabecalho-secao"
-  }, /*#__PURE__*/React.createElement("h2", null, "Configura\xE7\xF5es")), /*#__PURE__*/React.createElement("form", {
+  }, /*#__PURE__*/React.createElement("h2", null, "Configura\xE7\xF5es")), usuario.role === "psi" && /*#__PURE__*/React.createElement(CartaoMeuPlano, {
+    usuario: usuario
+  }), /*#__PURE__*/React.createElement("form", {
     className: "cartao-config",
     onSubmit: aoSalvar
   }, /*#__PURE__*/React.createElement("label", null, "Nome da cl\xEDnica (ou seu nome)"), /*#__PURE__*/React.createElement("input", {

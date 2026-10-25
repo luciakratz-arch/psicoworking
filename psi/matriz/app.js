@@ -292,6 +292,46 @@ function textoIA(a, planos) {
   return usos + (cota === null || cota === undefined ? " (sem limite)" : " de " + cota);
 }
 
+// Pedidos de mudança de plano feitos pelas psicólogas dentro do sistema.
+function CartaoPedidosPlano({ lista, planos, irPara }) {
+  const [pedidos, setPedidos] = useState([]);
+  useEffect(() => {
+    return db.collection("psi_pedidos_plano").onSnapshot(
+      (snap) => setPedidos(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.status === "pendente")),
+      () => {}
+    );
+  }, []);
+  async function atender(p) {
+    try { await db.collection("psi_pedidos_plano").doc(p.id).update({ status: "atendido" }); } catch (e) { alert("Erro: " + e.message); }
+  }
+  if (pedidos.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div className="pagina-titulo" style={{ fontSize: 15 }}>Pedidos de mudança de plano ({pedidos.length})</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {pedidos.map((p) => {
+          const c = lista.find((x) => x.id === p.psi_id);
+          const nomePlano = (id) => (id === "plus" ? planos.plus.nome : planos.essencial.nome);
+          return (
+            <div key={p.id} className="painel-form" style={{ maxWidth: 720, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{(c && c.nome) || p.nomeClinica || p.psi_id}</div>
+                <div style={{ fontSize: 12, color: "#6B7280" }}>
+                  {"Quer mudar de " + nomePlano(p.de) + " para " + nomePlano(p.para) + " (" + p.ciclo + ")" + (p.pedidoEm ? " · pedido em " + dataBr(p.pedidoEm) : "")}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-ghost" onClick={() => atender(p)}>Marcar atendido</button>
+                <button className="btn btn-primario" onClick={() => irPara("clinicas", { abrir: p.psi_id })}>Abrir clínica</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Painel ───────────────────────────────────────────────────
 function PaginaDashboard({ irPara }) {
   const planos = usarPlanos();
@@ -343,6 +383,7 @@ function PaginaDashboard({ irPara }) {
         <div className="cartao-stat"><div className="valor">{moeda(receita)}</div><div className="label">Receita mensal estimada</div></div>
         <div className="cartao-stat"><div className="valor">{usosIA}</div><div className="label">Usos de IA neste mês (custo estimado {moeda(usosIA * 0.02)})</div></div>
       </div>
+      <CartaoPedidosPlano lista={lista} planos={planos} irPara={irPara} />
       <div className="pagina-titulo" style={{ fontSize: 15 }}>Últimas entradas</div>
       <div className="tabela">
         <table>
@@ -378,13 +419,13 @@ function PaginaCatalogo() {
 }
 
 // ── Lista e detalhe das clínicas ─────────────────────────────
-function PaginaClinicas() {
+function PaginaClinicas({ abrirId }) {
   const planos = usarPlanos();
   const { lista, pronto } = usarClinicas();
   const uso = usarUsoClinicas(lista.length);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("todas");
-  const [aberta, setAberta] = useState(null);
+  const [aberta, setAberta] = useState(abrirId || null);
 
   if (!pronto) return <p style={{ color: "#6B7280" }}>Carregando...</p>;
 
@@ -613,6 +654,31 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
 }
 
 // ── Aprovações de cadastro ───────────────────────────────────
+function LinkCadastro() {
+  const [copiado, setCopiado] = useState("");
+  const base = window.location.origin + "/psi/cadastro/";
+  function copiar(texto, chave) {
+    navigator.clipboard.writeText(texto)
+      .then(() => { setCopiado(chave); setTimeout(() => setCopiado(""), 2000); })
+      .catch(() => prompt("Copie o link:", texto));
+  }
+  function copiarIndicacao() {
+    const nome = prompt("Nome de quem vai indicar (aparece no pedido de cadastro):");
+    if (nome && nome.trim()) copiar(base + "?ind=" + encodeURIComponent(nome.trim()), "ind");
+  }
+  return (
+    <div className="painel-form" style={{ maxWidth: 720, marginBottom: 18 }}>
+      <div className="subtitulo-painel">Link de cadastro para divulgar</div>
+      <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 8 }}>Quem preencher cai na lista abaixo para você conferir o CRP e aprovar.</p>
+      <div className="link-copia">{base}</div>
+      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+        <button className="btn btn-ghost" onClick={() => copiar(base, "geral")}>{copiado === "geral" ? "Copiado!" : "Copiar link"}</button>
+        <button className="btn btn-ghost" onClick={copiarIndicacao}>{copiado === "ind" ? "Copiado!" : "Copiar link de indicação"}</button>
+      </div>
+    </div>
+  );
+}
+
 function PaginaAprovacoes({ irPara }) {
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -644,6 +710,7 @@ function PaginaAprovacoes({ irPara }) {
       <p style={{ color: "#4B5563", fontSize: 13, maxWidth: 620, lineHeight: 1.6, marginBottom: 18 }}>
         Pedidos enviados pelo site. Antes de aprovar, confira o CRP no site do Conselho Federal de Psicologia (cadastro nacional de psicólogas). Ao aprovar, a conta é criada e ela entra em teste de 30 dias.
       </p>
+      <LinkCadastro />
       {pendentes.length === 0 && <p style={{ color: "#9CA3AF" }}>Nenhum pedido aguardando aprovação.</p>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {pendentes.map((i) => (
@@ -651,7 +718,7 @@ function PaginaAprovacoes({ irPara }) {
             <div>
               <div style={{ fontWeight: 700 }}>{i.nome}</div>
               <div style={{ fontSize: 12, color: "#6B7280", lineHeight: 1.7 }}>
-                {[i.email, i.telefone, i.cidade, i.crp ? "CRP " + i.crp : "", i.origem ? "origem: " + i.origem : "", i.criadoEm ? "em " + dataBr(i.criadoEm) : ""].filter(Boolean).join(" · ")}
+                {[i.email, i.telefone, i.cidade, i.crp ? "CRP " + i.crp : "", i.indicadoPor ? "indicada por " + i.indicadoPor : "", i.origem ? "origem: " + i.origem : "", i.criadoEm ? "em " + dataBr(i.criadoEm) : ""].filter(Boolean).join(" · ")}
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -778,6 +845,9 @@ function PaginaNovaPsicologa({ prefill }) {
   return (
     <div>
       <div className="pagina-titulo">Cadastrar Nova Psicóloga</div>
+      <p style={{ color: "#4B5563", fontSize: 13, maxWidth: 520, lineHeight: 1.6, marginBottom: 16 }}>
+        Prefere que ela se cadastre sozinha? Envie o link de cadastro (menu Aprovações). Use este formulário quando for você quem cadastra.
+      </p>
       <div className="painel-form">
         <form onSubmit={cadastrar}>
           <div className="form-grupo">
@@ -831,7 +901,7 @@ function App() {
   const [dadosNova, setDadosNova] = useState(null);
 
   function irPara(destino, dados) {
-    setDadosNova(destino === "nova" ? (dados || null) : null);
+    setDadosNova(dados || null);
     setPagina(destino);
   }
 
@@ -862,7 +932,7 @@ function App() {
 
   const paginas = {
     dashboard: <PaginaDashboard irPara={irPara} />,
-    clinicas: <PaginaClinicas />,
+    clinicas: <PaginaClinicas key={(dadosNova && dadosNova.abrir) || "lista"} abrirId={dadosNova && dadosNova.abrir} />,
     aprovacoes: <PaginaAprovacoes irPara={irPara} />,
     planos: <PaginaPlanos />,
     nova: <PaginaNovaPsicologa key={(dadosNova && dadosNova.interesseId) || "novo"} prefill={dadosNova} />,
