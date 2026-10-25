@@ -292,6 +292,47 @@ function textoIA(a, planos) {
   return usos + (cota === null || cota === undefined ? " (sem limite)" : " de " + cota);
 }
 
+// Quem precisa de atenção: testes terminando, planos vencendo e atrasos.
+function CartaoVencimentos({ lista, planos, irPara }) {
+  const itens = [];
+  lista.forEach((c) => {
+    const a = c.assinatura;
+    if (!a || a.origem === "fundadora") return;
+    if (a.situacao === "teste" && a.testeAte) {
+      const d = diasAte(a.testeAte);
+      if (d !== null && d <= 7) itens.push({ c, ordem: d, texto: "Teste termina " + (d <= 0 ? "hoje" : "em " + d + " dia(s)") });
+    } else if (a.situacao === "ativa" && a.proximoVencimento) {
+      const d = diasAte(a.proximoVencimento);
+      if (d !== null && d <= 7) itens.push({ c, ordem: d, texto: "Plano vence " + (d <= 0 ? "hoje" : "em " + d + " dia(s)") + " (" + dataBr(a.proximoVencimento) + ")" });
+    } else if (a.situacao === "atrasada") {
+      itens.push({ c, ordem: -100, texto: "Pagamento em atraso" + (a.proximoVencimento ? " desde " + dataBr(a.proximoVencimento) : "") });
+    } else if (a.situacao === "somente_leitura") {
+      itens.push({ c, ordem: -50, texto: "Somente leitura até " + dataBr(a.leituraAte) });
+    }
+  });
+  itens.sort((x, y) => x.ordem - y.ordem);
+  if (itens.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div className="pagina-titulo" style={{ fontSize: 15 }}>Vencimentos e cobranças ({itens.length})</div>
+      <div className="tabela">
+        <table>
+          <tbody>
+            {itens.map(({ c, texto }) => (
+              <tr key={c.id}>
+                <td style={{ fontWeight: 600 }}>{c.nome}</td>
+                <td>{rotuloPlano(c.assinatura, planos)}</td>
+                <td>{texto}</td>
+                <td><button className="btn btn-ghost" style={{ padding: "5px 12px", fontSize: 12 }} onClick={() => irPara("clinicas", { abrir: c.id })}>Abrir</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // Pedidos de mudança de plano feitos pelas psicólogas dentro do sistema.
 function CartaoPedidosPlano({ lista, planos, irPara }) {
   const [pedidos, setPedidos] = useState([]);
@@ -383,6 +424,7 @@ function PaginaDashboard({ irPara }) {
         <div className="cartao-stat"><div className="valor">{moeda(receita)}</div><div className="label">Receita mensal estimada</div></div>
         <div className="cartao-stat"><div className="valor">{usosIA}</div><div className="label">Usos de IA neste mês (custo estimado {moeda(usosIA * 0.02)})</div></div>
       </div>
+      <CartaoVencimentos lista={lista} planos={planos} irPara={irPara} />
       <CartaoPedidosPlano lista={lista} planos={planos} irPara={irPara} />
       <div className="pagina-titulo" style={{ fontSize: 15 }}>Últimas entradas</div>
       <div className="tabela">
@@ -485,6 +527,7 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
   const [diasExtra, setDiasExtra] = useState(15);
   const [valorPg, setValorPg] = useState("");
   const [formaPg, setFormaPg] = useState("Pix");
+  const [linkCobranca, setLinkCobranca] = useState((a && a.linkCobranca) || "");
   const [msg, setMsg] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const FV = firebase.firestore.FieldValue;
@@ -538,6 +581,12 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
       iaCotaMes: plano === "plus" ? (planos.plus.cotaIaMes === undefined ? null : planos.plus.cotaIaMes) : FV.delete(),
       pagamentos: FV.arrayUnion({ em: TS.now(), valor, forma: formaPg, ciclo, ate: TS.fromDate(novo) }),
     }, { merge: true }), "Pagamento registrado. Próximo vencimento: " + novo.toLocaleDateString("pt-BR") + ".");
+  }
+
+  function salvarLinkCobranca() {
+    const link = linkCobranca.trim();
+    if (link && !/^https:\/\//i.test(link)) { setMsg("Erro: o link de cobrança precisa começar com https://"); return Promise.resolve(); }
+    return executar(() => ref.set({ linkCobranca: link ? link : FV.delete() }, { merge: true }), link ? "Link de cobrança salvo. Ele aparece para a psicóloga e nos e-mails de aviso." : "Link de cobrança removido.");
   }
 
   async function alternarLogin() {
@@ -609,6 +658,11 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
               </select>
             </div>
             <button className="btn btn-sucesso" disabled={ocupado} onClick={registrarPagamento}>Registrar pagamento</button>
+            <div className="form-grupo" style={{ marginTop: 18 }}>
+              <label>Link de cobrança (Pix, boleto ou fatura que você gerou)</label>
+              <input value={linkCobranca} onChange={(e) => setLinkCobranca(e.target.value)} placeholder="https://..." />
+            </div>
+            <button className="btn btn-ghost" disabled={ocupado} onClick={salvarLinkCobranca}>Salvar link de cobrança</button>
           </div>
 
           <div className="painel-form">

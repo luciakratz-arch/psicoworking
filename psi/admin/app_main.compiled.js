@@ -51,10 +51,17 @@ function FaixaAssinatura({
     const dias = assinatura.testeAte && assinatura.testeAte.toDate ? Math.max(Math.ceil((assinatura.testeAte.toDate().getTime() - Date.now()) / 86400000), 0) : null;
     texto = "Período de teste" + (dias !== null ? ": restam " + dias + " dia(s)" : "") + ". Ao terminar, a clínica fica 15 dias só para consulta e exportação de dados.";
     link = true;
+  } else if (assinatura.situacao === "ativa" && assinatura.proximoVencimento && assinatura.proximoVencimento.toDate && Math.ceil((assinatura.proximoVencimento.toDate().getTime() - Date.now()) / 86400000) <= 7) {
+    const dias = Math.max(Math.ceil((assinatura.proximoVencimento.toDate().getTime() - Date.now()) / 86400000), 0);
+    texto = "Seu plano vence " + (dias === 0 ? "hoje" : "em " + dias + " dia(s)") + " (" + dataBr(assinatura.proximoVencimento) + ").";
+    cor = "#FEF3C7";
+    borda = "#F59E0B";
+    link = true;
   } else if (assinatura.situacao === "atrasada") {
     texto = "Há um pagamento em atraso. Regularize para evitar a limitação do acesso.";
     cor = "#FEF3C7";
     borda = "#F59E0B";
+    link = true;
   } else if (assinatura.situacao === "somente_leitura") {
     texto = "Seu teste terminou. Você pode consultar e exportar seus dados até " + dataBr(assinatura.leituraAte) + ", mas não pode gravar novas informações. Assine para continuar.";
     cor = "#FEF3C7";
@@ -78,13 +85,21 @@ function FaixaAssinatura({
       fontSize: 13,
       color: "#1F1B2E"
     }
-  }, texto, " ", link && /*#__PURE__*/React.createElement("a", {
+  }, texto, " ", link && (assinatura.linkCobranca ? /*#__PURE__*/React.createElement("a", {
+    href: assinatura.linkCobranca,
+    target: "_blank",
+    rel: "noopener",
+    style: {
+      color: "var(--cor-marca)",
+      fontWeight: 700
+    }
+  }, "Pagar agora") : /*#__PURE__*/React.createElement("a", {
     href: LINK_PLANO_PLUS,
     style: {
       color: "var(--cor-marca)",
       fontWeight: 700
     }
-  }, "Falar sobre o plano"));
+  }, "Falar sobre o plano")));
 }
 function App() {
   const {

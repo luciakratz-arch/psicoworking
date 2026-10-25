@@ -201,6 +201,168 @@ exports.atualizarSituacoesAssinaturas = onSchedule(
 );
 
 // ─────────────────────────────────────────────────────────────
+// AVISOS DE VENCIMENTO (e-mail para a psicóloga e resumo para a administradora)
+// Todo dia às 08h (Brasília). Cada aviso é enviado uma única vez por ciclo: o
+// registro fica em psi_assinaturas.avisosEnviados. Se a assinatura tiver um
+// "linkCobranca" (colado pela administradora, ou gerado pelo Asaas no futuro),
+// o e-mail leva o botão "Pagar agora".
+// ─────────────────────────────────────────────────────────────
+const EMAIL_ADMIN_PLATAFORMA = "contato@luciakratz.com.br";
+
+function dataSaoPaulo(d) {
+  return d.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+}
+
+// Dias de hoje até a data alvo, pelo calendário de Brasília (positivo = ainda falta).
+function diasAteData(alvo) {
+  const hoje = new Date(dataSaoPaulo(new Date()) + "T12:00:00Z");
+  const fim = new Date(dataSaoPaulo(alvo) + "T12:00:00Z");
+  return Math.round((fim.getTime() - hoje.getTime()) / 86400000);
+}
+
+function dataBrasil(d) {
+  return d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+
+function montarEmailAvisoPlano(nome, titulo, paragrafos, textoBotao, linkBotao) {
+  const corpo = paragrafos.map((p) => "<p style='color:#444;line-height:1.6'>" + escHtml(p) + "</p>").join("");
+  const botao = linkBotao
+    ? "<p style='text-align:center;margin:26px 0'><a href='" + escHtml(linkBotao) + "' style='background:#6A2BD9;color:white;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:bold'>" + escHtml(textoBotao) + "</a></p>"
+    : "";
+  return (
+    "<div style='font-family:Arial;background:#f5f3ff;padding:30px'><div style='max-width:520px;margin:0 auto;background:white;border-radius:16px;overflow:hidden'>" +
+    "<div style='background:#3B0D6F;padding:22px;text-align:center'><h1 style='color:white;font-size:18px;margin:0'>PsiCoWorking</h1></div>" +
+    "<div style='padding:28px'>" +
+    "<h2 style='color:#3B0D6F;font-size:18px;margin:0 0 14px'>" + escHtml(titulo) + "</h2>" +
+    "<p style='color:#444'>Olá, " + escHtml(nome) + ".</p>" +
+    corpo + botao +
+    "<p style='color:#888;font-size:12px'>Dúvidas? Responda este e-mail ou escreva para " + EMAIL_ADMIN_PLATAFORMA + ".</p>" +
+    "</div></div></div>"
+  );
+}
+
+// Decide quais avisos uma assinatura merece hoje. Cada item: { chave, assunto, titulo, paragrafos, botao }.
+function avisosDaAssinatura(a, nome) {
+  const lista = [];
+  const caminho = "Configurações > Meu plano";
+  const pagar = a.linkCobranca ? "Pagar agora" : "";
+  if (a.situacao === "teste" && a.testeAte) {
+    const fim = a.testeAte.toDate();
+    const dias = diasAteData(fim);
+    if (dias === 7 || dias === 1) {
+      lista.push({
+        chave: "teste:d" + dias,
+        assunto: dias === 1 ? "Seu teste do PsiCoWorking termina amanhã" : "Seu teste do PsiCoWorking termina em 7 dias",
+        titulo: dias === 1 ? "Seu teste termina amanhã" : "Seu teste termina em 7 dias",
+        paragrafos: [
+          "O seu período de teste gratuito termina em " + dataBrasil(fim) + ".",
+          "Depois dessa data, a clínica fica 15 dias só para consulta e exportação dos seus dados, sem poder gravar novas informações.",
+          "Para continuar normalmente, escolha um plano em " + caminho + ". O plano Plus inclui a inteligência artificial para organizar anotações e relatórios.",
+        ],
+        botao: pagar,
+      });
+    }
+  }
+  if (a.situacao === "somente_leitura" && a.leituraAte) {
+    const fim = a.leituraAte.toDate();
+    const dias = diasAteData(fim);
+    lista.push({
+      chave: "leitura:inicio",
+      assunto: "Seu teste do PsiCoWorking terminou",
+      titulo: "Seu teste terminou",
+      paragrafos: [
+        "Você pode consultar e exportar seus dados até " + dataBrasil(fim) + ", mas não pode gravar novas informações.",
+        "Para voltar a usar tudo normalmente, escolha um plano em " + caminho + ".",
+      ],
+      botao: pagar,
+    });
+    if (dias === 3) {
+      lista.push({
+        chave: "leitura:d3",
+        assunto: "Faltam 3 dias para a suspensão da sua conta no PsiCoWorking",
+        titulo: "Faltam 3 dias para a suspensão",
+        paragrafos: [
+          "Em " + dataBrasil(fim) + " a conta será suspensa. Exporte agora os dados de que precisar e, se quiser continuar, escolha um plano em " + caminho + ".",
+        ],
+        botao: pagar,
+      });
+    }
+  }
+  if ((a.situacao === "ativa" || a.situacao === "atrasada") && a.proximoVencimento) {
+    const venc = a.proximoVencimento.toDate();
+    const iso = dataSaoPaulo(venc);
+    const dias = diasAteData(venc);
+    if (a.situacao === "ativa" && (dias === 7 || dias === 3 || dias === 0)) {
+      lista.push({
+        chave: "venc:" + iso + ":d" + dias,
+        assunto: dias === 0 ? "Seu plano do PsiCoWorking vence hoje" : "Seu plano do PsiCoWorking vence em " + dias + " dias",
+        titulo: dias === 0 ? "Seu plano vence hoje" : "Seu plano vence em " + dias + " dias",
+        paragrafos: [
+          "A próxima cobrança do seu plano é em " + dataBrasil(venc) + ".",
+          a.linkCobranca ? "Use o botão abaixo para pagar." : "Para pagar ou conferir o valor, acesse " + caminho + " ou responda este e-mail.",
+        ],
+        botao: pagar,
+      });
+    }
+    if (a.situacao === "atrasada" && (dias === -1 || dias === -5)) {
+      lista.push({
+        chave: "venc:" + iso + ":a" + Math.abs(dias),
+        assunto: "Pagamento em atraso no PsiCoWorking",
+        titulo: "Pagamento em atraso",
+        paragrafos: [
+          "O vencimento de " + dataBrasil(venc) + " ainda não foi pago.",
+          a.linkCobranca ? "Use o botão abaixo para regularizar." : "Para regularizar, acesse " + caminho + " ou responda este e-mail.",
+        ],
+        botao: pagar,
+      });
+    }
+  }
+  return lista.map((x) => ({ ...x, nome }));
+}
+
+exports.avisarVencimentos = onSchedule(
+  { schedule: "0 8 * * *", timeZone: "America/Sao_Paulo", region: "southamerica-east1" },
+  async () => {
+    const snap = await db.collection("psi_assinaturas").get();
+    const resumo = [];
+    for (const d of snap.docs) {
+      const a = d.data();
+      if (a.origem === "fundadora") continue;
+      const perfil = await db.collection("psi_profiles").doc(d.id).get();
+      const dadosPerfil = perfil.exists ? perfil.data() : {};
+      let email = dadosPerfil.email || "";
+      if (!email) {
+        try { email = (await auth.getUser(d.id)).email || ""; } catch (e) { email = ""; }
+      }
+      const nome = dadosPerfil.nome || "psicóloga";
+      for (const av of avisosDaAssinatura(a, nome)) {
+        const chaveSegura = av.chave.replace(/[^A-Za-z0-9_]/g, "_");
+        if (a.avisosEnviados && a.avisosEnviados[chaveSegura]) continue;
+        if (email) {
+          await db.collection("clinica_emails").add({
+            to: email,
+            message: { subject: av.assunto, html: montarEmailAvisoPlano(nome, av.titulo, av.paragrafos, av.botao, a.linkCobranca || "") },
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+        await d.ref.update({ ["avisosEnviados." + chaveSegura]: admin.firestore.FieldValue.serverTimestamp() });
+        resumo.push(nome + ": " + av.titulo);
+      }
+    }
+    if (resumo.length) {
+      await db.collection("clinica_emails").add({
+        to: EMAIL_ADMIN_PLATAFORMA,
+        message: {
+          subject: "PsiCoWorking: " + resumo.length + " aviso(s) de plano enviado(s) hoje",
+          html: montarEmailAvisoPlano("Lucia", "Avisos de plano enviados hoje", resumo, "", ""),
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
 // 1) CARIMBO DE IDENTIDADE (custom claims)
 // ─────────────────────────────────────────────────────────────
 exports.definirCarimboEquipe = onCall(async (request) => {
