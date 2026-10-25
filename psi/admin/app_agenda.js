@@ -12,7 +12,7 @@
 // de verdade, client_secret, fica só na Cloud Function).
 const GOOGLE_CLIENT_ID_PUBLICO =
   "176262015536-fkv54bhgvtv4v3h3m4sjo9duokp165j2.apps.googleusercontent.com";
-const GOOGLE_REDIRECT_URI = "https://psicoworking.web.app/psi/admin/";
+const GOOGLE_REDIRECT_URI = window.location.origin + "/psi/admin/";
 
 function construirUrlAutorizacaoGoogle() {
   const params = new URLSearchParams({

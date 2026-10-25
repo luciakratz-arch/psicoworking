@@ -239,6 +239,34 @@ function pegarPsiIdConhecido() {
   try { return localStorage.getItem("psicoworking_psi_id") || ""; } catch (e) { return ""; }
 }
 
+// Endereço bonito da clínica: psicoworking.app.br/<apelido> (paciente) e
+// psicoworking.app.br/<apelido>/equipe (equipe). O apelido vira o código da clínica
+// consultando psi_slugs (leitura pública), só para mostrar logo e cor antes do login.
+const SLUGS_RESERVADOS_URL = ["psi", "entrar", "plataforma", "cadastro", "privacidade", "admin-matriz", "api"];
+
+function slugDoCaminho() {
+  const m = window.location.pathname.match(/^\/([a-z0-9][a-z0-9-]*)(?:\/equipe)?\/?$/);
+  if (!m || SLUGS_RESERVADOS_URL.includes(m[1])) return "";
+  return m[1];
+}
+
+function usarPsiIdPorEndereco() {
+  const [psiId, setPsiId] = useState(pegarPsiIdConhecido());
+  useEffect(() => {
+    const slug = slugDoCaminho();
+    if (!slug) return;
+    db.collection("psi_slugs").doc(slug).get()
+      .then((d) => {
+        if (d.exists && d.data().psiId) {
+          setPsiId(d.data().psiId);
+          try { localStorage.setItem("psicoworking_psi_id", d.data().psiId); } catch (e) {}
+        }
+      })
+      .catch(() => {});
+  }, []);
+  return psiId;
+}
+
 function usarConfiguracaoPreLogin(psiId) {
   const [config, setConfig] = useState(null);
   useEffect(() => {

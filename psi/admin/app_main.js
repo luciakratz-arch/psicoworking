@@ -15,7 +15,7 @@ function usarConexaoGoogleAgenda(usuario) {
 
     chamarConectarGoogleCalendar({
       codigoAutorizacao: codigo,
-      redirectUri: window.location.origin + window.location.pathname,
+      redirectUri: window.location.origin + "/psi/admin/",
     })
       .then(() => setStatus("ok"))
       .catch((e) => setStatus("erro: " + (e.message || JSON.stringify(e))));
@@ -91,7 +91,8 @@ function App() {
   const statusConexaoGoogle = usarConexaoGoogleAgenda(usuario);
   const configClinica = usarConfiguracaoClinica(usuario && usuario.psiId);
   const assinatura = usarAssinatura(usuario && usuario.psiId);
-  const configPreLogin = usarConfiguracaoPreLogin(!usuario ? pegarPsiIdConhecido() : null);
+  const psiIdEndereco = usarPsiIdPorEndereco();
+  const configPreLogin = usarConfiguracaoPreLogin(!usuario ? psiIdEndereco : null);
 
   useEffect(() => {
     if (statusConexaoGoogle === "ok") setTelaAtiva("agenda");

@@ -55,6 +55,55 @@ const PLANOS_PADRAO = {
   plus: { nome: "Plus", precoMensal: 69.9, precoAnual: 699, ia: true, cotaIaMes: 200 },
 };
 
+// ─────────────────────────────────────────────────────────────
+// ENDEREÇO DE CADA CLÍNICA (slug): psicoworking.app.br/<slug>
+// O slug é um apelido legível ligado ao psi_id (que pode ser um código longo).
+// A tabela psi_slugs (leitura pública, gravação só por estas funções) guarda
+// slug -> psiId. Apelidos antigos continuam valendo depois de uma troca.
+// ─────────────────────────────────────────────────────────────
+const SLUGS_RESERVADOS = [
+  "psi", "entrar", "plataforma", "cadastro", "privacidade", "admin", "admin-matriz", "matriz", "api", "www",
+  "app", "suporte", "contato", "termos", "planos", "precos", "sobre", "ajuda", "blog", "login", "portal",
+  "equipe", "paciente", "pacientes", "atividade", "aniversario", "compartilhado", "index", "favicon", "robots",
+];
+
+function slugificar(texto) {
+  return String(texto || "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\b(dra|dr|psicologa|psicologo|psi)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 38)
+    .replace(/-+$/g, "");
+}
+
+function slugValido(s) {
+  return typeof s === "string" && /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(s) && !SLUGS_RESERVADOS.includes(s);
+}
+
+// Reserva um slug livre para a clínica (base, base-2, base-3...) e grava em psi_config.slug.
+async function reservarSlug(psiId, desejado) {
+  let base = slugificar(desejado);
+  if (!slugValido(base)) base = "clinica";
+  for (let i = 1; i < 60; i++) {
+    const candidato = i === 1 ? base : base + "-" + i;
+    if (!slugValido(candidato)) continue;
+    const ref = db.collection("psi_slugs").doc(candidato);
+    const ok = await db.runTransaction(async (tx) => {
+      const d = await tx.get(ref);
+      if (d.exists && d.data().psiId !== psiId) return false;
+      tx.set(ref, { psiId, criadoEm: admin.firestore.FieldValue.serverTimestamp() });
+      return true;
+    });
+    if (ok) {
+      await db.collection("psi_config").doc(psiId).set({ slug: candidato }, { merge: true });
+      return candidato;
+    }
+  }
+  throw new HttpsError("internal", "Não foi possível reservar um endereço para a clínica.");
+}
+
 async function lerPlanos() {
   const snap = await db.collection("plataforma_config").doc("planos").get();
   const c = snap.exists ? snap.data() : {};
@@ -144,11 +193,50 @@ exports.garantirAssinaturas = onCall({ region: "southamerica-east1" }, async (re
     });
     criadas++;
   }
-  return { ok: true, criadas, total: refs.length };
+  // Dá um endereço (slug) a toda clínica que ainda não tem. Quando o próprio código da
+  // clínica já é um apelido válido (ex.: lucia-kratz), ele é mantido.
+  let slugs = 0;
+  for (const d of configs.docs) {
+    if (d.data().slug) continue;
+    await reservarSlug(d.id, slugValido(d.id) ? d.id : (d.data().nome || ""));
+    slugs++;
+  }
+  return { ok: true, criadas, total: refs.length, slugs };
 });
 
 // Quantos pacientes cada clínica tem (a administradora não lê dados clínicos,
 // só recebe as contagens).
+// Troca o endereço (slug) de uma clínica. Só a administradora. O apelido antigo
+// continua apontando para a mesma clínica, para links já enviados não quebrarem.
+exports.definirSlugClinica = onCall({ region: "southamerica-east1" }, async (request) => {
+  if (!request.auth || request.auth.token.role !== "admin_matriz") {
+    throw new HttpsError("permission-denied", "Só a administradora da plataforma pode fazer isso.");
+  }
+  const { psiId, slug } = request.data || {};
+  if (!psiId || typeof slug !== "string") throw new HttpsError("invalid-argument", "Informe a clínica e o endereço.");
+  const novo = slugificar(slug);
+  if (!slugValido(novo)) {
+    throw new HttpsError("invalid-argument", "Endereço inválido ou reservado. Use de 3 a 40 letras minúsculas, números e hífen.");
+  }
+  const ref = db.collection("psi_slugs").doc(novo);
+  const ok = await db.runTransaction(async (tx) => {
+    const d = await tx.get(ref);
+    if (d.exists && d.data().psiId !== psiId) return false;
+    tx.set(ref, { psiId, criadoEm: admin.firestore.FieldValue.serverTimestamp() });
+    return true;
+  });
+  if (!ok) throw new HttpsError("already-exists", "Este endereço já é de outra clínica. Escolha outro.");
+  await db.collection("psi_config").doc(psiId).set({ slug: novo }, { merge: true });
+  await db.collection("clinica_audit_log").add({
+    acao: "definir_slug_clinica",
+    alvoUid: psiId,
+    slug: novo,
+    executadoPor: request.auth.uid,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { ok: true, slug: novo };
+});
+
 exports.usoDasClinicas = onCall({ region: "southamerica-east1" }, async (request) => {
   if (!request.auth || request.auth.token.role !== "admin_matriz") {
     throw new HttpsError("permission-denied", "Só a administradora da plataforma pode fazer isso.");
@@ -712,6 +800,7 @@ exports.cadastrarPsicologa = onCall({ region: "southamerica-east1" }, async (req
 
   // Começa em teste de 30 dias, plano Essencial, com 5 usos de IA para experimentar.
   await db.collection("psi_assinaturas").doc(uid).set(montarAssinaturaTeste(await lerPlanos()));
+  const slugNovo = await reservarSlug(uid, nome);
 
   if (interesseId) {
     try {
@@ -735,7 +824,7 @@ exports.cadastrarPsicologa = onCall({ region: "southamerica-east1" }, async (req
     criadoEm: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  return { ok: true, uid, linkDefinirSenha };
+  return { ok: true, uid, linkDefinirSenha, slug: slugNovo };
 });
 
 // ─────────────────────────────────────────────────────────────

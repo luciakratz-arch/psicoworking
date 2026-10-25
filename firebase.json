@@ -12,8 +12,37 @@
       {
         "source": "**/*.@(js|css|png|jpg|jpeg|svg|woff2)",
         "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=3600" }
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
         ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/privacidade",
+        "destination": "/privacidade/index.html"
+      },
+      {
+        "source": "/entrar",
+        "destination": "/psi/admin/index.html"
+      },
+      {
+        "source": "/plataforma",
+        "destination": "/psi/matriz/index.html"
+      },
+      {
+        "source": "/cadastro",
+        "destination": "/psi/cadastro/index.html"
+      },
+      {
+        "source": "/*/equipe",
+        "destination": "/psi/admin/index.html"
+      },
+      {
+        "source": "/*",
+        "destination": "/psi/paciente/index.html"
       }
     ]
   },

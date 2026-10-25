@@ -395,6 +395,19 @@ describe("Assinatura, planos e situação da clínica", () => {
   });
 });
 
+describe("Endereço da clínica (psi_slugs)", () => {
+  test("qualquer pessoa lê o apelido, mas ninguém grava pelo navegador", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "psi_slugs/clinica-a"), { psiId: "clinA" });
+    });
+    await assertSucceeds(getDoc(doc(semLogin(), "psi_slugs/clinica-a")));
+    await assertFails(setDoc(doc(semLogin(), "psi_slugs/outra"), { psiId: "clinA" }));
+    await assertFails(setDoc(doc(psiA(), "psi_slugs/roubada"), { psiId: "clinA" }));
+    await assertFails(setDoc(doc(matriz(), "psi_slugs/admin-direto"), { psiId: "clinA" }));
+    await assertFails(updateDoc(doc(psiB(), "psi_slugs/clinica-a"), { psiId: "clinB" }));
+  });
+});
+
 describe("Autocadastro de psicóloga e pedido de mudança de plano", () => {
   const valido = () => ({ nome: "Ana Souza", email: "ana@exemplo.com", crp: "06/12345", telefone: "11999990000", cidade: "Goiânia", indicadoPor: "Lucia", origem: "autocadastro", criadoEm: new Date() });
   test("o público envia um pedido válido", async () => {

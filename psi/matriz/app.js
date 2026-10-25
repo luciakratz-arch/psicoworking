@@ -151,6 +151,8 @@ function TelaLogin({ aoLogar }) {
 }
 
 // ── Planos, assinaturas e dados compartilhados entre as telas ──────
+const DOMINIO_PUBLICO = "https://psicoworking.app.br";
+
 const PLANOS_BASE = {
   testeDias: 30,
   testeIaUsos: 5,
@@ -231,7 +233,7 @@ function usarClinicas() {
 
   useEffect(() => {
     if (!pronto || tentouPreparar.current) return;
-    const faltando = Object.keys(conf).some((id) => !assin[id]);
+    const faltando = Object.keys(conf).some((id) => !assin[id] || !conf[id].slug);
     if (!faltando) return;
     tentouPreparar.current = true;
     functions.httpsCallable("garantirAssinaturas")().catch(() => {});
@@ -245,6 +247,7 @@ function usarClinicas() {
       email: (perf[id] && perf[id].email) || "",
       crp: (perf[id] && perf[id].crp) || "",
       cidade: (perf[id] && perf[id].cidade) || "",
+      slug: (conf[id] && conf[id].slug) || "",
       ativo: perf[id] ? perf[id].ativo !== false : true,
       assinatura: assin[id] || null,
     }))
@@ -528,6 +531,7 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
   const [valorPg, setValorPg] = useState("");
   const [formaPg, setFormaPg] = useState("Pix");
   const [linkCobranca, setLinkCobranca] = useState((a && a.linkCobranca) || "");
+  const [slugEdit, setSlugEdit] = useState(clinica.slug || "");
   const [msg, setMsg] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const FV = firebase.firestore.FieldValue;
@@ -587,6 +591,13 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
     const link = linkCobranca.trim();
     if (link && !/^https:\/\//i.test(link)) { setMsg("Erro: o link de cobrança precisa começar com https://"); return Promise.resolve(); }
     return executar(() => ref.set({ linkCobranca: link ? link : FV.delete() }, { merge: true }), link ? "Link de cobrança salvo. Ele aparece para a psicóloga e nos e-mails de aviso." : "Link de cobrança removido.");
+  }
+
+  function salvarSlug() {
+    return executar(async () => {
+      const r = await functions.httpsCallable("definirSlugClinica")({ psiId: clinica.id, slug: slugEdit });
+      setSlugEdit(r.data.slug);
+    }, "Endereço atualizado. O apelido antigo continua funcionando.");
   }
 
   async function alternarLogin() {
@@ -679,6 +690,23 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
         </div>
       )}
 
+      <div className="painel-form" style={{ maxWidth: 720, marginTop: 16 }}>
+        <div className="subtitulo-painel">Endereço da clínica</div>
+        {clinica.slug ? (
+          <div style={{ fontSize: 13, lineHeight: 1.9, marginBottom: 10 }}>
+            <div>Pacientes: <strong>{DOMINIO_PUBLICO + "/" + clinica.slug}</strong></div>
+            <div>Equipe: <strong>{DOMINIO_PUBLICO + "/" + clinica.slug + "/equipe"}</strong></div>
+          </div>
+        ) : (
+          <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 10 }}>Esta clínica ainda não tem endereço. Atualize a página em alguns segundos.</p>
+        )}
+        <div className="form-grupo">
+          <label>Apelido no endereço (3 a 40 letras minúsculas, números e hífen)</label>
+          <input value={slugEdit} onChange={(e) => setSlugEdit(e.target.value)} placeholder="ex: maria-souza" />
+        </div>
+        <button className="btn btn-ghost" disabled={ocupado} onClick={salvarSlug}>Salvar endereço</button>
+      </div>
+
       {msg && <div className={msg.startsWith("Erro") ? "msg-erro" : "msg-ok"}>{msg}</div>}
 
       {a && (
@@ -710,7 +738,7 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
 // ── Aprovações de cadastro ───────────────────────────────────
 function LinkCadastro() {
   const [copiado, setCopiado] = useState("");
-  const base = window.location.origin + "/psi/cadastro/";
+  const base = DOMINIO_PUBLICO + "/cadastro";
   function copiar(texto, chave) {
     navigator.clipboard.writeText(texto)
       .then(() => { setCopiado(chave); setTimeout(() => setCopiado(""), 2000); })

@@ -138,6 +138,7 @@ function TelaConfiguracoes({
   const [corPrimaria, setCorPrimaria] = useState("#6A2BD9");
   const [logoUrl, setLogoUrl] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
+  const [slug, setSlug] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [crp, setCrp] = useState("");
   const [cidade, setCidade] = useState("");
@@ -168,6 +169,7 @@ function TelaConfiguracoes({
         setCorPrimaria(dados.corPrimaria || "#6A2BD9");
         setLogoUrl(dados.logoUrl || "");
         setFotoUrl(dados.fotoUrl || "");
+        setSlug(dados.slug || "");
         setWhatsapp(dados.whatsapp || "");
         setCrp(dados.crp || "");
         setCidade(dados.cidade || "");
@@ -226,14 +228,14 @@ function TelaConfiguracoes({
   // Link de entrada da equipe (psicóloga e secretária): abre o login já com a
   // logo, o nome e a cor da clínica, em vez da tela genérica do PsiCoWorking.
   function copiarLinkEquipe() {
-    const url = `${window.location.origin}/psi/admin/?psi=${usuario.psiId}`;
+    const url = slug ? `https://psicoworking.app.br/${slug}/equipe` : `${window.location.origin}/psi/admin/?psi=${usuario.psiId}`;
     navigator.clipboard.writeText(url).then(() => {
       setLinkEquipeCopiado(true);
       setTimeout(() => setLinkEquipeCopiado(false), 2500);
     }).catch(() => prompt("Copie o link:", url));
   }
   function copiarLinkPortal() {
-    const url = `${window.location.origin}/psi/paciente/?psi=${usuario.psiId}`;
+    const url = slug ? `https://psicoworking.app.br/${slug}` : `${window.location.origin}/psi/paciente/?psi=${usuario.psiId}`;
     navigator.clipboard.writeText(url).then(() => {
       setLinkCopiado(true);
       setTimeout(() => setLinkCopiado(false), 2500);

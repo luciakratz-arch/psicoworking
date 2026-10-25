@@ -410,6 +410,14 @@ service cloud.firestore {
                           || (request.method == 'create' && ehPsicologaEscrevendo(request.resource.data.psi_id));
     }
 
+    // ── Endereço de cada clínica: apelido (slug) -> psi_id ──
+    // Leitura pública (só serve para mostrar a marca antes do login). Gravação só pelas
+    // Cloud Functions (reservarSlug / definirSlugClinica), que garantem apelido único.
+    match /psi_slugs/{slug} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ── Assinatura (plano, teste, cobrança, uso de IA) de cada clínica ──
     // Só a administradora da plataforma grava. A equipe da própria clínica lê, para
     // mostrar avisos de teste e do plano Plus. Contadores de IA são gravados pelas
