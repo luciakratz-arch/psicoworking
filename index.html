@@ -3,348 +3,406 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PsiCoWorking — Plataforma para Psicólogas</title>
+  <title>PsiCoWorking — Prontuário, agenda e portal do paciente para psicólogas</title>
+  <meta name="description" content="Prontuário TCC com IA, portal do paciente, questionários, ferramentas terapêuticas, financeiro e agenda em um só lugar. Teste grátis por 30 dias, sem cartão." />
+  <meta property="og:title" content="PsiCoWorking — Sua clínica organizada. Seu tempo, devolvido." />
+  <meta property="og:description" content="Prontuário, portal do paciente, ferramentas e financeiro para psicólogas. Teste grátis por 30 dias." />
+  <meta property="og:type" content="website" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@0.383.0/dist/umd/lucide.min.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --marca: #6A2BD9;
-      --marca-escuro: #3B0D6F;
-      --marca-claro: #F6EFFD;
-      --texto: #111827;
-      --texto-suave: #6B7280;
+      --escuro: #3B0D6F;
+      --principal: #6A2BD9;
+      --claro: #A97BEF;
+      --lavanda: #EADDFC;
+      --lavanda-fraco: #F6EFFD;
+      --grafite: #1F1B2E;
+      --cinza: #6B7280;
+      --fundo: #F3F4F6;
       --borda: #E5E7EB;
     }
-    body { font-family: "DM Sans", system-ui, sans-serif; color: var(--texto); background: #fff; }
-    a { text-decoration: none; color: inherit; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: "DM Sans", system-ui, sans-serif; color: var(--grafite); background: #fff; line-height: 1.6; }
+    a { color: inherit; text-decoration: none; }
+    .contem { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
 
-    /* ── Nav ── */
-    .nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.95); backdrop-filter: blur(8px);
-      border-bottom: 1px solid var(--borda); padding: 0 24px; }
-    .nav-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center;
-      justify-content: space-between; height: 60px; }
-    .nav-logo { font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
-    .nav-logo .l-psi { color: #3B0D6F; }
-    .nav-logo .l-co { color: #A97BEF; }
-    .nav-logo .l-wk { color: #6A2BD9; }
-    .nav-links { display: flex; gap: 8px; align-items: center; }
-    .nav-links a { font-size: 13px; font-weight: 500; color: var(--texto-suave); padding: 6px 12px;
-      border-radius: 8px; transition: color .15s; }
-    .nav-links a:hover { color: var(--marca); }
-    .btn-nav { background: var(--marca); color: white !important; border-radius: 8px; padding: 8px 18px !important;
-      font-weight: 600 !important; font-size: 13px !important; }
-    .btn-nav:hover { opacity: .9; color: white !important; }
+    /* Logo em três tons (manual de marca) */
+    .logo { font-weight: 700; font-size: 20px; letter-spacing: -.3px; }
+    .logo .l1 { color: var(--escuro); }
+    .logo .l2 { color: var(--claro); }
+    .logo .l3 { color: var(--principal); }
+    .logo-branca span { color: #fff !important; }
 
-    /* ── Hero ── */
-    .hero { background: linear-gradient(135deg, #3B0D6F 0%, #6A2BD9 60%, #A97BEF 100%);
-      color: white; padding: 80px 24px 100px; text-align: center; }
-    .hero-inner { max-width: 760px; margin: 0 auto; }
-    .hero-badge { display: inline-block; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
-      border-radius: 999px; font-size: 12px; font-weight: 600; padding: 5px 14px; margin-bottom: 24px;
-      letter-spacing: .3px; }
-    .hero h1 { font-size: clamp(28px, 5vw, 48px); font-weight: 700; line-height: 1.15;
-      margin-bottom: 20px; letter-spacing: -.5px; }
-    .hero h1 em { font-style: normal; color: #EADDFC; }
-    .hero p { font-size: 17px; opacity: .85; line-height: 1.65; margin-bottom: 36px; }
-    .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    .btn-hero { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px;
-      border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
-      border: none; transition: all .2s; }
-    .btn-primario { background: white; color: var(--marca); }
-    .btn-primario:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,.15); }
-    .btn-secundario { background: rgba(255,255,255,.12); color: white; border: 1px solid rgba(255,255,255,.3); }
-    .btn-secundario:hover { background: rgba(255,255,255,.2); }
+    /* Barra do topo */
+    .topo { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,.96); backdrop-filter: blur(8px); border-bottom: 1px solid var(--borda); }
+    .topo-in { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
+    .menu { display: flex; align-items: center; gap: 4px; }
+    .menu a { font-size: 14px; font-weight: 500; color: var(--cinza); padding: 8px 12px; border-radius: 8px; }
+    .menu a:hover { color: var(--principal); }
+    .botao { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; font-weight: 700; font-size: 15px; padding: 13px 26px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; transition: transform .15s, box-shadow .15s, background .15s; }
+    .botao:hover { transform: translateY(-1px); }
+    .botao-principal { background: var(--principal); color: #fff; box-shadow: 0 6px 20px rgba(106,43,217,.28); }
+    .botao-principal:hover { background: var(--escuro); }
+    .botao-branco { background: #fff; color: var(--principal); }
+    .botao-contorno { background: transparent; color: #fff; border-color: rgba(255,255,255,.5); }
+    .botao-pequeno { padding: 9px 18px; font-size: 14px; border-radius: 10px; }
+    .botao-contorno-roxo { background: transparent; color: var(--principal); border-color: var(--principal); }
 
-    /* ── Números ── */
-    .numeros { background: white; padding: 48px 24px; border-bottom: 1px solid var(--borda); }
-    .numeros-inner { max-width: 860px; margin: 0 auto; display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 32px; text-align: center; }
-    .numero-valor { font-size: 36px; font-weight: 700; color: var(--marca); }
-    .numero-label { font-size: 13px; color: var(--texto-suave); margin-top: 4px; }
+    /* Abertura */
+    .hero { background: linear-gradient(135deg, var(--escuro) 0%, var(--principal) 62%, var(--claro) 100%); color: #fff; padding: 88px 0 104px; text-align: center; }
+    .selo { display: inline-block; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); border-radius: 999px; font-size: 13px; font-weight: 600; padding: 6px 16px; margin-bottom: 26px; }
+    .hero h1 { font-size: clamp(32px, 5.4vw, 56px); line-height: 1.1; letter-spacing: -.8px; margin-bottom: 22px; }
+    .hero h1 em { font-style: normal; color: var(--lavanda); }
+    .hero p.sub { font-size: clamp(16px, 2vw, 19px); max-width: 680px; margin: 0 auto 36px; opacity: .92; }
+    .hero-botoes { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .hero small { display: block; margin-top: 18px; font-size: 13px; opacity: .85; }
 
-    /* ── Funcionalidades ── */
-    .secao { padding: 80px 24px; }
-    .secao-inner { max-width: 1060px; margin: 0 auto; }
-    .secao-titulo { font-size: 13px; font-weight: 700; color: var(--marca); text-transform: uppercase;
-      letter-spacing: 1px; margin-bottom: 12px; }
-    .secao-h2 { font-size: clamp(22px, 3vw, 34px); font-weight: 700; margin-bottom: 14px;
-      letter-spacing: -.3px; }
-    .secao-desc { font-size: 15px; color: var(--texto-suave); line-height: 1.65; max-width: 560px;
-      margin-bottom: 48px; }
-    .grid-3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-    .cartao { border: 1px solid var(--borda); border-radius: 16px; padding: 24px;
-      background: white; transition: box-shadow .2s; }
-    .cartao:hover { box-shadow: 0 4px 20px rgba(106,43,217,.1); border-color: #EADDFC; }
-    .cartao-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--marca-claro);
-      display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px; }
-    .cartao h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
-    .cartao p { font-size: 13px; color: var(--texto-suave); line-height: 1.6; }
+    /* Faixa de números */
+    .numeros { padding: 44px 0; border-bottom: 1px solid var(--borda); }
+    .numeros-grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; text-align: center; }
+    .numero { font-size: 34px; font-weight: 700; color: var(--principal); line-height: 1.1; }
+    .numero-rotulo { font-size: 13px; color: var(--cinza); margin-top: 4px; }
 
-    /* ── LGPD strip ── */
-    .strip-lgpd { background: #F0FDF4; border-top: 1px solid #BBF7D0; border-bottom: 1px solid #BBF7D0;
-      padding: 32px 24px; text-align: center; }
-    .strip-lgpd-inner { max-width: 700px; margin: 0 auto; }
-    .strip-lgpd h3 { font-size: 16px; font-weight: 700; color: #065F46; margin-bottom: 8px; }
-    .strip-lgpd p { font-size: 13.5px; color: #374151; line-height: 1.6; }
+    /* Seções */
+    section.bloco { padding: 84px 0; }
+    .bloco-fundo { background: var(--fundo); }
+    .etiqueta { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--principal); background: var(--lavanda); padding: 5px 12px; border-radius: 999px; margin-bottom: 14px; }
+    h2.titulo { font-size: clamp(26px, 3.6vw, 38px); line-height: 1.18; letter-spacing: -.5px; margin-bottom: 14px; }
+    p.chamada { font-size: 17px; color: var(--cinza); max-width: 640px; }
+    .centro { text-align: center; }
+    .centro p.chamada { margin-left: auto; margin-right: auto; }
 
-    /* ── Formulário de interesse ── */
-    .secao-form { background: var(--marca-claro); padding: 80px 24px; }
-    .form-card { background: white; border-radius: 20px; padding: 48px 40px;
-      max-width: 560px; margin: 0 auto; box-shadow: 0 4px 32px rgba(106,43,217,.12); }
-    .form-card h2 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
-    .form-card p { font-size: 14px; color: var(--texto-suave); margin-bottom: 28px; line-height: 1.5; }
-    .campo { margin-bottom: 16px; }
-    .campo label { display: block; font-size: 12px; font-weight: 700; color: #374151;
-      text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
-    .campo input, .campo select { display: block; width: 100%; padding: 11px 14px;
-      border: 1px solid var(--borda); border-radius: 10px; font-size: 14px;
-      font-family: inherit; color: var(--texto); transition: border .15s; }
-    .campo input:focus, .campo select:focus { outline: none; border-color: var(--marca);
-      box-shadow: 0 0 0 3px rgba(106,43,217,.1); }
-    .btn-enviar { width: 100%; padding: 14px; background: var(--marca); color: white;
-      border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer;
-      margin-top: 8px; transition: opacity .15s; }
-    .btn-enviar:hover { opacity: .9; }
-    .btn-enviar:disabled { opacity: .5; cursor: not-allowed; }
-    .msg-sucesso { background: #D1FAE5; color: #065F46; border-radius: 10px;
-      padding: 16px 20px; font-size: 14px; margin-top: 16px; text-align: center; }
-    .msg-erro-form { background: #FEE2E2; color: #991B1B; border-radius: 10px;
-      padding: 16px 20px; font-size: 14px; margin-top: 16px; }
+    /* Recursos */
+    .grade-recursos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 46px; }
+    .cartao { background: #fff; border: 1px solid var(--borda); border-radius: 18px; padding: 26px; transition: box-shadow .2s, border-color .2s; }
+    .cartao:hover { box-shadow: 0 10px 34px rgba(106,43,217,.12); border-color: var(--lavanda); }
+    .icone { width: 46px; height: 46px; border-radius: 13px; background: var(--lavanda-fraco); color: var(--principal); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+    .cartao h3 { font-size: 18px; margin-bottom: 8px; }
+    .cartao p { font-size: 14.5px; color: var(--cinza); }
 
-    /* ── Rodapé ── */
-    .rodape { background: #111827; color: rgba(255,255,255,.6); padding: 48px 24px; }
-    .rodape-inner { max-width: 1060px; margin: 0 auto; display: flex; flex-wrap: wrap;
-      gap: 32px; justify-content: space-between; }
-    .rodape-marca h3 { font-size: 16px; font-weight: 700; color: white; margin-bottom: 6px; }
-    .rodape-marca p { font-size: 12px; line-height: 1.6; }
-    .rodape-links h4 { font-size: 12px; font-weight: 700; color: rgba(255,255,255,.8);
-      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
-    .rodape-links a { display: block; font-size: 13px; color: rgba(255,255,255,.5);
-      margin-bottom: 6px; transition: color .15s; }
-    .rodape-links a:hover { color: white; }
-    .rodape-base { border-top: 1px solid rgba(255,255,255,.1); margin-top: 40px;
-      padding-top: 20px; font-size: 12px; color: rgba(255,255,255,.35); text-align: center; }
+    /* Passos */
+    .passos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 46px; }
+    .passo { background: #fff; border-radius: 18px; padding: 28px; border: 1px solid var(--borda); }
+    .passo-num { width: 40px; height: 40px; border-radius: 50%; background: var(--principal); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+    .passo h3 { font-size: 18px; margin-bottom: 6px; }
+    .passo p { font-size: 14.5px; color: var(--cinza); }
 
-    @media (max-width: 640px) {
-      .nav-links a:not(.btn-nav) { display: none; }
-      .form-card { padding: 32px 20px; }
-      .hero { padding: 60px 20px 80px; }
+    /* Planos */
+    .alternador { display: inline-flex; background: #fff; border: 1px solid var(--borda); border-radius: 999px; padding: 4px; margin: 30px 0 6px; }
+    .alternador button { font-family: inherit; font-size: 14px; font-weight: 600; border: 0; background: transparent; color: var(--cinza); padding: 9px 22px; border-radius: 999px; cursor: pointer; }
+    .alternador button.ativo { background: var(--principal); color: #fff; }
+    .economia { font-size: 13px; color: var(--principal); font-weight: 600; min-height: 20px; }
+    .grade-planos { display: grid; grid-template-columns: repeat(2, minmax(0, 420px)); gap: 26px; justify-content: center; margin-top: 30px; text-align: left; }
+    .plano { background: #fff; border: 2px solid var(--borda); border-radius: 22px; padding: 34px 30px; position: relative; display: flex; flex-direction: column; }
+    .plano.destaque { border-color: var(--principal); box-shadow: 0 16px 48px rgba(106,43,217,.18); }
+    .faixa-plano { position: absolute; top: -14px; left: 30px; background: var(--principal); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 999px; letter-spacing: .04em; }
+    .plano h3 { font-size: 22px; }
+    .plano .desc { font-size: 14px; color: var(--cinza); margin: 4px 0 18px; }
+    .preco { font-size: 44px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+    .preco small { font-size: 15px; font-weight: 500; color: var(--cinza); letter-spacing: 0; }
+    .preco-apoio { font-size: 13px; color: var(--cinza); margin: 6px 0 22px; min-height: 20px; }
+    .plano ul { list-style: none; margin-bottom: 26px; flex: 1; }
+    .plano li { display: flex; gap: 10px; font-size: 14.5px; padding: 6px 0; }
+    .plano li svg { flex-shrink: 0; color: var(--principal); margin-top: 3px; }
+    .plano li.sem { color: #9CA3AF; }
+    .plano li.sem svg { color: #CBD5E1; }
+    .nota-planos { font-size: 13px; color: var(--cinza); margin-top: 26px; max-width: 700px; margin-left: auto; margin-right: auto; }
+
+    /* Segurança */
+    .grade-seg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 40px; }
+    .seg { display: flex; gap: 16px; background: #fff; border: 1px solid var(--borda); border-radius: 16px; padding: 22px; }
+    .seg .icone { margin: 0; flex-shrink: 0; }
+    .seg h3 { font-size: 16.5px; margin-bottom: 4px; }
+    .seg p { font-size: 14px; color: var(--cinza); }
+
+    /* Fundadora */
+    .fundadora { display: grid; grid-template-columns: 1fr; max-width: 760px; margin: 0 auto; text-align: center; }
+    .fundadora blockquote { font-size: 20px; line-height: 1.55; color: var(--grafite); margin: 22px 0 18px; }
+    .fundadora .assina { font-weight: 700; }
+    .fundadora .assina span { display: block; font-weight: 400; color: var(--cinza); font-size: 14px; }
+
+    /* Perguntas */
+    .faq { max-width: 780px; margin: 40px auto 0; }
+    details { background: #fff; border: 1px solid var(--borda); border-radius: 14px; padding: 18px 22px; margin-bottom: 12px; }
+    details[open] { border-color: var(--lavanda); box-shadow: 0 6px 22px rgba(106,43,217,.08); }
+    summary { font-weight: 600; font-size: 16px; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; font-size: 22px; color: var(--principal); line-height: 1; }
+    details[open] summary::after { content: "−"; }
+    details p { margin-top: 12px; font-size: 14.5px; color: var(--cinza); }
+
+    /* Chamada final */
+    .final { background: linear-gradient(135deg, var(--escuro) 0%, var(--principal) 100%); color: #fff; text-align: center; padding: 84px 0; }
+    .final h2 { font-size: clamp(26px, 3.8vw, 40px); margin-bottom: 14px; }
+    .final p { opacity: .9; margin-bottom: 30px; font-size: 17px; }
+
+    /* Rodapé */
+    footer { background: var(--grafite); color: #D1D5DB; padding: 48px 0 30px; font-size: 14px; }
+    .rodape-grade { display: flex; justify-content: space-between; gap: 30px; flex-wrap: wrap; }
+    footer a:hover { color: #fff; }
+    .rodape-links { display: flex; gap: 20px; flex-wrap: wrap; }
+    .rodape-fim { margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,.12); font-size: 12.5px; color: #9CA3AF; }
+
+    @media (max-width: 900px) {
+      .grade-recursos, .passos { grid-template-columns: repeat(2, 1fr); }
+      .numeros-grade { grid-template-columns: repeat(2, 1fr); }
+      .grade-seg, .grade-planos { grid-template-columns: 1fr; }
+      .menu a.some { display: none; }
+    }
+    @media (max-width: 600px) {
+      .grade-recursos, .passos { grid-template-columns: 1fr; }
+      .hero { padding: 64px 0 76px; }
+      section.bloco { padding: 60px 0; }
+      .menu a.link-menu { display: none; }
     }
   </style>
 </head>
 <body>
 
-<!-- ── Nav ── -->
-<nav class="nav">
-  <div class="nav-inner">
-    <div class="nav-logo"><span class="l-psi">Psi</span><span class="l-co">Co</span><span class="l-wk">Working</span></div>
-    <div class="nav-links">
-      <a href="#funcionalidades">Funcionalidades</a>
-      <a href="#interesse">Para psicólogas</a>
-      <a href="/privacidade/">Privacidade</a>
-      <a href="/psi/admin/" class="btn-nav">Entrar</a>
+  <header class="topo">
+    <div class="contem topo-in">
+      <a href="#inicio" class="logo"><span class="l1">Psi</span><span class="l2">Co</span><span class="l3">Working</span></a>
+      <nav class="menu">
+        <a class="link-menu some" href="#recursos">Recursos</a>
+        <a class="link-menu some" href="#como-funciona">Como funciona</a>
+        <a class="link-menu" href="#planos">Planos</a>
+        <a class="link-menu some" href="#seguranca">Segurança</a>
+        <a class="link-menu some" href="#perguntas">Perguntas</a>
+        <a class="link-menu" href="/entrar">Entrar</a>
+        <a class="botao botao-principal botao-pequeno" href="/cadastro">Teste grátis</a>
+      </nav>
     </div>
-  </div>
-</nav>
+  </header>
 
-<!-- ── Hero ── -->
-<section class="hero">
-  <div class="hero-inner">
-    <div class="hero-badge">Plataforma para psicólogas clínicas</div>
-    <h1>Sua clínica organizada.<br /><em>Seu tempo, devolvido.</em></h1>
-    <p>PsiCoWorking reúne prontuário, agenda, ferramentas terapêuticas,<br />
-    portal do paciente e questionários DSM-5 em um só lugar.</p>
-    <div class="hero-cta">
-      <a href="#interesse" class="btn-hero btn-primario">Quero conhecer</a>
-      <a href="/psi/admin/" class="btn-hero btn-secundario">Já sou usuária</a>
+  <main id="inicio">
+    <section class="hero">
+      <div class="contem">
+        <span class="selo">Plataforma para psicólogas clínicas</span>
+        <h1>Sua clínica organizada.<br /><em>Seu tempo, devolvido.</em></h1>
+        <p class="sub">Prontuário TCC com inteligência artificial, portal do paciente, questionários, ferramentas terapêuticas, financeiro e agenda em um só lugar, feito por uma psicóloga para a rotina de psicólogas.</p>
+        <div class="hero-botoes">
+          <a class="botao botao-branco" href="/cadastro">Teste grátis por 30 dias</a>
+          <a class="botao botao-contorno" href="#planos">Ver planos e preços</a>
+        </div>
+        <small>Sem cartão para começar. Conferimos o seu CRP antes de liberar o acesso.</small>
+      </div>
+    </section>
+
+    <section class="numeros">
+      <div class="contem numeros-grade">
+        <div><div class="numero">30+</div><div class="numero-rotulo">ferramentas terapêuticas</div></div>
+        <div><div class="numero">6</div><div class="numero-rotulo">rastreamentos clínicos (DSM-5)</div></div>
+        <div><div class="numero">SP</div><div class="numero-rotulo">dados guardados em São Paulo</div></div>
+        <div><div class="numero">LGPD</div><div class="numero-rotulo">dados de saúde protegidos</div></div>
+      </div>
+    </section>
+
+    <section class="bloco" id="recursos">
+      <div class="contem centro">
+        <span class="etiqueta">Recursos</span>
+        <h2 class="titulo">Tudo o que você usa no dia a dia, em um lugar só</h2>
+        <p class="chamada">Menos planilhas, menos papel e menos aplicativos separados. Mais tempo para o que importa: o atendimento.</p>
+      </div>
+      <div class="contem">
+        <div class="grade-recursos">
+          <div class="cartao"><div class="icone"><i data-lucide="notebook-pen"></i></div><h3>Prontuário TCC</h3><p>Anotações por sessão no formato TCC, com ditado por voz. A IA organiza o texto bruto em seções; você revisa e salva.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="activity"></i></div><h3>Crises e perfil clínico</h3><p>Registre crises com intensidade, acompanhe a evolução, e mantenha CID, condições e medicações sempre à vista na anotação.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="file-text"></i></div><h3>Relatórios e documentos</h3><p>Relatório detalhado para a sua análise e resumo para enviar a terceiros, com a sua logo e o seu CRP. Declarações e laudos conforme a CFP 06/2019.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="users"></i></div><h3>Portal do paciente</h3><p>Seu paciente acessa com a identidade da sua clínica: diário, humor, metas, ferramentas e confirmação de presença.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="clipboard-check"></i></div><h3>Questionários e rastreamentos</h3><p>Anamnese e seis rastreamentos clínicos com pontuação e laudo, enviados ao paciente por link.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="wrench"></i></div><h3>Ferramentas e fábulas</h3><p>Um catálogo compartilhado de ferramentas terapêuticas, fábulas e psicoeducação para enviar ao paciente com um clique.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="circle-dollar-sign"></i></div><h3>Financeiro da clínica</h3><p>Lançamentos, pacotes e sessões, comissões e orçamentos por WhatsApp, sem sair do sistema.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="calendar-days"></i></div><h3>Agenda Google</h3><p>Conectada à sua Google Agenda: sem agenda duplicada e sem trabalho em dobro.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="message-circle"></i></div><h3>Tarefas por WhatsApp</h3><p>As tarefas de casa saem prontas para enviar ao paciente, em linguagem simples, direto do prontuário.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloco bloco-fundo" id="como-funciona">
+      <div class="contem centro">
+        <span class="etiqueta">Como funciona</span>
+        <h2 class="titulo">Do cadastro ao primeiro atendimento em poucos minutos</h2>
+      </div>
+      <div class="contem">
+        <div class="passos">
+          <div class="passo"><div class="passo-num">1</div><h3>Peça o seu acesso</h3><p>Preencha o cadastro com o seu CRP. Conferimos o registro e liberamos o seu acesso por e-mail.</p></div>
+          <div class="passo"><div class="passo-num">2</div><h3>Teste por 30 dias</h3><p>Use tudo do plano Essencial, sem cartão. Você ainda experimenta a IA do plano Plus em 5 usos.</p></div>
+          <div class="passo"><div class="passo-num">3</div><h3>Escolha o seu plano</h3><p>Gostou? Assine pelo próprio sistema, com Pix, boleto ou cartão de crédito. Seus dados continuam onde estavam.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloco" id="planos">
+      <div class="contem centro">
+        <span class="etiqueta">Planos</span>
+        <h2 class="titulo">Um preço simples, sem surpresa</h2>
+        <p class="chamada">Comece grátis por 30 dias. Depois, escolha o plano que cabe na sua rotina e mude de plano quando precisar.</p>
+        <div class="alternador" role="group" aria-label="Forma de pagamento">
+          <button type="button" id="b-mensal" class="ativo">Mensal</button>
+          <button type="button" id="b-anual">Anual</button>
+        </div>
+        <div class="economia" id="economia"></div>
+
+        <div class="grade-planos">
+          <div class="plano">
+            <h3 id="n-essencial">Essencial</h3>
+            <div class="desc">Tudo o que a clínica precisa, sem inteligência artificial.</div>
+            <div class="preco"><span id="p-essencial">R$ 39,90</span> <small id="u-essencial">/mês</small></div>
+            <div class="preco-apoio" id="a-essencial"></div>
+            <ul>
+              <li><i data-lucide="check" width="18" height="18"></i>Prontuário TCC com ditado por voz</li>
+              <li><i data-lucide="check" width="18" height="18"></i>Crises, CID, condições e medicações</li>
+              <li><i data-lucide="check" width="18" height="18"></i>Portal do paciente com a sua identidade</li>
+              <li><i data-lucide="check" width="18" height="18"></i>Questionários, rastreamentos e ferramentas</li>
+              <li><i data-lucide="check" width="18" height="18"></i>Financeiro, pacotes e Agenda Google</li>
+              <li><i data-lucide="check" width="18" height="18"></i>Relatórios em PDF com a sua logo</li>
+              <li class="sem"><i data-lucide="minus" width="18" height="18"></i>Inteligência artificial</li>
+            </ul>
+            <a class="botao botao-contorno-roxo" href="/cadastro">Começar teste grátis</a>
+          </div>
+
+          <div class="plano destaque">
+            <span class="faixa-plano">COM IA</span>
+            <h3 id="n-plus">Plus</h3>
+            <div class="desc">Tudo do Essencial, mais a inteligência artificial para ganhar tempo.</div>
+            <div class="preco"><span id="p-plus">R$ 69,90</span> <small id="u-plus">/mês</small></div>
+            <div class="preco-apoio" id="a-plus"></div>
+            <ul>
+              <li><i data-lucide="check" width="18" height="18"></i>Tudo do plano Essencial</li>
+              <li><i data-lucide="check" width="18" height="18"></i>IA que organiza as anotações da sessão</li>
+              <li><i data-lucide="check" width="18" height="18"></i>IA que resume o período para relatórios</li>
+              <li><i data-lucide="check" width="18" height="18"></i>Perfil clínico por ditado, organizado pela IA</li>
+              <li><i data-lucide="check" width="18" height="18"></i><span id="cota-plus">200 usos de IA por mês</span></li>
+              <li><i data-lucide="check" width="18" height="18"></i>Você sempre revisa antes de salvar</li>
+            </ul>
+            <a class="botao botao-principal" href="/cadastro">Começar teste grátis</a>
+          </div>
+        </div>
+        <p class="nota-planos">Teste grátis de <span id="dias-teste">30</span> dias, sem cartão. No teste, o Essencial vem completo e você experimenta a IA em <span id="usos-teste">5</span> usos. Pagamento por Pix, boleto ou cartão de crédito. Valores em reais.</p>
+      </div>
+    </section>
+
+    <section class="bloco bloco-fundo" id="seguranca">
+      <div class="contem centro">
+        <span class="etiqueta">Segurança e sigilo</span>
+        <h2 class="titulo">Dado de saúde mental merece cuidado de verdade</h2>
+        <p class="chamada">O prontuário é seu e do seu paciente. A plataforma foi desenhada para proteger esse sigilo.</p>
+      </div>
+      <div class="contem">
+        <div class="grade-seg">
+          <div class="seg"><div class="icone"><i data-lucide="lock"></i></div><div><h3>Prontuário só para a psicóloga</h3><p>A secretária da clínica não acessa anotações, crises nem perfil clínico. A trava está no banco de dados, não só na tela.</p></div></div>
+          <div class="seg"><div class="icone"><i data-lucide="building-2"></i></div><div><h3>Cada clínica no seu quadrado</h3><p>Os dados de uma clínica não aparecem para outra, e isso é verificado por testes automáticos antes de cada mudança nas regras de segurança.</p></div></div>
+          <div class="seg"><div class="icone"><i data-lucide="server"></i></div><div><h3>Servidores em São Paulo</h3><p>Dados criptografados e com cópia de segurança automática diária.</p></div></div>
+          <div class="seg"><div class="icone"><i data-lucide="shield-check"></i></div><div><h3>LGPD no dia a dia</h3><p>O paciente aceita a política, baixa os próprios dados e pode pedir a exclusão. A IA é opcional e avisada na política.</p></div></div>
+        </div>
+        <p class="centro" style="margin-top:26px;font-size:14px;color:var(--cinza)"><a href="/privacidade/" style="color:var(--principal);font-weight:600">Ler a Política de Privacidade completa</a></p>
+      </div>
+    </section>
+
+    <section class="bloco" id="perguntas">
+      <div class="contem centro">
+        <span class="etiqueta">Perguntas frequentes</span>
+        <h2 class="titulo">Dúvidas comuns</h2>
+      </div>
+      <div class="contem">
+        <div class="faq">
+          <details><summary>Preciso de cartão para testar?</summary><p>Não. Os 30 dias de teste são grátis e sem cartão. Antes de liberar o acesso, conferimos o seu CRP.</p></details>
+          <details><summary>O que acontece quando o teste termina?</summary><p>Se você não assinar, a clínica fica 15 dias em modo somente leitura: você consulta e exporta os seus dados, mas não grava novas informações. Depois disso, o acesso é suspenso. Ao assinar, tudo volta ao normal.</p></details>
+          <details><summary>A inteligência artificial é obrigatória?</summary><p>Não. O plano Essencial funciona completo, sem IA. No plano Plus, a IA organiza anotações e resume relatórios, mas nada é salvo sem a sua revisão. A política de privacidade explica quais dados vão ao serviço de IA.</p></details>
+          <details><summary>A minha secretária vê os prontuários?</summary><p>Não. A secretária acessa cadastro, agenda e financeiro, mas o prontuário, as crises e o perfil clínico são exclusivos da psicóloga.</p></details>
+          <details><summary>Meus pacientes precisam instalar algum aplicativo?</summary><p>Não. O portal do paciente abre no navegador, com um endereço com o nome da sua clínica e a sua identidade visual.</p></details>
+          <details><summary>Posso levar os meus dados embora?</summary><p>Sim. Você consulta e exporta os dados da clínica, e o paciente pode baixar os próprios dados pelo portal.</p></details>
+          <details><summary>Como funciona o pagamento?</summary><p>Você assina pelo próprio sistema e paga com Pix, boleto ou cartão de crédito, mensal ou anual com desconto. A cobrança é gerada automaticamente e o plano é liberado assim que o pagamento é confirmado.</p></details>
+          <details><summary>Sou psicóloga em outro estado. Posso usar?</summary><p>Sim. A plataforma funciona em qualquer lugar do Brasil, desde que o CRP esteja ativo.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="final">
+      <div class="contem">
+        <h2>Pronta para ter a sua clínica organizada?</h2>
+        <p>Teste grátis por 30 dias, sem cartão. Cadastre-se em poucos minutos.</p>
+        <a class="botao botao-branco" href="/cadastro">Quero testar grátis</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="contem">
+      <div class="rodape-grade">
+        <div>
+          <div class="logo logo-branca"><span>PsiCoWorking</span></div>
+          <p style="margin-top:8px">Pessoas. Conexões. Possibilidades.</p>
+        </div>
+        <div class="rodape-links">
+          <a href="/entrar">Entrar</a>
+          <a href="/cadastro">Cadastro</a>
+          <a href="/privacidade/">Política de Privacidade</a>
+          <a href="mailto:contato@luciakratz.com.br">contato@luciakratz.com.br</a>
+        </div>
+      </div>
+      <div class="rodape-fim">A!Equipe Desenvolvimento Humano e Cultural · CNPJ 07.242.408/0001-19 · Goiânia, GO</div>
     </div>
-  </div>
-</section>
+  </footer>
 
-<!-- ── Números ── -->
-<section class="numeros">
-  <div class="numeros-inner">
-    <div>
-      <div class="numero-valor">7</div>
-      <div class="numero-label">Grupos diagnósticos DSM-5</div>
-    </div>
-    <div>
-      <div class="numero-valor">12+</div>
-      <div class="numero-label">Ferramentas terapêuticas</div>
-    </div>
-    <div>
-      <div class="numero-valor">100%</div>
-      <div class="numero-label">Sem papel, sem planilha</div>
-    </div>
-    <div>
-      <div class="numero-valor">LGPD</div>
-      <div class="numero-label">Dados de saúde protegidos</div>
-    </div>
-  </div>
-</section>
+  <script>
+    // Preços e regras vêm do que a administradora define na matriz (leitura pública).
+    // Se a leitura falhar, valem os valores abaixo.
+    var planos = {
+      testeDias: 30, testeIaUsos: 5,
+      essencial: { nome: "Essencial", precoMensal: 39.9, precoAnual: 399 },
+      plus: { nome: "Plus", precoMensal: 69.9, precoAnual: 699, cotaIaMes: 200 }
+    };
+    var modo = "mensal";
 
-<!-- ── Funcionalidades ── -->
-<section class="secao" id="funcionalidades">
-  <div class="secao-inner">
-    <div class="secao-titulo">O que está incluído</div>
-    <h2 class="secao-h2">Tudo que você usa no dia a dia,<br />em um lugar só</h2>
-    <p class="secao-desc">Desenvolvida por uma psicóloga para psicólogas. Cada funcionalidade reflete a rotina real do consultório.</p>
+    function reais(v) { return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-    <div class="grid-3">
-      <div class="cartao">
-        <div class="cartao-icon">📋</div>
-        <h3>Prontuário Digital</h3>
-        <p>Evolução de sessões, anamnese, laudos, atestados e relatórios (CFP 06/2019) — tudo em abas organizadas por paciente.</p>
-      </div>
-      <div class="cartao">
-        <div class="cartao-icon">🧠</div>
-        <h3>Questionários DSM-5</h3>
-        <p>7 grupos diagnósticos com hipóteses selecionáveis. Link enviado por WhatsApp — o paciente responde pelo celular, sem login.</p>
-      </div>
-      <div class="cartao">
-        <div class="cartao-icon">🔧</div>
-        <h3>Ferramentas Terapêuticas</h3>
-        <p>Gestão da Ansiedade, Registro ABC, Roda da Vida, Respiração 4-7-8, Relaxamento Muscular, Fábulas e muito mais.</p>
-      </div>
-      <div class="cartao">
-        <div class="cartao-icon">👤</div>
-        <h3>Portal do Paciente</h3>
-        <p>O paciente acessa pelo celular: vê seus recursos, metas, laudos liberados, histórico de humor e diário terapêutico.</p>
-      </div>
-      <div class="cartao">
-        <div class="cartao-icon">💰</div>
-        <h3>Financeiro Completo</h3>
-        <p>Lançamentos, pacotes de sessões com integração ao Google Agenda, comissões de equipe e gerador de orçamento por WhatsApp.</p>
-      </div>
-      <div class="cartao">
-        <div class="cartao-icon">📅</div>
-        <h3>Agenda Google</h3>
-        <p>Conecte sua agenda Google existente. Cria eventos automaticamente ao registrar pacotes — sem agenda paralela para manter.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── LGPD ── -->
-<div class="strip-lgpd">
-  <div class="strip-lgpd-inner">
-    <h3>Dados de saúde protegidos por lei</h3>
-    <p>Todos os dados clínicos são tratados em conformidade com a <strong>LGPD (Lei 13.709/2018)</strong> e com as resoluções do CFP.
-    O paciente consente antes do primeiro acesso, pode exportar e solicitar exclusão dos seus dados a qualquer momento.
-    <a href="/privacidade/" style="color:#065F46;font-weight:600;">Ver Política de Privacidade</a>.</p>
-  </div>
-</div>
-
-<!-- ── Formulário de interesse ── -->
-<section class="secao-form" id="interesse">
-  <div class="form-card">
-    <h2>Quero conhecer o PsiCoWorking</h2>
-    <p>Deixe seus dados e entraremos em contato para apresentar a plataforma e tirar suas dúvidas.</p>
-
-    <form id="form-interesse" onsubmit="enviarInteresse(event)">
-      <div class="campo">
-        <label>Nome completo</label>
-        <input type="text" id="f-nome" required placeholder="Dra. Maria Silva" />
-      </div>
-      <div class="campo">
-        <label>E-mail profissional</label>
-        <input type="email" id="f-email" required placeholder="voce@clinica.com.br" />
-      </div>
-      <div class="campo">
-        <label>WhatsApp</label>
-        <input type="tel" id="f-telefone" placeholder="(00) 90000-0000" />
-      </div>
-      <div class="campo">
-        <label>Cidade / Estado</label>
-        <input type="text" id="f-cidade" placeholder="Goiânia — GO" />
-      </div>
-      <div class="campo">
-        <label>Como nos encontrou?</label>
-        <select id="f-origem">
-          <option value="">Selecione</option>
-          <option value="indicacao">Indicação de colega</option>
-          <option value="instagram">Instagram</option>
-          <option value="google">Google</option>
-          <option value="outro">Outro</option>
-        </select>
-      </div>
-      <button type="submit" class="btn-enviar" id="btn-enviar">Enviar interesse</button>
-      <div id="msg-form" style="display:none"></div>
-    </form>
-  </div>
-</section>
-
-<!-- ── Rodapé ── -->
-<footer class="rodape">
-  <div class="rodape-inner">
-    <div class="rodape-marca">
-      <h3>PsiCoWorking</h3>
-      <p>Plataforma de apoio ao atendimento<br />psicológico — desenvolvida por psicólogas,<br />para psicólogas.</p>
-    </div>
-    <div class="rodape-links">
-      <h4>Plataforma</h4>
-      <a href="/psi/admin/">Entrar no Admin</a>
-      <a href="/psi/paciente/">Portal do Paciente</a>
-      <a href="/privacidade/">Política de Privacidade</a>
-    </div>
-    <div class="rodape-links">
-      <h4>Contato</h4>
-      <a href="mailto:contato@luciakratz.com.br">contato@luciakratz.com.br</a>
-    </div>
-  </div>
-  <div class="rodape-base">
-    &copy; 2026 A!Equipe Desenvolvimento Humano e Cultural — CNPJ 07.242.408/0001-19 &nbsp;|&nbsp;
-    DPO: Dra. Lucia Kratz &nbsp;|&nbsp; <a href="/privacidade/" style="color:rgba(255,255,255,.4)">Privacidade</a>
-  </div>
-</footer>
-
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyCJx1RwX5-FM2wcUqzeC_CYAUdkmTKU2u4",
-    authDomain: "psicoworking.firebaseapp.com",
-    projectId: "psicoworking",
-    storageBucket: "psicoworking.firebasestorage.app",
-    messagingSenderId: "176262015536",
-    appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
-  };
-  const appSite = firebase.initializeApp(firebaseConfig, "psicoworking-site");
-  const db = appSite.firestore();
-
-  async function enviarInteresse(e) {
-    e.preventDefault();
-    const btn = document.getElementById("btn-enviar");
-    const msg = document.getElementById("msg-form");
-    btn.disabled = true;
-    btn.textContent = "Enviando...";
-    msg.style.display = "none";
-
-    const nome = document.getElementById("f-nome").value.trim();
-    const email = document.getElementById("f-email").value.trim();
-    const telefone = document.getElementById("f-telefone").value.trim();
-    const cidade = document.getElementById("f-cidade").value.trim();
-    const origem = document.getElementById("f-origem").value;
-
-    try {
-      await db.collection("psi_interesse").add({
-        nome, email, telefone, cidade, origem,
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    function pintar() {
+      ["essencial", "plus"].forEach(function (id) {
+        var p = planos[id];
+        document.getElementById("n-" + id).textContent = p.nome;
+        var anual = modo === "anual";
+        document.getElementById("p-" + id).textContent = reais(anual ? p.precoAnual : p.precoMensal);
+        document.getElementById("u-" + id).textContent = anual ? "/ano" : "/mês";
+        document.getElementById("a-" + id).textContent = anual ? "equivale a " + reais(p.precoAnual / 12) + " por mês" : "";
       });
-      msg.className = "msg-sucesso";
-      msg.textContent = "Recebemos seu interesse! Entraremos em contato em breve.";
-      msg.style.display = "block";
-      document.getElementById("form-interesse").reset();
-    } catch (err) {
-      msg.className = "msg-erro-form";
-      msg.textContent = "Erro ao enviar. Tente novamente ou escreva para contato@luciakratz.com.br";
-      msg.style.display = "block";
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Enviar interesse";
+      var e = document.getElementById("economia");
+      var cheio = planos.essencial.precoMensal * 12;
+      var pct = cheio > 0 ? Math.round((1 - planos.essencial.precoAnual / cheio) * 100) : 0;
+      e.textContent = modo === "anual" && pct > 0 ? "Economize cerca de " + pct + "% pagando o ano inteiro" : "";
+      document.getElementById("cota-plus").textContent = (planos.plus.cotaIaMes ? planos.plus.cotaIaMes + " usos de IA por mês" : "IA sem limite mensal");
+      document.getElementById("dias-teste").textContent = planos.testeDias;
+      document.getElementById("usos-teste").textContent = planos.testeIaUsos;
     }
-  }
-</script>
+
+    document.getElementById("b-mensal").onclick = function () { modo = "mensal"; this.classList.add("ativo"); document.getElementById("b-anual").classList.remove("ativo"); pintar(); };
+    document.getElementById("b-anual").onclick = function () { modo = "anual"; this.classList.add("ativo"); document.getElementById("b-mensal").classList.remove("ativo"); pintar(); };
+
+    function num(campo) { return campo && campo.doubleValue !== undefined ? Number(campo.doubleValue) : (campo && campo.integerValue !== undefined ? Number(campo.integerValue) : undefined); }
+    function mapa(campo) { return campo && campo.mapValue && campo.mapValue.fields ? campo.mapValue.fields : {}; }
+
+    fetch("https://firestore.googleapis.com/v1/projects/psicoworking/databases/(default)/documents/plataforma_publico/planos")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.fields) return;
+        var f = d.fields, ess = mapa(f.essencial), plu = mapa(f.plus);
+        if (num(f.testeDias) !== undefined) planos.testeDias = num(f.testeDias);
+        if (num(f.testeIaUsos) !== undefined) planos.testeIaUsos = num(f.testeIaUsos);
+        if (num(ess.precoMensal) !== undefined) planos.essencial.precoMensal = num(ess.precoMensal);
+        if (num(ess.precoAnual) !== undefined) planos.essencial.precoAnual = num(ess.precoAnual);
+        if (num(plu.precoMensal) !== undefined) planos.plus.precoMensal = num(plu.precoMensal);
+        if (num(plu.precoAnual) !== undefined) planos.plus.precoAnual = num(plu.precoAnual);
+        if (num(plu.cotaIaMes) !== undefined) planos.plus.cotaIaMes = num(plu.cotaIaMes);
+        pintar();
+      })
+      .catch(function () {});
+
+    pintar();
+    if (window.lucide) window.lucide.createIcons();
+  </script>
 </body>
 </html>
