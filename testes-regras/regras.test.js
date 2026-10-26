@@ -395,6 +395,35 @@ describe("Assinatura, planos e situação da clínica", () => {
   });
 });
 
+describe("Depoimentos do site (psicólogas)", () => {
+  const novo = (o) => ({ nome: "Ana", detalhe: "Goiânia", texto: "Facilitou muito a minha rotina.", aprovado: false, autorizou: true, autorizouEm: new Date(), criadoEm: new Date(), ...o });
+  test("qualquer pessoa envia um depoimento válido, sempre como não aprovado", async () => {
+    await assertSucceeds(addDoc(collection(semLogin(), "site_depoimentos"), novo()));
+  });
+  test("não consegue se aprovar, enviar sem autorização, com texto curto/enorme ou campos extras", async () => {
+    await assertFails(addDoc(collection(semLogin(), "site_depoimentos"), novo({ aprovado: true })));
+    await assertFails(addDoc(collection(semLogin(), "site_depoimentos"), novo({ autorizou: false })));
+    await assertFails(addDoc(collection(semLogin(), "site_depoimentos"), novo({ texto: "curto" })));
+    await assertFails(addDoc(collection(semLogin(), "site_depoimentos"), novo({ texto: "x".repeat(800) })));
+    await assertFails(addDoc(collection(semLogin(), "site_depoimentos"), novo({ role: "admin" })));
+  });
+  test("o público lê só os aprovados; a administradora lê, edita e apaga tudo", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, "site_depoimentos/ok"), novo({ aprovado: true }));
+      await setDoc(doc(d, "site_depoimentos/pendente"), novo());
+    });
+    await assertSucceeds(getDoc(doc(semLogin(), "site_depoimentos/ok")));
+    await assertFails(getDoc(doc(semLogin(), "site_depoimentos/pendente")));
+    await assertSucceeds(getDocs(query(collection(semLogin(), "site_depoimentos"), where("aprovado", "==", true))));
+    await assertFails(getDocs(collection(semLogin(), "site_depoimentos")));
+    await assertFails(updateDoc(doc(psiA(), "site_depoimentos/pendente"), { aprovado: true }));
+    await assertSucceeds(getDoc(doc(matriz(), "site_depoimentos/pendente")));
+    await assertSucceeds(updateDoc(doc(matriz(), "site_depoimentos/pendente"), { aprovado: true, texto: "Texto corrigido pela administradora." }));
+    await assertSucceeds(deleteDoc(doc(matriz(), "site_depoimentos/ok")));
+  });
+});
+
 describe("Preços públicos do site de vendas", () => {
   test("qualquer pessoa lê, só a administradora grava", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {

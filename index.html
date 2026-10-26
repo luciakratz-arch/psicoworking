@@ -542,10 +542,10 @@
     // Depoimentos reais, só de psicólogas que usam o sistema e autorizaram a publicação.
     // Cada item: { nome: "Nome da psicóloga", detalhe: "CRP ou cidade (opcional)", texto: "mensagem", hora: "09:41" }.
     // Enquanto a lista estiver vazia, a seção inteira fica escondida.
-    var DEPOIMENTOS = [];
-    (function () {
+    function mostrarDepoimentos(DEPOIMENTOS) {
       if (!DEPOIMENTOS.length) return;
       var lista = document.getElementById("lista-depoimentos");
+      lista.innerHTML = "";
       DEPOIMENTOS.forEach(function (d) {
         var m = document.createElement("div");
         m.className = "msg";
@@ -561,7 +561,35 @@
         lista.appendChild(m);
       });
       document.getElementById("depoimentos").hidden = false;
-    })();
+    }
+
+    // Busca só os depoimentos aprovados pela administradora (leitura pública).
+    fetch("https://firestore.googleapis.com/v1/projects/psicoworking/databases/(default)/documents:runQuery", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ structuredQuery: {
+        from: [{ collectionId: "site_depoimentos" }],
+        where: { fieldFilter: { field: { fieldPath: "aprovado" }, op: "EQUAL", value: { booleanValue: true } } },
+        limit: 12
+      } })
+    })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (linhas) {
+        var itens = (linhas || []).filter(function (l) { return l.document; }).map(function (l) {
+          var f = l.document.fields || {};
+          var criado = f.criadoEm && f.criadoEm.timestampValue ? new Date(f.criadoEm.timestampValue) : null;
+          return {
+            nome: f.nome && f.nome.stringValue || "",
+            detalhe: f.detalhe && f.detalhe.stringValue || "",
+            texto: f.texto && f.texto.stringValue || "",
+            quando: criado ? criado.getTime() : 0,
+            hora: criado ? criado.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
+          };
+        }).filter(function (d) { return d.nome && d.texto; })
+          .sort(function (a, b) { return a.quando - b.quando; });
+        mostrarDepoimentos(itens);
+      })
+      .catch(function () {});
 
     pintar();
     if (window.lucide) window.lucide.createIcons();

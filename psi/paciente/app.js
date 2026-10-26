@@ -64,7 +64,7 @@ function pegarPsiIdConhecido() {
 // Endereço bonito da clínica: psicoworking.app.br/<apelido> (paciente) e
 // psicoworking.app.br/<apelido>/equipe (equipe). O apelido vira o código da clínica
 // consultando psi_slugs (leitura pública), só para mostrar logo e cor antes do login.
-const SLUGS_RESERVADOS_URL = ["psi", "entrar", "plataforma", "cadastro", "privacidade", "admin-matriz", "api"];
+const SLUGS_RESERVADOS_URL = ["psi", "entrar", "plataforma", "cadastro", "depoimento", "privacidade", "admin-matriz", "api"];
 
 function slugDoCaminho() {
   const m = window.location.pathname.match(/^\/([a-z0-9][a-z0-9-]*)(?:\/equipe)?\/?$/);

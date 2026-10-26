@@ -427,6 +427,20 @@ service cloud.firestore {
       allow write: if ehAdminMatriz();
     }
 
+    // ── Depoimentos de psicólogas para o site de vendas ──
+    // Qualquer pessoa pode ENVIAR (sempre como não aprovado, com autorização marcada).
+    // Só os aprovados pela administradora são públicos; ela revisa, edita e aprova.
+    match /site_depoimentos/{id} {
+      allow read: if resource.data.aprovado == true || ehAdminMatriz();
+      allow create: if request.resource.data.keys().hasOnly(['nome', 'detalhe', 'texto', 'aprovado', 'autorizou', 'autorizouEm', 'criadoEm'])
+                    && request.resource.data.aprovado == false
+                    && request.resource.data.autorizou == true
+                    && request.resource.data.nome is string && request.resource.data.nome.size() >= 2 && request.resource.data.nome.size() <= 80
+                    && request.resource.data.texto is string && request.resource.data.texto.size() >= 10 && request.resource.data.texto.size() <= 700
+                    && request.resource.data.get('detalhe', '') is string && request.resource.data.get('detalhe', '').size() <= 80;
+      allow update, delete: if ehAdminMatriz();
+    }
+
     // ── Preços públicos para o site de vendas (cópia sem nada sensível) ──
     match /plataforma_publico/{docId} {
       allow read: if true;

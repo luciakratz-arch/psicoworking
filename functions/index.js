@@ -64,7 +64,7 @@ const PLANOS_PADRAO = {
 const SLUGS_RESERVADOS = [
   "psi", "entrar", "plataforma", "cadastro", "privacidade", "admin", "admin-matriz", "matriz", "api", "www",
   "app", "suporte", "contato", "termos", "planos", "precos", "sobre", "ajuda", "blog", "login", "portal",
-  "equipe", "paciente", "pacientes", "atividade", "aniversario", "compartilhado", "index", "favicon", "robots",
+  "equipe", "paciente", "pacientes", "atividade", "aniversario", "compartilhado", "index", "favicon", "robots", "depoimento", "depoimentos",
 ];
 
 function slugificar(texto) {

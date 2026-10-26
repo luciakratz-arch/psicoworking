@@ -37,6 +37,10 @@
         "destination": "/psi/cadastro/index.html"
       },
       {
+        "source": "/depoimento",
+        "destination": "/psi/depoimento/index.html"
+      },
+      {
         "source": "/*/equipe",
         "destination": "/psi/admin/index.html"
       },

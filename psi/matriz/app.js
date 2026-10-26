@@ -954,6 +954,105 @@ function PainelAsaas() {
   );
 }
 
+// ── Depoimentos de psicólogas (para o site) ──────────────────
+function PaginaDepoimentos() {
+  const [itens, setItens] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [edicao, setEdicao] = useState({});
+  const [copiado, setCopiado] = useState("");
+  const [msg, setMsg] = useState("");
+  const link = DOMINIO_PUBLICO + "/depoimento";
+  const convite =
+    "Olá! Você está usando o PsiCoWorking e eu adoraria saber a sua opinião. " +
+    "Se puder deixar uma mensagem curta (menos de 1 minuto), com o seu nome, neste link: " + link + ". " +
+    "Ela só vai ao ar no site depois que eu revisar, e só com a autorização que você marca no formulário. Obrigada!";
+
+  useEffect(() => {
+    return db.collection("site_depoimentos").onSnapshot(
+      (snap) => { setItens(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); setCarregando(false); },
+      () => setCarregando(false)
+    );
+  }, []);
+
+  function copiar(texto, chave) {
+    navigator.clipboard.writeText(texto)
+      .then(() => { setCopiado(chave); setTimeout(() => setCopiado(""), 2000); })
+      .catch(() => prompt("Copie:", texto));
+  }
+
+  const valor = (d, campo) => (edicao[d.id] && edicao[d.id][campo] !== undefined ? edicao[d.id][campo] : (d[campo] || ""));
+  const mudar = (d, campo, v) => setEdicao((e) => ({ ...e, [d.id]: { ...(e[d.id] || {}), [campo]: v } }));
+
+  async function salvar(d, aprovado) {
+    setMsg("");
+    try {
+      await db.collection("site_depoimentos").doc(d.id).update({
+        nome: valor(d, "nome").trim(), detalhe: valor(d, "detalhe").trim(), texto: valor(d, "texto").trim(),
+        aprovado, aprovadoEm: aprovado ? firebase.firestore.FieldValue.serverTimestamp() : firebase.firestore.FieldValue.delete(),
+      });
+      setMsg(aprovado ? "Depoimento publicado no site." : "Depoimento salvo.");
+    } catch (e) { setMsg("Erro: " + e.message); }
+  }
+
+  async function excluir(d) {
+    if (!confirm("Excluir o depoimento de " + d.nome + "? Não dá para desfazer.")) return;
+    try { await db.collection("site_depoimentos").doc(d.id).delete(); } catch (e) { setMsg("Erro: " + e.message); }
+  }
+
+  const ordenar = (a, b) => ((b.criadoEm && b.criadoEm.seconds) || 0) - ((a.criadoEm && a.criadoEm.seconds) || 0);
+  const pendentes = itens.filter((d) => !d.aprovado).sort(ordenar);
+  const publicados = itens.filter((d) => d.aprovado).sort(ordenar);
+
+  const cartao = (d, publicado) => (
+    <div key={d.id} className="painel-form" style={{ maxWidth: 720 }}>
+      <div className="form-grupo"><label>Nome (como aparece no site)</label><input value={valor(d, "nome")} onChange={(e) => mudar(d, "nome", e.target.value)} /></div>
+      <div className="form-grupo"><label>Cidade ou CRP</label><input value={valor(d, "detalhe")} onChange={(e) => mudar(d, "detalhe", e.target.value)} /></div>
+      <div className="form-grupo"><label>Mensagem</label>
+        <textarea rows={4} style={{ width: "100%", padding: "9px 12px", border: "1px solid #D1D5DB", borderRadius: 8, fontSize: 14, fontFamily: "inherit" }}
+          value={valor(d, "texto")} onChange={(e) => mudar(d, "texto", e.target.value)} />
+      </div>
+      <div style={{ fontSize: 11.5, color: "#6B7280", marginBottom: 10 }}>
+        {d.criadoEm ? "Enviado em " + dataBr(d.criadoEm) : ""}{d.autorizou ? " · autorizou a publicação" : ""}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {!publicado && <button className="btn btn-primario" onClick={() => salvar(d, true)}>Publicar no site</button>}
+        {publicado && <button className="btn btn-ghost" onClick={() => salvar(d, true)}>Salvar alterações</button>}
+        {publicado && <button className="btn btn-ghost" onClick={() => salvar(d, false)}>Tirar do site</button>}
+        {!publicado && <button className="btn btn-ghost" onClick={() => salvar(d, false)}>Salvar sem publicar</button>}
+        <button className="btn btn-perigo" onClick={() => excluir(d)}>Excluir</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="pagina-titulo">Depoimentos</div>
+      <div className="painel-form" style={{ maxWidth: 720, marginBottom: 22 }}>
+        <div className="subtitulo-painel">Link para pedir depoimentos</div>
+        <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 8, lineHeight: 1.6 }}>
+          Envie às psicólogas que já usam o sistema. O que elas escreverem chega aqui para você revisar. Nada vai ao site sem a sua aprovação, e só profissionais, nunca pacientes.
+        </p>
+        <div className="link-copia">{link}</div>
+        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+          <button className="btn btn-ghost" onClick={() => copiar(link, "link")}>{copiado === "link" ? "Copiado!" : "Copiar link"}</button>
+          <button className="btn btn-primario" onClick={() => copiar(convite, "convite")}>{copiado === "convite" ? "Copiado!" : "Copiar mensagem de convite"}</button>
+        </div>
+      </div>
+
+      {msg && <div className={msg.startsWith("Erro") ? "msg-erro" : "msg-ok"} style={{ maxWidth: 720, marginBottom: 14 }}>{msg}</div>}
+      {carregando && <p style={{ color: "#6B7280" }}>Carregando...</p>}
+
+      <div className="pagina-titulo" style={{ fontSize: 15 }}>Aguardando a sua revisão ({pendentes.length})</div>
+      {!carregando && pendentes.length === 0 && <p style={{ color: "#9CA3AF", marginBottom: 20 }}>Nenhum depoimento novo.</p>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 26 }}>{pendentes.map((d) => cartao(d, false))}</div>
+
+      <div className="pagina-titulo" style={{ fontSize: 15 }}>Publicados no site ({publicados.length})</div>
+      {!carregando && publicados.length === 0 && <p style={{ color: "#9CA3AF" }}>Nenhum ainda.</p>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>{publicados.map((d) => cartao(d, true))}</div>
+    </div>
+  );
+}
+
 // ── Planos e preços ──────────────────────────────────────────
 function PaginaPlanos() {
   const planos = usarPlanos();
@@ -1191,6 +1290,7 @@ function App() {
     { id: "clinicas", label: "Clínicas", icone: "building-2" },
     { id: "aprovacoes", label: "Aprovações", icone: "user-check" },
     { id: "planos", label: "Planos", icone: "credit-card" },
+    { id: "depoimentos", label: "Depoimentos", icone: "message-circle" },
     { id: "nova", label: "Nova Psicóloga", icone: "user-plus" },
     { id: "catalogo", label: "Fábulas e ferramentas", icone: "book-open" },
   ];
@@ -1200,6 +1300,7 @@ function App() {
     clinicas: <PaginaClinicas key={(dadosNova && dadosNova.abrir) || "lista"} abrirId={dadosNova && dadosNova.abrir} />,
     aprovacoes: <PaginaAprovacoes irPara={irPara} />,
     planos: <PaginaPlanos />,
+    depoimentos: <PaginaDepoimentos />,
     nova: <PaginaNovaPsicologa key={(dadosNova && dadosNova.interesseId) || "novo"} prefill={dadosNova} />,
     catalogo: <PaginaCatalogo />,
   };

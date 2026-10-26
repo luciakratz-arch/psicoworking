@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Deixe o seu depoimento — PsiCoWorking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "DM Sans", system-ui, sans-serif; background: linear-gradient(150deg, #EADDFC 0%, #F3F4F6 60%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; color: #1F1B2E; }
+    .cartao { background: #fff; border-radius: 20px; padding: 34px; width: 100%; max-width: 520px; box-shadow: 0 8px 40px rgba(106,43,217,0.14); }
+    .marca { font-size: 15px; font-weight: 700; margin-bottom: 18px; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .sub { font-size: 14px; color: #6B7280; line-height: 1.6; margin-bottom: 6px; }
+    .aviso { background: #F5F0FF; border-left: 3px solid #6A2BD9; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13px; color: #374151; line-height: 1.6; margin: 14px 0 4px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 5px; }
+    input[type=text], textarea { width: 100%; padding: 11px 14px; border: 1.5px solid #E5E7EB; border-radius: 10px; font-size: 15px; font-family: inherit; }
+    textarea { min-height: 130px; resize: vertical; line-height: 1.5; }
+    input:focus, textarea:focus { outline: none; border-color: #6A2BD9; }
+    .contador { font-size: 12px; color: #9CA3AF; text-align: right; margin-top: 4px; }
+    .linha-aceite { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; font-size: 13px; color: #374151; line-height: 1.55; }
+    .linha-aceite input { margin-top: 4px; }
+    .linha-aceite label { margin: 0; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 13px; color: #374151; }
+    button { width: 100%; margin-top: 22px; padding: 14px; background: #6A2BD9; color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: default; }
+    .erro { background: #FEE2E2; color: #B91C1C; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-top: 14px; display: none; }
+    .sucesso { display: none; text-align: center; }
+    .sucesso h2 { font-size: 21px; color: #3B0D6F; margin-bottom: 10px; }
+    .sucesso p { font-size: 14.5px; color: #6B7280; line-height: 1.7; }
+    .oculto { position: absolute; left: -9999px; height: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div class="cartao">
+    <div class="marca"><span style="color:#3B0D6F">Psi</span><span style="color:#A97BEF">Co</span><span style="color:#6A2BD9">Working</span></div>
+
+    <div id="formulario">
+      <h1>Conte como foi usar o PsiCoWorking</h1>
+      <p class="sub">A sua opinião ajuda outras psicólogas a conhecerem a plataforma. Leva menos de um minuto.</p>
+      <div class="aviso">Este espaço é para <strong>profissionais</strong>. Escreva só sobre o <strong>sistema</strong>: nada sobre pacientes, atendimentos ou resultados clínicos.</div>
+
+      <form id="form" novalidate>
+        <label for="nome">Seu nome *</label>
+        <input type="text" id="nome" maxlength="80" autocomplete="name" placeholder="Como quer aparecer no site" />
+        <label for="detalhe">Cidade ou CRP (opcional)</label>
+        <input type="text" id="detalhe" maxlength="80" placeholder="ex: Goiânia, GO" />
+        <label for="texto">Sua mensagem *</label>
+        <textarea id="texto" maxlength="700" placeholder="O que mais ajudou na sua rotina? Foi fácil de usar?"></textarea>
+        <div class="contador"><span id="contagem">0</span>/700</div>
+
+        <div class="oculto"><label for="site">Não preencha</label><input type="text" id="site" tabindex="-1" autocomplete="off" /></div>
+
+        <div class="linha-aceite">
+          <input type="checkbox" id="aceite" />
+          <label for="aceite">Autorizo o PsiCoWorking (A!Equipe Desenvolvimento Humano e Cultural) a publicar esta mensagem, com o meu nome, no site psicoworking.app.br. Posso pedir a retirada a qualquer momento pelo e-mail contato@luciakratz.com.br.</label>
+        </div>
+
+        <div class="erro" id="erro"></div>
+        <button type="submit" id="enviar">Enviar depoimento</button>
+      </form>
+    </div>
+
+    <div class="sucesso" id="sucesso">
+      <h2>Muito obrigada!</h2>
+      <p>Recebemos a sua mensagem. Ela será lida e só vai ao ar no site depois de revisada.</p>
+    </div>
+  </div>
+
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyCJx1RwX5-FM2wcUqzeC_CYAUdkmTKU2u4",
+      authDomain: "psicoworking.firebaseapp.com",
+      projectId: "psicoworking",
+      storageBucket: "psicoworking.firebasestorage.app",
+      messagingSenderId: "176262015536",
+      appId: "1:176262015536:web:4c72df01b83ba6f6995bf5"
+    });
+    const db = firebase.firestore();
+    const $ = (id) => document.getElementById(id);
+
+    $("texto").addEventListener("input", () => { $("contagem").textContent = $("texto").value.length; });
+
+    function mostrarErro(txt) { $("erro").textContent = txt; $("erro").style.display = "block"; }
+
+    $("form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      $("erro").style.display = "none";
+      if ($("site").value) return; // armadilha contra robôs
+      const nome = $("nome").value.trim();
+      const texto = $("texto").value.trim();
+      if (nome.length < 2) return mostrarErro("Informe o seu nome.");
+      if (texto.length < 10) return mostrarErro("Escreva uma mensagem um pouco maior (pelo menos 10 letras).");
+      if (!$("aceite").checked) return mostrarErro("Marque a autorização de publicação para enviar.");
+      $("enviar").disabled = true;
+      $("enviar").textContent = "Enviando...";
+      try {
+        const agora = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection("site_depoimentos").add({
+          nome, detalhe: $("detalhe").value.trim(), texto,
+          aprovado: false, autorizou: true, autorizouEm: agora, criadoEm: agora,
+        });
+        $("formulario").style.display = "none";
+        $("sucesso").style.display = "block";
+      } catch (e) {
+        mostrarErro("Não foi possível enviar agora. Tente de novo em instantes ou escreva para contato@luciakratz.com.br.");
+        $("enviar").disabled = false;
+        $("enviar").textContent = "Enviar depoimento";
+      }
+    });
+  </script>
+</body>
+</html>
