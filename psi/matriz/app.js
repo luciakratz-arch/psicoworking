@@ -13,7 +13,8 @@ const FIREBASE_CONFIG = {
   appId: "1:176262015536:web:placeholder",
 };
 
-const firebaseApp = firebase.initializeApp(FIREBASE_CONFIG, "psicoworking-matriz");
+// Mesma sessão do painel da equipe (/entrar): quem entra uma vez já está dentro dos dois.
+const firebaseApp = firebase.initializeApp(FIREBASE_CONFIG, "psicoworking-admin");
 const auth = firebaseApp.auth();
 const db = firebaseApp.firestore();
 const functions = firebaseApp.functions("southamerica-east1");
@@ -1149,8 +1150,8 @@ function App() {
       if (!u) { setUsuario(null); return; }
       const token = await u.getIdTokenResult();
       if (token.claims.role !== "admin_matriz") {
-        await auth.signOut();
-        setUsuario(null);
+        // Pode ser uma psicóloga com o painel dela aberto neste navegador: não desloga.
+        setUsuario(false);
       } else {
         setUsuario(u);
       }
@@ -1158,6 +1159,21 @@ function App() {
   }, []);
 
   if (usuario === undefined) return null;
+  if (usuario === false) {
+    return (
+      <>
+        <style>{estilos}</style>
+        <div className="tela-login">
+          <div className="card-login" style={{ textAlign: "center" }}>
+            <h1>Área da administradora</h1>
+            <p>Esta página é só para a administradora da plataforma. Você está conectada com o seu painel da clínica.</p>
+            <a className="btn btn-primario" style={{ width: "100%", justifyContent: "center", textDecoration: "none", marginBottom: 10 }} href="/entrar">Ir para o meu painel</a>
+            <button className="btn btn-ghost" style={{ width: "100%", justifyContent: "center" }} onClick={() => auth.signOut()}>Sair e entrar com outra conta</button>
+          </div>
+        </div>
+      </>
+    );
+  }
   if (!usuario) return <TelaLogin aoLogar={setUsuario} />;
 
   const NAV = [

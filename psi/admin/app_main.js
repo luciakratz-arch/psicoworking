@@ -96,6 +96,15 @@ function App() {
   const statusConexaoGoogle = usarConexaoGoogleAgenda(usuario);
   const configClinica = usarConfiguracaoClinica(usuario && usuario.psiId);
   const assinatura = usarAssinatura(usuario && usuario.psiId);
+
+  // A administradora entra pela mesma porta (/entrar) e vai direto para o painel da
+  // plataforma, sem pedir o login de novo (a sessão é a mesma). Dentro do painel da
+  // plataforma, o catálogo aparece embutido (?embutido=1) e não redireciona.
+  useEffect(() => {
+    if (usuario && usuario.role === "admin_matriz" && new URLSearchParams(window.location.search).get("embutido") !== "1") {
+      window.location.replace("/plataforma");
+    }
+  }, [usuario]);
   const psiIdEndereco = usarPsiIdPorEndereco();
   const configPreLogin = usarConfiguracaoPreLogin(!usuario ? psiIdEndereco : null);
 

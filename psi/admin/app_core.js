@@ -28,7 +28,7 @@ const firebaseConfig = {
 // psicóloga logada em outra aba do mesmo navegador.
 // Com ?plataforma=1 (link do painel da administradora) usa a MESMA sessão do
 // painel /psi/matriz/, para ela não cair na conta da psicóloga.
-const nomeAppAdmin = new URLSearchParams(window.location.search).get("plataforma") === "1" ? "psicoworking-matriz" : "psicoworking-admin";
+const nomeAppAdmin = "psicoworking-admin";
 const appAdmin = firebase.apps.find((a) => a.name === nomeAppAdmin) || firebase.initializeApp(firebaseConfig, nomeAppAdmin);
 const auth = appAdmin.auth();
 const db = appAdmin.firestore();
@@ -397,10 +397,12 @@ function TelaLogin({ configClinica }) {
           <button type="button" className="link-esqueci-senha" onClick={aoEsquecerSenha}>
             Esqueci minha senha
           </button>
+
+          <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid var(--borda)", textAlign: "center", fontSize: 13, color: "var(--texto-suave)" }}>
+            Ainda não tem conta?{" "}
+            <a href="https://psicoworking.app.br/" style={{ color: "var(--cor-marca)", fontWeight: 600, whiteSpace: "nowrap" }}>Conheça o PsiCoWorking</a>
+          </div>
         </form>
-        <p style={{ textAlign: "center", marginTop: 20, fontSize: 13 }}>
-          <a href="https://psicoworking.app.br/" style={{ color: "var(--cor-marca)", fontWeight: 600 }}>Conheça o PsiCoWorking e teste grátis por 30 dias</a>
-        </p>
       </div>
     </div>
   );

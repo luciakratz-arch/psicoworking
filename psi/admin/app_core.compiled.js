@@ -34,7 +34,7 @@ const firebaseConfig = {
 // psicóloga logada em outra aba do mesmo navegador.
 // Com ?plataforma=1 (link do painel da administradora) usa a MESMA sessão do
 // painel /psi/matriz/, para ela não cair na conta da psicóloga.
-const nomeAppAdmin = new URLSearchParams(window.location.search).get("plataforma") === "1" ? "psicoworking-matriz" : "psicoworking-admin";
+const nomeAppAdmin = "psicoworking-admin";
 const appAdmin = firebase.apps.find(a => a.name === nomeAppAdmin) || firebase.initializeApp(firebaseConfig, nomeAppAdmin);
 const auth = appAdmin.auth();
 const db = appAdmin.firestore();
@@ -455,19 +455,23 @@ function TelaLogin({
     type: "button",
     className: "link-esqueci-senha",
     onClick: aoEsquecerSenha
-  }, "Esqueci minha senha")), /*#__PURE__*/React.createElement("p", {
+  }, "Esqueci minha senha"), /*#__PURE__*/React.createElement("div", {
     style: {
+      marginTop: 22,
+      paddingTop: 16,
+      borderTop: "1px solid var(--borda)",
       textAlign: "center",
-      marginTop: 20,
-      fontSize: 13
+      fontSize: 13,
+      color: "var(--texto-suave)"
     }
-  }, /*#__PURE__*/React.createElement("a", {
+  }, "Ainda n\xE3o tem conta?", " ", /*#__PURE__*/React.createElement("a", {
     href: "https://psicoworking.app.br/",
     style: {
       color: "var(--cor-marca)",
-      fontWeight: 600
+      fontWeight: 600,
+      whiteSpace: "nowrap"
     }
-  }, "Conhe\xE7a o PsiCoWorking e teste gr\xE1tis por 30 dias"))));
+  }, "Conhe\xE7a o PsiCoWorking")))));
 }
 
 // ─── Campo de texto com ditado por voz (mesmo padrão do sistema
