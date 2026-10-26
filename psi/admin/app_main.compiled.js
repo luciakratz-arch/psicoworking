@@ -39,7 +39,8 @@ function usarConfiguracaoClinica(psiId) {
 
 // Faixa no topo conforme a situação da assinatura (teste, somente leitura, etc.).
 function FaixaAssinatura({
-  assinatura
+  assinatura,
+  aoAbrirPlano
 }) {
   if (!assinatura) return null;
   const dataBr = ts => ts && ts.toDate ? ts.toDate().toLocaleDateString("pt-BR") : "";
@@ -100,12 +101,16 @@ function FaixaAssinatura({
       fontWeight: 700
     }
   }, "Pagar agora") : /*#__PURE__*/React.createElement("a", {
-    href: LINK_PLANO_PLUS,
+    href: "#",
+    onClick: e => {
+      e.preventDefault();
+      if (aoAbrirPlano) aoAbrirPlano();
+    },
     style: {
       color: "var(--cor-marca)",
       fontWeight: 700
     }
-  }, "Falar sobre o plano")));
+  }, "Ver meu plano")));
 }
 function App() {
   const {
@@ -187,7 +192,8 @@ function App() {
   }), /*#__PURE__*/React.createElement("main", {
     className: "area-principal"
   }, !embutido && /*#__PURE__*/React.createElement(FaixaAssinatura, {
-    assinatura: assinatura
+    assinatura: assinatura,
+    aoAbrirPlano: () => setTelaAtiva("plano")
   }), statusConexaoGoogle && statusConexaoGoogle.startsWith("erro") && /*#__PURE__*/React.createElement("p", {
     className: "mensagem-erro"
   }, "N\xE3o foi poss\xEDvel conectar o Google Agenda: ", statusConexaoGoogle), telaEfetiva === "dashboard" && /*#__PURE__*/React.createElement(TelaDashboard, {
@@ -200,6 +206,8 @@ function App() {
   }), telaEfetiva === "recursos" && /*#__PURE__*/React.createElement(TelaRecursos, {
     usuario: usuario
   }), telaEfetiva === "agenda" && /*#__PURE__*/React.createElement(TelaAgenda, {
+    usuario: usuario
+  }), telaEfetiva === "plano" && usuario.role === "psi" && /*#__PURE__*/React.createElement(TelaMeuPlano, {
     usuario: usuario
   }), telaEfetiva === "configuracoes" && /*#__PURE__*/React.createElement(TelaConfiguracoes, {
     usuario: usuario
@@ -234,12 +242,16 @@ function Sidebar({
     rotulo: "Agenda",
     icone: "calendar-days"
   }, {
+    id: "plano",
+    rotulo: "Meu plano",
+    icone: "credit-card"
+  }, {
     id: "configuracoes",
     rotulo: "Configurações",
     icone: "settings"
   }];
   const ehAdminPlataforma = usuario.role === "admin_matriz";
-  const itens = ehAdminPlataforma ? todosItens.filter(i => i.id === "recursos") : todosItens;
+  const itens = ehAdminPlataforma ? todosItens.filter(i => i.id === "recursos") : todosItens.filter(i => i.id !== "plano" || usuario.role === "psi");
   return /*#__PURE__*/React.createElement("aside", {
     className: "barra-lateral"
   }, temMarca ? /*#__PURE__*/React.createElement("div", {

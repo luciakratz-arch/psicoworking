@@ -47,7 +47,7 @@ function usarConfiguracaoClinica(psiId) {
 }
 
 // Faixa no topo conforme a situação da assinatura (teste, somente leitura, etc.).
-function FaixaAssinatura({ assinatura }) {
+function FaixaAssinatura({ assinatura, aoAbrirPlano }) {
   if (!assinatura) return null;
   const dataBr = (ts) => (ts && ts.toDate ? ts.toDate().toLocaleDateString("pt-BR") : "");
   let texto = "";
@@ -85,7 +85,7 @@ function FaixaAssinatura({ assinatura }) {
       {texto}{" "}
       {link && (assinatura.linkCobranca
         ? <a href={assinatura.linkCobranca} target="_blank" rel="noopener" style={{ color: "var(--cor-marca)", fontWeight: 700 }}>Pagar agora</a>
-        : <a href={LINK_PLANO_PLUS} style={{ color: "var(--cor-marca)", fontWeight: 700 }}>Falar sobre o plano</a>)}
+        : <a href="#" onClick={(e) => { e.preventDefault(); if (aoAbrirPlano) aoAbrirPlano(); }} style={{ color: "var(--cor-marca)", fontWeight: 700 }}>Ver meu plano</a>)}
     </div>
   );
 }
@@ -167,7 +167,7 @@ function App() {
         />
       )}
       <main className="area-principal">
-        {!embutido && <FaixaAssinatura assinatura={assinatura} />}
+        {!embutido && <FaixaAssinatura assinatura={assinatura} aoAbrirPlano={() => setTelaAtiva("plano")} />}
         {statusConexaoGoogle && statusConexaoGoogle.startsWith("erro") && (
           <p className="mensagem-erro">
             Não foi possível conectar o Google Agenda: {statusConexaoGoogle}
@@ -180,6 +180,7 @@ function App() {
         {telaEfetiva === "financeiro" && <TelaFinanceiro usuario={usuario} />}
         {telaEfetiva === "recursos" && <TelaRecursos usuario={usuario} />}
         {telaEfetiva === "agenda" && <TelaAgenda usuario={usuario} />}
+        {telaEfetiva === "plano" && usuario.role === "psi" && <TelaMeuPlano usuario={usuario} />}
         {telaEfetiva === "configuracoes" && <TelaConfiguracoes usuario={usuario} />}
       </main>
     </div>
@@ -196,10 +197,13 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
     { id: "financeiro", rotulo: "Financeiro", icone: "circle-dollar-sign" },
     { id: "recursos", rotulo: "Recursos Terapêuticos", icone: "wrench" },
     { id: "agenda", rotulo: "Agenda", icone: "calendar-days" },
+    { id: "plano", rotulo: "Meu plano", icone: "credit-card" },
     { id: "configuracoes", rotulo: "Configurações", icone: "settings" },
   ];
   const ehAdminPlataforma = usuario.role === "admin_matriz";
-  const itens = ehAdminPlataforma ? todosItens.filter((i) => i.id === "recursos") : todosItens;
+  const itens = ehAdminPlataforma
+    ? todosItens.filter((i) => i.id === "recursos")
+    : todosItens.filter((i) => i.id !== "plano" || usuario.role === "psi");
 
   return (
     <aside className="barra-lateral">

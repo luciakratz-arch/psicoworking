@@ -152,6 +152,53 @@ function CartaoMeuPlano({ usuario }) {
   );
 }
 
+function TelaMeuPlano({ usuario }) {
+  const a = usarAssinatura(usuario.psiId);
+  const moeda = (v) => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dataBr = (ts) => (ts && ts.toDate ? ts.toDate().toLocaleDateString("pt-BR") : "");
+  const dataIso = (s) => (s ? String(s).split("-").reverse().join("/") : "");
+  const pagamentos = [...((a && a.pagamentos) || [])].reverse();
+
+  return (
+    <div className="conteudo">
+      <div className="cabecalho-secao">
+        <h2>Meu plano</h2>
+      </div>
+
+      <CartaoMeuPlano usuario={usuario} />
+
+      {a && a.cobrancaAberta && a.linkCobranca && (
+        <div className="cartao-config" style={{ marginBottom: 16 }}>
+          <label>Cobrança em aberto</label>
+          <p className="dica-campo">
+            {moeda(a.cobrancaAberta.valor)}
+            {a.cobrancaAberta.vencimento ? " · vence em " + dataIso(a.cobrancaAberta.vencimento) : ""}
+          </p>
+          <a href={a.linkCobranca} target="_blank" rel="noopener" className="botao-primario" style={{ display: "inline-block", textDecoration: "none", marginTop: 8 }}>
+            Pagar agora
+          </a>
+        </div>
+      )}
+
+      <div className="cartao-config">
+        <label>Pagamentos</label>
+        {pagamentos.length === 0 ? (
+          <p className="dica-campo">Nenhum pagamento registrado ainda.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+            {pagamentos.map((p, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", fontSize: 13, borderBottom: "1px solid var(--borda)", paddingBottom: 6 }}>
+                <span>{dataBr(p.em)} · {p.forma}</span>
+                <span><strong>{moeda(p.valor)}</strong> · cobre até {dataBr(p.ate)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TelaConfiguracoes({ usuario }) {
   const [nome, setNome] = useState("");
   const [corPrimaria, setCorPrimaria] = useState("#6A2BD9");
@@ -290,7 +337,6 @@ function TelaConfiguracoes({ usuario }) {
         <h2>Configurações</h2>
       </div>
 
-      {usuario.role === "psi" && <CartaoMeuPlano usuario={usuario} />}
 
       <form className="cartao-config" onSubmit={aoSalvar}>
         <label>Nome da clínica (ou seu nome)</label>

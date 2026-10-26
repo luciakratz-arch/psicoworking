@@ -189,6 +189,64 @@ function CartaoMeuPlano({
     }
   }, msg)));
 }
+function TelaMeuPlano({
+  usuario
+}) {
+  const a = usarAssinatura(usuario.psiId);
+  const moeda = v => "R$ " + Number(v || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  const dataBr = ts => ts && ts.toDate ? ts.toDate().toLocaleDateString("pt-BR") : "";
+  const dataIso = s => s ? String(s).split("-").reverse().join("/") : "";
+  const pagamentos = [...(a && a.pagamentos || [])].reverse();
+  return /*#__PURE__*/React.createElement("div", {
+    className: "conteudo"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cabecalho-secao"
+  }, /*#__PURE__*/React.createElement("h2", null, "Meu plano")), /*#__PURE__*/React.createElement(CartaoMeuPlano, {
+    usuario: usuario
+  }), a && a.cobrancaAberta && a.linkCobranca && /*#__PURE__*/React.createElement("div", {
+    className: "cartao-config",
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Cobran\xE7a em aberto"), /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo"
+  }, moeda(a.cobrancaAberta.valor), a.cobrancaAberta.vencimento ? " · vence em " + dataIso(a.cobrancaAberta.vencimento) : ""), /*#__PURE__*/React.createElement("a", {
+    href: a.linkCobranca,
+    target: "_blank",
+    rel: "noopener",
+    className: "botao-primario",
+    style: {
+      display: "inline-block",
+      textDecoration: "none",
+      marginTop: 8
+    }
+  }, "Pagar agora")), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-config"
+  }, /*#__PURE__*/React.createElement("label", null, "Pagamentos"), pagamentos.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo"
+  }, "Nenhum pagamento registrado ainda.") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+      marginTop: 8
+    }
+  }, pagamentos.map((p, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 10,
+      flexWrap: "wrap",
+      fontSize: 13,
+      borderBottom: "1px solid var(--borda)",
+      paddingBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", null, dataBr(p.em), " \xB7 ", p.forma), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, moeda(p.valor)), " \xB7 cobre at\xE9 ", dataBr(p.ate)))))));
+}
 function TelaConfiguracoes({
   usuario
 }) {
@@ -308,9 +366,7 @@ function TelaConfiguracoes({
     className: "conteudo"
   }, /*#__PURE__*/React.createElement("div", {
     className: "cabecalho-secao"
-  }, /*#__PURE__*/React.createElement("h2", null, "Configura\xE7\xF5es")), usuario.role === "psi" && /*#__PURE__*/React.createElement(CartaoMeuPlano, {
-    usuario: usuario
-  }), /*#__PURE__*/React.createElement("form", {
+  }, /*#__PURE__*/React.createElement("h2", null, "Configura\xE7\xF5es")), /*#__PURE__*/React.createElement("form", {
     className: "cartao-config",
     onSubmit: aoSalvar
   }, /*#__PURE__*/React.createElement("label", null, "Nome da cl\xEDnica (ou seu nome)"), /*#__PURE__*/React.createElement("input", {
