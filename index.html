@@ -70,6 +70,14 @@
     .hero > .contem, .final > .contem { position: relative; z-index: 2; }
     @media (prefers-reduced-motion: reduce) { .fundo-video { display: none; } }
 
+    /* Faixa com vídeo de ambiente */
+    .faixa-video { position: relative; overflow: hidden; color: #fff; text-align: center; padding: 120px 0; background: var(--escuro) center / cover no-repeat url(/videos/clinica-poster.jpg); }
+    .faixa-video > .contem { position: relative; z-index: 2; }
+    .camada-faixa { position: absolute; inset: 0; z-index: 1; background: linear-gradient(135deg, rgba(59,13,111,.86) 0%, rgba(106,43,217,.66) 100%); }
+    .faixa-video h2 { font-size: clamp(28px, 4.4vw, 46px); line-height: 1.15; letter-spacing: -.6px; margin-bottom: 16px; }
+    .faixa-video p { font-size: clamp(16px, 2vw, 19px); max-width: 640px; margin: 0 auto 30px; opacity: .93; }
+    @media (max-width: 600px) { .faixa-video { padding: 84px 0; } }
+
     /* Faixa de números */
     .numeros { padding: 44px 0; border-bottom: 1px solid var(--borda); }
     .numeros-grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; text-align: center; }
@@ -245,6 +253,16 @@
           <div class="cartao"><div class="icone"><i data-lucide="calendar-days"></i></div><h3>Agenda Google</h3><p>Conectada à sua Google Agenda: sem agenda duplicada e sem trabalho em dobro.</p></div>
           <div class="cartao"><div class="icone"><i data-lucide="message-circle"></i></div><h3>Tarefas por WhatsApp</h3><p>As tarefas de casa saem prontas para enviar ao paciente, em linguagem simples, direto do prontuário.</p></div>
         </div>
+      </div>
+    </section>
+
+    <section class="faixa-video">
+      <video class="fundo-video" muted loop playsinline preload="none" poster="/videos/clinica-poster.jpg" data-src="/videos/clinica.mp4" aria-hidden="true"></video>
+      <div class="camada-faixa"></div>
+      <div class="contem">
+        <h2>Menos papel.<br />Mais presença.</h2>
+        <p>O PsiCoWorking cuida da organização para você cuidar de quem está na sua frente.</p>
+        <a class="botao botao-branco" href="/cadastro">Teste grátis por 30 dias</a>
       </div>
     </section>
 
@@ -450,6 +468,23 @@
     try {
       if (navigator.connection && navigator.connection.saveData) {
         document.querySelectorAll(".fundo-video").forEach(function (v) { v.remove(); });
+      }
+    } catch (e) {}
+
+    // O vídeo da faixa do meio só começa a baixar quando ela aparece na tela.
+    try {
+      var lento = document.querySelector("video[data-src]");
+      if (lento && "IntersectionObserver" in window) {
+        new IntersectionObserver(function (itens, obs) {
+          itens.forEach(function (i) {
+            if (i.isIntersecting) {
+              lento.src = lento.getAttribute("data-src");
+              var p = lento.play();
+              if (p && p.catch) p.catch(function () {});
+              obs.disconnect();
+            }
+          });
+        }, { rootMargin: "200px" }).observe(lento);
       }
     } catch (e) {}
 
