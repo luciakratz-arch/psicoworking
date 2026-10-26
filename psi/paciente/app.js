@@ -186,6 +186,9 @@ function TelaLogin({ configClinica }) {
             Esqueci minha senha
           </button>
         </form>
+        <p style={{ textAlign: "center", marginTop: 18, fontSize: 12 }}>
+          <a href="https://psicoworking.app.br/" style={{ color: "var(--cor-marca-p)", fontWeight: 600 }}>Conheça o PsiCoWorking</a>
+        </p>
       </div>
     </div>
   );

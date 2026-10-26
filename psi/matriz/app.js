@@ -144,6 +144,9 @@ function TelaLogin({ aoLogar }) {
               {carregando ? "Entrando..." : "Entrar"}
             </button>
           </form>
+          <p style={{ textAlign: "center", marginTop: 18, fontSize: 13 }}>
+            <a href="https://psicoworking.app.br/" style={{ color: "#6A2BD9", fontWeight: 600, textDecoration: "none" }}>Conheça o PsiCoWorking</a>
+          </p>
         </div>
       </div>
     </>

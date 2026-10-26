@@ -455,7 +455,19 @@ function TelaLogin({
     type: "button",
     className: "link-esqueci-senha",
     onClick: aoEsquecerSenha
-  }, "Esqueci minha senha"))));
+  }, "Esqueci minha senha")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      textAlign: "center",
+      marginTop: 20,
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("a", {
+    href: "https://psicoworking.app.br/",
+    style: {
+      color: "var(--cor-marca)",
+      fontWeight: 600
+    }
+  }, "Conhe\xE7a o PsiCoWorking e teste gr\xE1tis por 30 dias"))));
 }
 
 // ─── Campo de texto com ditado por voz (mesmo padrão do sistema
