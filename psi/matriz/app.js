@@ -269,12 +269,16 @@ function usarUsoClinicas(quantas) {
 function rotuloPlano(a, planos) {
   if (!a) return "—";
   if (a.origem === "fundadora") return "Fundadora (Plus)";
+  if (a.origem === "cortesia") return "Cortesia (" + (a.plano === "plus" ? planos.plus.nome : planos.essencial.nome) + ")";
   return a.plano === "plus" ? planos.plus.nome : planos.essencial.nome;
 }
 
 function EtiquetaSituacao({ a }) {
   if (!a) return <span className="badge badge-neutro">Sem assinatura</span>;
   const dias = diasAte(a.testeAte);
+  if (a.origem === "cortesia" && a.situacao === "ativa") {
+    return <span className="badge badge-teste">{a.cortesiaAte ? "Cortesia até " + dataBr(a.cortesiaAte) : "Cortesia sem prazo"}</span>;
+  }
   if (a.situacao === "teste") {
     return <span className="badge badge-teste">{"Teste até " + dataBr(a.testeAte) + (dias !== null ? " (" + Math.max(dias, 0) + "d)" : "")}</span>;
   }
@@ -304,6 +308,9 @@ function CartaoVencimentos({ lista, planos, irPara }) {
     if (a.situacao === "teste" && a.testeAte) {
       const d = diasAte(a.testeAte);
       if (d !== null && d <= 7) itens.push({ c, ordem: d, texto: "Teste termina " + (d <= 0 ? "hoje" : "em " + d + " dia(s)") });
+    } else if (a.situacao === "ativa" && a.origem === "cortesia" && a.cortesiaAte) {
+      const d = diasAte(a.cortesiaAte);
+      if (d !== null && d <= 7) itens.push({ c, ordem: d, texto: "Cortesia termina " + (d <= 0 ? "hoje" : "em " + d + " dia(s)") });
     } else if (a.situacao === "ativa" && a.proximoVencimento) {
       const d = diasAte(a.proximoVencimento);
       if (d !== null && d <= 7) itens.push({ c, ordem: d, texto: "Plano vence " + (d <= 0 ? "hoje" : "em " + d + " dia(s)") + " (" + dataBr(a.proximoVencimento) + ")" });
@@ -393,12 +400,13 @@ function PaginaDashboard({ irPara }) {
   const emTeste = comAssin.filter((c) => c.assinatura.situacao === "teste").length;
   const emAtraso = comAssin.filter((c) => c.assinatura.situacao === "atrasada").length;
   const pendentes = interesses.filter((i) => !i.status || i.status === "pendente").length;
+  const cortesias = comAssin.filter((c) => c.assinatura.origem === "cortesia" && c.assinatura.situacao === "ativa").length;
 
   // Receita mensal estimada: só quem paga (fundadoras e testes não entram).
   let receita = 0;
   comAssin.forEach((c) => {
     const a = c.assinatura;
-    if (a.origem === "fundadora" || (a.situacao !== "ativa" && a.situacao !== "atrasada")) return;
+    if (a.origem === "fundadora" || a.origem === "cortesia" || (a.situacao !== "ativa" && a.situacao !== "atrasada")) return;
     const p = a.plano === "plus" ? planos.plus : planos.essencial;
     receita += a.ciclo === "anual" ? Number(p.precoAnual || 0) / 12 : Number(p.precoMensal || 0);
   });
@@ -425,6 +433,7 @@ function PaginaDashboard({ irPara }) {
       </div>
       <div className="cartoes-stats">
         <div className="cartao-stat"><div className="valor">{moeda(receita)}</div><div className="label">Receita mensal estimada</div></div>
+        <div className="cartao-stat"><div className="valor" style={{ color: "#6A2BD9" }}>{cortesias}</div><div className="label">Acessos de cortesia</div></div>
         <div className="cartao-stat"><div className="valor">{usosIA}</div><div className="label">Usos de IA neste mês (custo estimado {moeda(usosIA * 0.02)})</div></div>
       </div>
       <CartaoVencimentos lista={lista} planos={planos} irPara={irPara} />
@@ -532,6 +541,8 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
   const [formaPg, setFormaPg] = useState("Pix");
   const [linkCobranca, setLinkCobranca] = useState((a && a.linkCobranca) || "");
   const [slugEdit, setSlugEdit] = useState(clinica.slug || "");
+  const [planoCortesia, setPlanoCortesia] = useState((a && a.plano) || "essencial");
+  const [mesesCortesia, setMesesCortesia] = useState("0");
   const [msg, setMsg] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const FV = firebase.firestore.FieldValue;
@@ -591,6 +602,35 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
     const link = linkCobranca.trim();
     if (link && !/^https:\/\//i.test(link)) { setMsg("Erro: o link de cobrança precisa começar com https://"); return Promise.resolve(); }
     return executar(() => ref.set({ linkCobranca: link ? link : FV.delete() }, { merge: true }), link ? "Link de cobrança salvo. Ele aparece para a psicóloga e nos e-mails de aviso." : "Link de cobrança removido.");
+  }
+
+  function concederCortesia() {
+    const meses = Number(mesesCortesia);
+    const ate = new Date();
+    ate.setMonth(ate.getMonth() + meses);
+    return executar(() => ref.set({
+      plano: planoCortesia,
+      situacao: "ativa",
+      origem: "cortesia",
+      ciclo: "mensal",
+      iaCotaMes: planoCortesia === "plus" ? (planos.plus.cotaIaMes === undefined ? null : planos.plus.cotaIaMes) : FV.delete(),
+      cortesiaAte: meses ? TS.fromDate(ate) : FV.delete(),
+      proximoVencimento: FV.delete(),
+      testeAte: FV.delete(),
+      leituraAte: FV.delete(),
+      avisosEnviados: FV.delete(),
+    }, { merge: true }), meses ? "Cortesia concedida por " + meses + " meses." : "Cortesia concedida, sem prazo.");
+  }
+
+  function encerrarCortesia() {
+    if (!confirm("Encerrar a cortesia e iniciar um teste de " + planos.testeDias + " dias?")) return Promise.resolve();
+    return executar(() => ref.set({
+      origem: "cadastro",
+      situacao: "teste",
+      testeAte: TS.fromMillis(Date.now() + planos.testeDias * 86400000),
+      cortesiaAte: FV.delete(),
+      avisosEnviados: FV.delete(),
+    }, { merge: true }), "Cortesia encerrada. A clínica entrou em teste de " + planos.testeDias + " dias.");
   }
 
   function salvarSlug() {
@@ -686,6 +726,39 @@ function DetalheClinica({ clinica, planos, uso, aoVoltar }) {
               <button className="btn btn-ghost" disabled={ocupado} onClick={estenderTeste}>Estender teste</button>
               <button className="btn btn-ghost" disabled={ocupado} onClick={maisIA}>Liberar +5 usos de IA no teste</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {a && a.origem !== "fundadora" && (
+        <div className="painel-form" style={{ maxWidth: 720, marginTop: 16 }}>
+          <div className="subtitulo-painel">Acesso de cortesia (gratuito)</div>
+          <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 10 }}>
+            {a.origem === "cortesia"
+              ? "Esta clínica está com acesso de cortesia: sem cobrança e sem avisos de pagamento."
+              : "Conceda acesso gratuito a esta clínica. Ela deixa de ser cobrada e de receber avisos de pagamento."}
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div className="form-grupo" style={{ flex: 1, minWidth: 180 }}>
+              <label>Plano</label>
+              <select value={planoCortesia} onChange={(e) => setPlanoCortesia(e.target.value)}>
+                <option value="essencial">Essencial (sem IA)</option>
+                <option value="plus">Plus (com IA)</option>
+              </select>
+            </div>
+            <div className="form-grupo" style={{ flex: 1, minWidth: 180 }}>
+              <label>Duração</label>
+              <select value={mesesCortesia} onChange={(e) => setMesesCortesia(e.target.value)}>
+                <option value="0">Sem prazo</option>
+                <option value="3">3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12">12 meses</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn btn-primario" disabled={ocupado} onClick={concederCortesia}>{a.origem === "cortesia" ? "Atualizar cortesia" : "Conceder cortesia"}</button>
+            {a.origem === "cortesia" && <button className="btn btn-ghost" disabled={ocupado} onClick={encerrarCortesia}>Encerrar cortesia e iniciar teste</button>}
           </div>
         </div>
       )}
@@ -897,6 +970,10 @@ function PaginaNovaPsicologa({ prefill }) {
   const [resultado, setResultado] = useState(null);
   const [copiado, setCopiado] = useState(false);
 
+  const [acessoTipo, setAcessoTipo] = useState("teste");
+  const [acessoPlano, setAcessoPlano] = useState("essencial");
+  const [acessoMeses, setAcessoMeses] = useState("0");
+
   function campo(key) {
     return { value: form[key], onChange: (e) => setForm((f) => ({ ...f, [key]: e.target.value })) };
   }
@@ -907,7 +984,10 @@ function PaginaNovaPsicologa({ prefill }) {
     setSalvando(true);
     try {
       const fn = functions.httpsCallable("cadastrarPsicologa");
-      const { data } = await fn({ ...form, interesseId: (prefill && prefill.interesseId) || undefined });
+      const acesso = acessoTipo === "cortesia"
+        ? { tipo: "cortesia", plano: acessoPlano, meses: Number(acessoMeses) }
+        : { tipo: "teste" };
+      const { data } = await fn({ ...form, interesseId: (prefill && prefill.interesseId) || undefined, acesso });
       setResultado({ ok: true, link: data.linkDefinirSenha });
       setForm({ nome: "", email: "", crp: "", cidade: "", titulo: "Psicóloga" });
     } catch (err) {
@@ -952,6 +1032,33 @@ function PaginaNovaPsicologa({ prefill }) {
             <label>Título profissional</label>
             <input type="text" {...campo("titulo")} />
           </div>
+          <div className="form-grupo">
+            <label>Tipo de acesso</label>
+            <select value={acessoTipo} onChange={(e) => setAcessoTipo(e.target.value)}>
+              <option value="teste">Teste de 30 dias (depois assina um plano)</option>
+              <option value="cortesia">Cortesia (acesso gratuito)</option>
+            </select>
+          </div>
+          {acessoTipo === "cortesia" && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div className="form-grupo" style={{ flex: 1, minWidth: 180 }}>
+                <label>Plano da cortesia</label>
+                <select value={acessoPlano} onChange={(e) => setAcessoPlano(e.target.value)}>
+                  <option value="essencial">Essencial (sem IA)</option>
+                  <option value="plus">Plus (com IA)</option>
+                </select>
+              </div>
+              <div className="form-grupo" style={{ flex: 1, minWidth: 180 }}>
+                <label>Duração</label>
+                <select value={acessoMeses} onChange={(e) => setAcessoMeses(e.target.value)}>
+                  <option value="0">Sem prazo</option>
+                  <option value="3">3 meses</option>
+                  <option value="6">6 meses</option>
+                  <option value="12">12 meses</option>
+                </select>
+              </div>
+            </div>
+          )}
           <button type="submit" className="btn btn-primario" disabled={salvando}>
             <Icone nome="user-plus" tamanho={15} />
             {salvando ? "Cadastrando..." : "Cadastrar"}

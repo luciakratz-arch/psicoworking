@@ -43,17 +43,20 @@ function CartaoMeuPlano({ usuario }) {
   const dataBr = (ts) => (ts && ts.toDate ? ts.toDate().toLocaleDateString("pt-BR") : "");
 
   const fundadora = a.origem === "fundadora";
-  const nomePlano = fundadora ? "Fundadora (acesso integral, sem cobrança)" : p(a.plano).nome;
+  const cortesia = a.origem === "cortesia";
+  const nomePlano = fundadora ? "Fundadora (acesso integral, sem cobrança)" : cortesia ? p(a.plano).nome + " (cortesia)" : p(a.plano).nome;
   const situacaoTxt = {
     teste: "Em teste até " + dataBr(a.testeAte),
-    ativa: "Ativa" + (a.proximoVencimento ? ", próximo vencimento em " + dataBr(a.proximoVencimento) : ""),
+    ativa: cortesia
+      ? "Acesso gratuito" + (a.cortesiaAte ? " até " + dataBr(a.cortesiaAte) : ", sem prazo definido")
+      : "Ativa" + (a.proximoVencimento ? ", próximo vencimento em " + dataBr(a.proximoVencimento) : ""),
     atrasada: "Pagamento em atraso",
     somente_leitura: "Somente leitura até " + dataBr(a.leituraAte),
     suspensa: "Suspensa",
     cancelada: "Cancelada",
   }[a.situacao] || a.situacao;
   const pendente = pedido && pedido.status === "pendente";
-  const jaEhEsse = !fundadora && a.situacao !== "teste" && a.plano === para;
+  const jaEhEsse = !fundadora && !cortesia && a.situacao !== "teste" && a.plano === para;
 
   async function pedirMudanca() {
     setEnviando(true);

@@ -51,6 +51,12 @@ function FaixaAssinatura({
     const dias = assinatura.testeAte && assinatura.testeAte.toDate ? Math.max(Math.ceil((assinatura.testeAte.toDate().getTime() - Date.now()) / 86400000), 0) : null;
     texto = "Período de teste" + (dias !== null ? ": restam " + dias + " dia(s)" : "") + ". Ao terminar, a clínica fica 15 dias só para consulta e exportação de dados.";
     link = true;
+  } else if (assinatura.situacao === "ativa" && assinatura.origem === "cortesia" && assinatura.cortesiaAte && assinatura.cortesiaAte.toDate && Math.ceil((assinatura.cortesiaAte.toDate().getTime() - Date.now()) / 86400000) <= 7) {
+    const dias = Math.max(Math.ceil((assinatura.cortesiaAte.toDate().getTime() - Date.now()) / 86400000), 0);
+    texto = "Seu acesso de cortesia termina " + (dias === 0 ? "hoje" : "em " + dias + " dia(s)") + " (" + dataBr(assinatura.cortesiaAte) + "). Depois disso, a clínica fica 15 dias só para consulta.";
+    cor = "#FEF3C7";
+    borda = "#F59E0B";
+    link = true;
   } else if (assinatura.situacao === "ativa" && assinatura.proximoVencimento && assinatura.proximoVencimento.toDate && Math.ceil((assinatura.proximoVencimento.toDate().getTime() - Date.now()) / 86400000) <= 7) {
     const dias = Math.max(Math.ceil((assinatura.proximoVencimento.toDate().getTime() - Date.now()) / 86400000), 0);
     texto = "Seu plano vence " + (dias === 0 ? "hoje" : "em " + dias + " dia(s)") + " (" + dataBr(assinatura.proximoVencimento) + ").";

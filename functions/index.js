@@ -131,6 +131,28 @@ function montarAssinaturaTeste(planos) {
   };
 }
 
+// Acesso gratuito (cortesia) concedido pela administradora: ativo, sem cobrança e sem
+// avisos de pagamento. Com "meses" tem prazo; sem prazo fica até ela encerrar.
+function montarAssinaturaCortesia(planos, plano, meses) {
+  const p = plano === "plus" ? "plus" : "essencial";
+  const m = Number(meses) > 0 ? Math.min(Number(meses), 60) : 0;
+  const a = {
+    plano: p,
+    situacao: "ativa",
+    ciclo: "mensal",
+    origem: "cortesia",
+    observacao: "Acesso de cortesia concedido pela administradora.",
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (p === "plus") a.iaCotaMes = planos.plus.cotaIaMes;
+  if (m) {
+    const ate = new Date();
+    ate.setMonth(ate.getMonth() + m);
+    a.cortesiaAte = admin.firestore.Timestamp.fromDate(ate);
+  }
+  return a;
+}
+
 // Conta um uso de IA da clínica, respeitando o plano. Lança erro (em português,
 // mostrado ao usuário) se não puder usar. Clínica sem assinatura (legado) usa livremente.
 async function consumirUsoIA(psiId) {
@@ -271,6 +293,11 @@ exports.atualizarSituacoesAssinaturas = onSchedule(
           situacao: "somente_leitura",
           leituraAte: admin.firestore.Timestamp.fromMillis(a.testeAte.toMillis() + planos.somenteLeituraDias * 86400000),
         };
+      } else if (a.situacao === "ativa" && a.origem === "cortesia" && a.cortesiaAte && a.cortesiaAte.toMillis() < agora.toMillis()) {
+        mudanca = {
+          situacao: "somente_leitura",
+          leituraAte: admin.firestore.Timestamp.fromMillis(a.cortesiaAte.toMillis() + planos.somenteLeituraDias * 86400000),
+        };
       } else if (a.situacao === "somente_leitura" && a.leituraAte && a.leituraAte.toMillis() < agora.toMillis()) {
         mudanca = { situacao: "suspensa" };
       } else if (a.situacao === "ativa" && a.proximoVencimento && a.proximoVencimento.toMillis() < agora.toMillis()) {
@@ -334,6 +361,23 @@ function avisosDaAssinatura(a, nome) {
   const lista = [];
   const caminho = "Configurações > Meu plano";
   const pagar = a.linkCobranca ? "Pagar agora" : "";
+  if (a.origem === "cortesia" && a.situacao === "ativa" && a.cortesiaAte) {
+    const fim = a.cortesiaAte.toDate();
+    const dias = diasAteData(fim);
+    if (dias === 7 || dias === 1) {
+      lista.push({
+        chave: "cortesia:d" + dias,
+        assunto: dias === 1 ? "Seu acesso de cortesia ao PsiCoWorking termina amanhã" : "Seu acesso de cortesia ao PsiCoWorking termina em 7 dias",
+        titulo: dias === 1 ? "Seu acesso de cortesia termina amanhã" : "Seu acesso de cortesia termina em 7 dias",
+        paragrafos: [
+          "O seu acesso de cortesia termina em " + dataBrasil(fim) + ".",
+          "Depois dessa data, a clínica fica 15 dias só para consulta e exportação dos seus dados, sem poder gravar novas informações.",
+          "Para continuar normalmente, escolha um plano em " + caminho + ".",
+        ],
+        botao: pagar,
+      });
+    }
+  }
   if (a.situacao === "teste" && a.testeAte) {
     const fim = a.testeAte.toDate();
     const dias = diasAteData(fim);
@@ -772,7 +816,7 @@ exports.cadastrarPsicologa = onCall({ region: "southamerica-east1" }, async (req
     throw new HttpsError("permission-denied", "Só a Admin Matriz pode cadastrar psicólogas.");
   }
 
-  const { nome, email, crp, cidade, titulo, interesseId } = request.data || {};
+  const { nome, email, crp, cidade, titulo, interesseId, acesso } = request.data || {};
   if (!nome || !email) {
     throw new HttpsError("invalid-argument", "Nome e e-mail são obrigatórios.");
   }
@@ -799,7 +843,11 @@ exports.cadastrarPsicologa = onCall({ region: "southamerica-east1" }, async (req
   });
 
   // Começa em teste de 30 dias, plano Essencial, com 5 usos de IA para experimentar.
-  await db.collection("psi_assinaturas").doc(uid).set(montarAssinaturaTeste(await lerPlanos()));
+  const planosCfg = await lerPlanos();
+  const assinaturaNova = acesso && acesso.tipo === "cortesia"
+    ? montarAssinaturaCortesia(planosCfg, acesso.plano, acesso.meses)
+    : montarAssinaturaTeste(planosCfg);
+  await db.collection("psi_assinaturas").doc(uid).set(assinaturaNova);
   const slugNovo = await reservarSlug(uid, nome);
 
   if (interesseId) {
