@@ -71,7 +71,7 @@
     @media (prefers-reduced-motion: reduce) { .fundo-video { display: none; } }
 
     /* Faixa com vídeo de ambiente */
-    .faixa-video { position: relative; overflow: hidden; color: #fff; text-align: center; padding: 120px 0; background: var(--escuro) center / cover no-repeat url(/videos/clinica-poster.jpg); }
+    .faixa-video { position: relative; overflow: hidden; color: #fff; text-align: center; padding: 120px 0; background: var(--escuro) center / cover no-repeat url(/videos/abertura-poster.jpg); }
     .faixa-video > .contem { position: relative; z-index: 2; }
     .camada-faixa { position: absolute; inset: 0; z-index: 1; background: linear-gradient(135deg, rgba(59,13,111,.86) 0%, rgba(106,43,217,.66) 100%); }
     .faixa-video h2 { font-size: clamp(28px, 4.4vw, 46px); line-height: 1.15; letter-spacing: -.6px; margin-bottom: 16px; }
@@ -210,8 +210,8 @@
 
   <main id="inicio">
     <section class="hero">
-      <video class="fundo-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
-        <source src="https://res.cloudinary.com/oqntgzyb/video/upload/w_1920,h_1080,c_fill,q_auto/10570658-uhd-4096-2160-25fps_oTysb7z5.mp4" type="video/mp4" />
+      <video class="fundo-video" autoplay muted loop playsinline preload="auto" poster="/videos/clinica-poster.jpg" aria-hidden="true">
+        <source src="/videos/clinica.mp4" type="video/mp4" />
       </video>
       <div class="camada-hero"></div>
       <div class="contem">
@@ -257,7 +257,7 @@
     </section>
 
     <section class="faixa-video">
-      <video class="fundo-video" muted loop playsinline preload="none" poster="/videos/clinica-poster.jpg" data-src="/videos/clinica.mp4" aria-hidden="true"></video>
+      <video class="fundo-video" muted loop playsinline preload="none" poster="/videos/abertura-poster.jpg" data-src="/videos/abertura.mp4" aria-hidden="true"></video>
       <div class="camada-faixa"></div>
       <div class="contem">
         <h2>Menos papel.<br />Mais presença.</h2>
@@ -382,8 +382,8 @@
     </section>
 
     <section class="final">
-      <video class="fundo-video" autoplay muted loop playsinline preload="none" aria-hidden="true">
-        <source src="https://res.cloudinary.com/oqntgzyb/video/upload/w_1920,h_1080,c_fill,q_auto/10570658-uhd-4096-2160-25fps_oTysb7z5.mp4" type="video/mp4" />
+      <video class="fundo-video" autoplay muted loop playsinline preload="none" poster="/videos/clinica-poster.jpg" aria-hidden="true">
+        <source src="/videos/clinica.mp4" type="video/mp4" />
       </video>
       <div class="camada-final"></div>
       <div class="contem">
