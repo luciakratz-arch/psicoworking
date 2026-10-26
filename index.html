@@ -78,6 +78,15 @@
     .faixa-video p { font-size: clamp(16px, 2vw, 19px); max-width: 640px; margin: 0 auto 30px; opacity: .93; }
     @media (max-width: 600px) { .faixa-video { padding: 84px 0; } }
 
+    /* Portal do paciente (texto + vídeo) */
+    .portal { display: grid; grid-template-columns: 1.05fr 1fr; gap: 60px; align-items: center; }
+    .portal-video { border-radius: 28px; overflow: hidden; box-shadow: 0 22px 60px rgba(59,13,111,.22); background: var(--lavanda); aspect-ratio: 16 / 9; }
+    .portal-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .portal ul { list-style: none; margin: 22px 0 30px; }
+    .portal li { display: flex; gap: 12px; font-size: 16px; padding: 7px 0; }
+    .portal li svg { flex-shrink: 0; color: var(--principal); margin-top: 4px; }
+    @media (max-width: 800px) { .portal { grid-template-columns: 1fr; gap: 32px; } .portal-video { order: -1; } }
+
     /* Faixa de números */
     .numeros { padding: 44px 0; border-bottom: 1px solid var(--borda); }
     .numeros-grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; text-align: center; }
@@ -263,6 +272,26 @@
         <h2>Menos papel.<br />Mais presença.</h2>
         <p>O PsiCoWorking cuida da organização para você cuidar de quem está na sua frente.</p>
         <a class="botao botao-branco" href="/cadastro">Teste grátis por 30 dias</a>
+      </div>
+    </section>
+
+    <section class="bloco" id="portal">
+      <div class="contem portal">
+        <div>
+          <span class="etiqueta">Portal do paciente</span>
+          <h2 class="titulo">O cuidado continua no celular do seu paciente</h2>
+          <p class="chamada">Entre uma sessão e outra, o paciente acompanha o processo no navegador, sem instalar nada, com o nome, a logo e a cor da sua clínica.</p>
+          <ul>
+            <li><i data-lucide="check" width="20" height="20"></i>Diário e registro de humor entre as sessões</li>
+            <li><i data-lucide="check" width="20" height="20"></i>Metas, ferramentas terapêuticas e fábulas</li>
+            <li><i data-lucide="check" width="20" height="20"></i>Confirmação de presença com um toque</li>
+            <li><i data-lucide="check" width="20" height="20"></i>Endereço próprio da sua clínica para enviar por WhatsApp</li>
+          </ul>
+          <a class="botao botao-principal" href="/cadastro">Teste grátis por 30 dias</a>
+        </div>
+        <div class="portal-video">
+          <video muted loop playsinline preload="none" poster="/videos/celular-poster.jpg" data-src="/videos/celular.mp4" aria-label="Pessoa usando o celular"></video>
+        </div>
       </div>
     </section>
 
@@ -473,18 +502,20 @@
 
     // O vídeo da faixa do meio só começa a baixar quando ela aparece na tela.
     try {
-      var lento = document.querySelector("video[data-src]");
-      if (lento && "IntersectionObserver" in window) {
-        new IntersectionObserver(function (itens, obs) {
+      var lentos = document.querySelectorAll("video[data-src]");
+      if (lentos.length && "IntersectionObserver" in window) {
+        var observador = new IntersectionObserver(function (itens, obs) {
           itens.forEach(function (i) {
             if (i.isIntersecting) {
-              lento.src = lento.getAttribute("data-src");
-              var p = lento.play();
+              var v = i.target;
+              v.src = v.getAttribute("data-src");
+              var p = v.play();
               if (p && p.catch) p.catch(function () {});
-              obs.disconnect();
+              obs.unobserve(v);
             }
           });
-        }, { rootMargin: "200px" }).observe(lento);
+        }, { rootMargin: "200px" });
+        lentos.forEach(function (v) { observador.observe(v); });
       }
     } catch (e) {}
 
