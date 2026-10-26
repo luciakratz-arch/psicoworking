@@ -62,6 +62,14 @@
     .hero-botoes { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
     .hero small { display: block; margin-top: 18px; font-size: 13px; opacity: .85; }
 
+    /* Vídeo de fundo (movimento suave) */
+    .hero, .final { position: relative; overflow: hidden; }
+    .fundo-video { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); min-width: 100%; min-height: 100%; width: auto; height: auto; object-fit: cover; z-index: 0; }
+    .camada-hero { position: absolute; inset: 0; z-index: 1; background: linear-gradient(135deg, rgba(59,13,111,.88) 0%, rgba(106,43,217,.74) 62%, rgba(169,123,239,.58) 100%); }
+    .camada-final { position: absolute; inset: 0; z-index: 1; background: linear-gradient(135deg, rgba(59,13,111,.93) 0%, rgba(106,43,217,.84) 100%); }
+    .hero > .contem, .final > .contem { position: relative; z-index: 2; }
+    @media (prefers-reduced-motion: reduce) { .fundo-video { display: none; } }
+
     /* Faixa de números */
     .numeros { padding: 44px 0; border-bottom: 1px solid var(--borda); }
     .numeros-grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; text-align: center; }
@@ -181,6 +189,10 @@
 
   <main id="inicio">
     <section class="hero">
+      <video class="fundo-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
+        <source src="https://res.cloudinary.com/oqntgzyb/video/upload/w_1920,h_1080,c_fill,q_auto/10570658-uhd-4096-2160-25fps_oTysb7z5.mp4" type="video/mp4" />
+      </video>
+      <div class="camada-hero"></div>
       <div class="contem">
         <span class="selo">Plataforma para psicólogas clínicas</span>
         <h1>Sua clínica organizada.<br /><em>Seu tempo, devolvido.</em></h1>
@@ -324,6 +336,10 @@
     </section>
 
     <section class="final">
+      <video class="fundo-video" autoplay muted loop playsinline preload="none" aria-hidden="true">
+        <source src="https://res.cloudinary.com/oqntgzyb/video/upload/w_1920,h_1080,c_fill,q_auto/10570658-uhd-4096-2160-25fps_oTysb7z5.mp4" type="video/mp4" />
+      </video>
+      <div class="camada-final"></div>
       <div class="contem">
         <h2>Pronta para ter a sua clínica organizada?</h2>
         <p>Teste grátis por 30 dias, sem cartão. Cadastre-se em poucos minutos.</p>
@@ -401,6 +417,13 @@
         pintar();
       })
       .catch(function () {});
+
+    // Quem usa o modo "economizar dados" não baixa os vídeos de fundo.
+    try {
+      if (navigator.connection && navigator.connection.saveData) {
+        document.querySelectorAll(".fundo-video").forEach(function (v) { v.remove(); });
+      }
+    } catch (e) {}
 
     pintar();
     if (window.lucide) window.lucide.createIcons();
