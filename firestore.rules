@@ -427,6 +427,12 @@ service cloud.firestore {
       allow write: if ehAdminMatriz();
     }
 
+    // ── Preços públicos para o site de vendas (cópia sem nada sensível) ──
+    match /plataforma_publico/{docId} {
+      allow read: if true;
+      allow write: if ehAdminMatriz();
+    }
+
     // ── Planos, preços e regras do teste (editados pela administradora) ──
     match /plataforma_config/{docId} {
       allow read: if ehAdminMatriz() || ehEquipeDeAlgumaClinica();

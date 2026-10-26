@@ -971,6 +971,16 @@ function PaginaPlanos() {
     }
   }, [planos]);
 
+  // Mantém a cópia pública dos preços (usada pelo site de vendas) igual à configuração atual.
+  useEffect(() => {
+    db.collection("plataforma_publico").doc("planos").set({
+      testeDias: planos.testeDias,
+      testeIaUsos: planos.testeIaUsos,
+      essencial: { nome: planos.essencial.nome, precoMensal: Number(planos.essencial.precoMensal), precoAnual: Number(planos.essencial.precoAnual) },
+      plus: { nome: planos.plus.nome, precoMensal: Number(planos.plus.precoMensal), precoAnual: Number(planos.plus.precoAnual), cotaIaMes: Number(planos.plus.cotaIaMes) },
+    }).catch(() => {});
+  }, [planos]);
+
   if (!f) return null;
   const campo = (k) => ({ value: f[k], onChange: (e) => setF({ ...f, [k]: e.target.value }) });
   const num = (v) => Number(String(v).replace(",", "."));

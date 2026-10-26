@@ -395,6 +395,18 @@ describe("Assinatura, planos e situação da clínica", () => {
   });
 });
 
+describe("Preços públicos do site de vendas", () => {
+  test("qualquer pessoa lê, só a administradora grava", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "plataforma_publico/planos"), { testeDias: 30 });
+    });
+    await assertSucceeds(getDoc(doc(semLogin(), "plataforma_publico/planos")));
+    await assertFails(setDoc(doc(semLogin(), "plataforma_publico/planos"), { testeDias: 1 }));
+    await assertFails(setDoc(doc(psiA(), "plataforma_publico/planos"), { testeDias: 1 }));
+    await assertSucceeds(setDoc(doc(matriz(), "plataforma_publico/planos"), { testeDias: 30 }));
+  });
+});
+
 describe("Endereço da clínica (psi_slugs)", () => {
   test("qualquer pessoa lê o apelido, mas ninguém grava pelo navegador", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
