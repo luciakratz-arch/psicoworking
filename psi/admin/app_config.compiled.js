@@ -20,6 +20,8 @@ function CartaoMeuPlano({
   const [ciclo, setCiclo] = useState("mensal");
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState("");
+  const [documento, setDocumento] = useState("");
+  const [assinando, setAssinando] = useState(false);
   useEffect(() => {
     return db.collection("plataforma_config").doc("planos").onSnapshot(s => setPlanos(s.exists ? s.data() : {}), () => setPlanos({}));
   }, []);
@@ -60,7 +62,30 @@ function CartaoMeuPlano({
     cancelada: "Cancelada"
   }[a.situacao] || a.situacao;
   const pendente = pedido && pedido.status === "pendente";
+  const cobrancaAutomatica = !!(planos && planos.asaasAtivo);
   const jaEhEsse = !fundadora && !cortesia && a.situacao !== "teste" && a.plano === para;
+
+  // Cobrança automática (Asaas): cria a assinatura e abre o link de pagamento.
+  async function assinarAgora() {
+    setAssinando(true);
+    setMsg("");
+    try {
+      const fn = appAdmin.functions("southamerica-east1").httpsCallable("asaasAssinar");
+      const r = await fn({
+        plano: para,
+        ciclo,
+        cpfCnpj: documento
+      });
+      if (r.data && r.data.link) {
+        window.open(r.data.link, "_blank", "noopener");
+        setMsg("Abrimos a página de pagamento em outra aba. Assim que o pagamento for confirmado, o seu plano é liberado automaticamente.");
+      }
+    } catch (e) {
+      setMsg(e.message || "Não foi possível gerar a cobrança.");
+    } finally {
+      setAssinando(false);
+    }
+  }
   async function pedirMudanca() {
     setEnviando(true);
     setMsg("");
@@ -115,12 +140,44 @@ function CartaoMeuPlano({
     value: "mensal"
   }, "Pagamento mensal"), /*#__PURE__*/React.createElement("option", {
     value: "anual"
-  }, "Pagamento anual (", moeda(p(para).precoAnual), ", com desconto)")), /*#__PURE__*/React.createElement("button", {
+  }, "Pagamento anual (", moeda(p(para).precoAnual), ", com desconto)")), cobrancaAutomatica ? /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    onClick: assinarAgora,
+    disabled: assinando || jaEhEsse
+  }, jaEhEsse ? "Este já é o seu plano" : assinando ? "Gerando cobrança..." : "Assinar agora") : /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "botao-secundario",
     onClick: pedirMudanca,
     disabled: enviando || pendente || jaEhEsse
-  }, pendente ? "Pedido já enviado" : jaEhEsse ? "Este já é o seu plano" : enviando ? "Enviando..." : "Quero este plano")), pendente && /*#__PURE__*/React.createElement("p", {
+  }, pendente ? "Pedido já enviado" : jaEhEsse ? "Este já é o seu plano" : enviando ? "Enviando..." : "Quero este plano")), cobrancaAutomatica && !jaEhEsse && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      maxWidth: 360
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12
+    }
+  }, "CPF ou CNPJ para a cobran\xE7a"), /*#__PURE__*/React.createElement("input", {
+    value: documento,
+    onChange: e => setDocumento(e.target.value),
+    placeholder: "somente n\xFAmeros",
+    inputMode: "numeric"
+  })), a.linkCobranca && a.planoPretendido && /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo",
+    style: {
+      marginTop: 8
+    }
+  }, "Voc\xEA tem uma cobran\xE7a em aberto do plano ", p(a.planoPretendido).nome, ".", " ", /*#__PURE__*/React.createElement("a", {
+    href: a.linkCobranca,
+    target: "_blank",
+    rel: "noopener",
+    style: {
+      color: "var(--cor-marca)",
+      fontWeight: 700
+    }
+  }, "Pagar agora")), pendente && /*#__PURE__*/React.createElement("p", {
     className: "dica-campo",
     style: {
       marginTop: 8

@@ -259,6 +259,273 @@ exports.definirSlugClinica = onCall({ region: "southamerica-east1" }, async (req
   return { ok: true, slug: novo };
 });
 
+// ─────────────────────────────────────────────────────────────
+// COBRANÇA AUTOMÁTICA (Asaas)
+// A chave da API fica só no Secret Manager (ASAAS_API_KEY) e só é lida aqui, no
+// servidor. O ambiente (sandbox de teste ou produção) é escolhido em
+// plataforma_config/asaas; sem esse documento, usa o sandbox.
+// Fluxo: a psicóloga pede "Assinar agora" -> criamos cliente e assinatura no Asaas ->
+// ela paga pelo link do Asaas -> o Asaas avisa o webhook -> o plano é liberado.
+// O webhook é protegido por um token derivado da própria chave (HMAC), sem segredo extra.
+// ─────────────────────────────────────────────────────────────
+const ASAAS_API_KEY = defineSecret("ASAAS_API_KEY");
+const URL_WEBHOOK_ASAAS = "https://southamerica-east1-psicoworking.cloudfunctions.net/asaasWebhook";
+const EVENTOS_ASAAS = [
+  "PAYMENT_CREATED", "PAYMENT_UPDATED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED",
+  "PAYMENT_OVERDUE", "PAYMENT_REFUNDED", "SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED",
+];
+
+async function asaasAmbiente() {
+  const s = await db.collection("plataforma_config").doc("asaas").get();
+  return s.exists && s.data().ambiente === "producao" ? "producao" : "sandbox";
+}
+
+async function asaas(metodo, caminho, corpo) {
+  const ambiente = await asaasAmbiente();
+  const base = ambiente === "producao" ? "https://api.asaas.com/v3" : "https://api-sandbox.asaas.com/v3";
+  const resp = await fetch(base + caminho, {
+    method: metodo,
+    headers: { "Content-Type": "application/json", access_token: ASAAS_API_KEY.value(), "User-Agent": "PsiCoWorking" },
+    body: corpo ? JSON.stringify(corpo) : undefined,
+  });
+  const texto = await resp.text();
+  let dados = {};
+  try { dados = texto ? JSON.parse(texto) : {}; } catch (e) { dados = { bruto: texto.slice(0, 300) }; }
+  if (!resp.ok) {
+    const msg = (Array.isArray(dados.errors) && dados.errors.map((e) => e.description).join("; ")) || ("HTTP " + resp.status);
+    console.error("Asaas erro", metodo, caminho, resp.status, JSON.stringify(dados).slice(0, 400));
+    throw new HttpsError("failed-precondition", "Asaas: " + msg);
+  }
+  return dados;
+}
+
+function tokenWebhookAsaas() {
+  return require("crypto").createHmac("sha256", ASAAS_API_KEY.value()).update("psicoworking-webhook").digest("hex").slice(0, 48);
+}
+
+function exigirAdminMatriz(request) {
+  if (!request.auth || request.auth.token.role !== "admin_matriz") {
+    throw new HttpsError("permission-denied", "Só a administradora da plataforma pode fazer isso.");
+  }
+}
+
+// Testa a conexão com o Asaas (mostra o ambiente e o saldo, sem expor a chave).
+exports.asaasStatus = onCall({ region: "southamerica-east1", secrets: [ASAAS_API_KEY] }, async (request) => {
+  exigirAdminMatriz(request);
+  const ambiente = await asaasAmbiente();
+  const saldo = await asaas("GET", "/finance/balance");
+  const planos = await db.collection("plataforma_config").doc("planos").get();
+  return { ok: true, ambiente, saldo: saldo.balance, cobrancaAtiva: !!(planos.exists && planos.data().asaasAtivo) };
+});
+
+// Cadastra no Asaas o aviso automático de pagamentos (webhook) e liga a cobrança no sistema.
+exports.asaasConfigurarWebhook = onCall({ region: "southamerica-east1", secrets: [ASAAS_API_KEY] }, async (request) => {
+  exigirAdminMatriz(request);
+  const existentes = await asaas("GET", "/webhooks");
+  const lista = Array.isArray(existentes.data) ? existentes.data : [];
+  const jaTem = lista.find((w) => w.url === URL_WEBHOOK_ASAAS);
+  const corpo = {
+    name: "PsiCoWorking",
+    url: URL_WEBHOOK_ASAAS,
+    email: EMAIL_ADMIN_PLATAFORMA,
+    enabled: true,
+    interrupted: false,
+    apiVersion: 3,
+    authToken: tokenWebhookAsaas(),
+    sendType: "SEQUENTIALLY",
+    events: EVENTOS_ASAAS,
+  };
+  if (jaTem && jaTem.id) await asaas("PUT", "/webhooks/" + jaTem.id, corpo);
+  else await asaas("POST", "/webhooks", corpo);
+  await db.collection("plataforma_config").doc("planos").set({ asaasAtivo: true }, { merge: true });
+  await db.collection("clinica_audit_log").add({
+    acao: "asaas_configurar_webhook",
+    executadoPor: request.auth.uid,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { ok: true, atualizado: !!jaTem };
+});
+
+// A psicóloga pede para assinar: cria cliente e assinatura no Asaas e devolve o link de pagamento.
+exports.asaasAssinar = onCall({ region: "southamerica-east1", secrets: [ASAAS_API_KEY] }, async (request) => {
+  if (!request.auth || request.auth.token.role !== "psi") {
+    throw new HttpsError("permission-denied", "Só a psicóloga responsável pela clínica pode assinar.");
+  }
+  const psiId = request.auth.token.psi_id;
+  const { plano, ciclo, cpfCnpj } = request.data || {};
+  if (plano !== "essencial" && plano !== "plus") throw new HttpsError("invalid-argument", "Escolha um plano.");
+  if (ciclo !== "mensal" && ciclo !== "anual") throw new HttpsError("invalid-argument", "Escolha mensal ou anual.");
+  const documento = String(cpfCnpj || "").replace(/\D/g, "");
+  if (documento.length !== 11 && documento.length !== 14) {
+    throw new HttpsError("invalid-argument", "Informe um CPF (11 números) ou CNPJ (14 números) válido.");
+  }
+
+  const ref = db.collection("psi_assinaturas").doc(psiId);
+  const snap = await ref.get();
+  const a = snap.exists ? snap.data() : {};
+  if (a.origem === "fundadora") throw new HttpsError("failed-precondition", "Sua clínica tem acesso integral, sem cobrança.");
+
+  const planos = await lerPlanos();
+  const dadosPlano = plano === "plus" ? planos.plus : planos.essencial;
+  const valor = Number(ciclo === "anual" ? dadosPlano.precoAnual : dadosPlano.precoMensal);
+  if (!(valor > 0)) throw new HttpsError("failed-precondition", "O preço do plano ainda não foi definido.");
+
+  const perfil = await db.collection("psi_profiles").doc(psiId).get();
+  const dadosPerfil = perfil.exists ? perfil.data() : {};
+  let nome = dadosPerfil.nome || request.auth.token.name || "";
+  let email = dadosPerfil.email || request.auth.token.email || "";
+  if (!nome || !email) {
+    const u = await auth.getUser(request.auth.uid);
+    nome = nome || u.displayName || "Psicóloga";
+    email = email || u.email || "";
+  }
+
+  let clienteId = a.asaasCustomerId;
+  if (!clienteId) {
+    const cliente = await asaas("POST", "/customers", { name: nome, email, cpfCnpj: documento, externalReference: psiId });
+    clienteId = cliente.id;
+  }
+
+  // Já existe assinatura em aberto para o mesmo plano: devolve o mesmo link, sem duplicar cobrança.
+  if (a.asaasSubscriptionId && a.planoPretendido === plano && a.cicloPretendido === ciclo && a.linkCobranca) {
+    return { ok: true, link: a.linkCobranca, reaproveitada: true };
+  }
+  if (a.asaasSubscriptionId) {
+    try { await asaas("DELETE", "/subscriptions/" + a.asaasSubscriptionId); } catch (e) { console.error("Não cancelou a assinatura anterior:", e.message); }
+  }
+
+  const hoje = dataSaoPaulo(new Date());
+  const assinatura = await asaas("POST", "/subscriptions", {
+    customer: clienteId,
+    billingType: "UNDEFINED",
+    value: valor,
+    nextDueDate: hoje,
+    cycle: ciclo === "anual" ? "YEARLY" : "MONTHLY",
+    description: "PsiCoWorking " + dadosPlano.nome + " (" + ciclo + ")",
+    externalReference: psiId,
+  });
+  const cobrancas = await asaas("GET", "/subscriptions/" + assinatura.id + "/payments");
+  const primeira = Array.isArray(cobrancas.data) ? cobrancas.data[0] : null;
+  const link = primeira && primeira.invoiceUrl ? primeira.invoiceUrl : "";
+
+  await ref.set({
+    asaasCustomerId: clienteId,
+    asaasSubscriptionId: assinatura.id,
+    planoPretendido: plano,
+    cicloPretendido: ciclo,
+    linkCobranca: link || admin.firestore.FieldValue.delete(),
+  }, { merge: true });
+  await db.collection("clinica_audit_log").add({
+    acao: "asaas_assinar",
+    alvoUid: psiId,
+    plano, ciclo,
+    executadoPor: request.auth.uid,
+    criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  if (!link) throw new HttpsError("unavailable", "A cobrança está sendo gerada. Tente novamente em alguns instantes.");
+  return { ok: true, link };
+});
+
+// Soma meses a uma data AAAA-MM-DD sem pular de mês (31/01 + 1 mês = 28 ou 29/02).
+function somarMesesData(dataIso, meses) {
+  const [a, m, d] = dataIso.split("-").map(Number);
+  const alvo = new Date(Date.UTC(a, m - 1 + meses, 1, 12));
+  const ultimo = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0, 12)).getUTCDate();
+  alvo.setUTCDate(Math.min(d, ultimo));
+  return alvo;
+}
+
+function formaPagamentoAsaas(tipo) {
+  return { PIX: "Pix", BOLETO: "Boleto", CREDIT_CARD: "Cartão de crédito", DEBIT_CARD: "Cartão de débito" }[tipo] || "Asaas";
+}
+
+// Processa um aviso do Asaas. Cada pagamento só é registrado uma vez (idempotente).
+async function processarEventoAsaas(corpo) {
+  const evento = corpo.event;
+  const FV = admin.firestore.FieldValue;
+  const TS = admin.firestore.Timestamp;
+
+  if (evento === "SUBSCRIPTION_DELETED" || evento === "SUBSCRIPTION_INACTIVATED") {
+    const idSub = corpo.subscription && corpo.subscription.id;
+    if (!idSub) return;
+    const q = await db.collection("psi_assinaturas").where("asaasSubscriptionId", "==", idSub).limit(1).get();
+    if (q.empty) return;
+    await q.docs[0].ref.update({ asaasSubscriptionId: FV.delete(), cancelamentoEm: FV.serverTimestamp() });
+    await db.collection("clinica_audit_log").add({ acao: "asaas_" + evento.toLowerCase(), alvoUid: q.docs[0].id, executadoPor: "asaas", criadoEm: FV.serverTimestamp() });
+    return;
+  }
+
+  const p = corpo.payment;
+  if (!p || !p.customer) return;
+  const q = await db.collection("psi_assinaturas").where("asaasCustomerId", "==", p.customer).limit(1).get();
+  if (q.empty) { console.log("Asaas: cliente sem clínica", p.customer); return; }
+  const ref = q.docs[0].ref;
+  const a = q.docs[0].data();
+
+  if (evento === "PAYMENT_CREATED" || evento === "PAYMENT_UPDATED") {
+    if (p.status === "PENDING" || p.status === "OVERDUE") {
+      await ref.update({
+        linkCobranca: p.invoiceUrl || FV.delete(),
+        cobrancaAberta: { id: p.id, valor: p.value, vencimento: p.dueDate || "" },
+      });
+    }
+    return;
+  }
+
+  if (evento === "PAYMENT_CONFIRMED" || evento === "PAYMENT_RECEIVED") {
+    if ((a.pagamentos || []).some((x) => x.paymentId === p.id)) return;
+    const planos = await lerPlanos();
+    const plano = a.planoPretendido || a.plano || "essencial";
+    const ciclo = a.cicloPretendido || a.ciclo || "mensal";
+    const proximo = somarMesesData(p.dueDate || dataSaoPaulo(new Date()), ciclo === "anual" ? 12 : 1);
+    await ref.update({
+      plano, ciclo,
+      situacao: "ativa",
+      origem: "assinatura",
+      proximoVencimento: TS.fromDate(proximo),
+      pagamentos: FV.arrayUnion({ em: TS.now(), valor: p.value, forma: formaPagamentoAsaas(p.billingType), ciclo, ate: TS.fromDate(proximo), origem: "asaas", paymentId: p.id }),
+      linkCobranca: FV.delete(),
+      cobrancaAberta: FV.delete(),
+      testeAte: FV.delete(),
+      leituraAte: FV.delete(),
+      cortesiaAte: FV.delete(),
+      avisosEnviados: FV.delete(),
+      iaCotaMes: plano === "plus" ? planos.plus.cotaIaMes : FV.delete(),
+    });
+    await db.collection("clinica_audit_log").add({ acao: "asaas_pagamento_recebido", alvoUid: q.docs[0].id, paymentId: p.id, valor: p.value, executadoPor: "asaas", criadoEm: FV.serverTimestamp() });
+    return;
+  }
+
+  if (evento === "PAYMENT_OVERDUE") {
+    const mudanca = { linkCobranca: p.invoiceUrl || FV.delete() };
+    if (a.situacao === "ativa") mudanca.situacao = "atrasada";
+    await ref.update(mudanca);
+    await db.collection("clinica_audit_log").add({ acao: "asaas_pagamento_atrasado", alvoUid: q.docs[0].id, paymentId: p.id, executadoPor: "asaas", criadoEm: FV.serverTimestamp() });
+    return;
+  }
+
+  if (evento === "PAYMENT_REFUNDED") {
+    await db.collection("clinica_audit_log").add({ acao: "asaas_pagamento_estornado", alvoUid: q.docs[0].id, paymentId: p.id, executadoPor: "asaas", criadoEm: FV.serverTimestamp() });
+  }
+}
+
+exports.asaasWebhook = onRequest({ region: "southamerica-east1", secrets: [ASAAS_API_KEY] }, async (req, res) => {
+  if (req.method !== "POST") { res.status(405).send("método não permitido"); return; }
+  const recebido = Buffer.from(String(req.get("asaas-access-token") || ""));
+  const esperado = Buffer.from(tokenWebhookAsaas());
+  if (recebido.length !== esperado.length || !require("crypto").timingSafeEqual(recebido, esperado)) {
+    res.status(401).send("não autorizado");
+    return;
+  }
+  try {
+    await processarEventoAsaas(req.body || {});
+    res.status(200).send("ok");
+  } catch (e) {
+    console.error("Erro ao processar o aviso do Asaas:", e);
+    res.status(500).send("erro");
+  }
+});
+
 exports.usoDasClinicas = onCall({ region: "southamerica-east1" }, async (request) => {
   if (!request.auth || request.auth.token.role !== "admin_matriz") {
     throw new HttpsError("permission-denied", "Só a administradora da plataforma pode fazer isso.");
@@ -420,7 +687,7 @@ function avisosDaAssinatura(a, nome) {
       });
     }
   }
-  if ((a.situacao === "ativa" || a.situacao === "atrasada") && a.proximoVencimento) {
+  if ((a.situacao === "ativa" || a.situacao === "atrasada") && a.proximoVencimento && !a.asaasSubscriptionId) {
     const venc = a.proximoVencimento.toDate();
     const iso = dataSaoPaulo(venc);
     const dias = diasAteData(venc);

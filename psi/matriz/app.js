@@ -904,6 +904,52 @@ function PaginaAprovacoes({ irPara }) {
   );
 }
 
+// ── Cobrança automática (Asaas) ──────────────────────────────
+function PainelAsaas() {
+  const [estado, setEstado] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+
+  async function chamar(nome, texto) {
+    setOcupado(true);
+    setMsg("");
+    try {
+      const r = await functions.httpsCallable(nome)();
+      if (nome === "asaasStatus") setEstado(r.data);
+      else setMsg(texto);
+      if (nome !== "asaasStatus") {
+        const s = await functions.httpsCallable("asaasStatus")();
+        setEstado(s.data);
+      }
+    } catch (e) {
+      setMsg("Erro: " + e.message);
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <div className="painel-form" style={{ maxWidth: 560, marginBottom: 24 }}>
+      <div className="subtitulo-painel">Cobrança automática (Asaas)</div>
+      <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 12, lineHeight: 1.6 }}>
+        Quando ligada, a psicóloga assina pelo próprio sistema, paga pelo link do Asaas e o plano é liberado sozinho assim que o pagamento é confirmado.
+      </p>
+      {estado && (
+        <div style={{ fontSize: 13, lineHeight: 1.9, marginBottom: 12 }}>
+          <div>Ambiente: <strong>{estado.ambiente === "producao" ? "Produção (dinheiro real)" : "Teste (sandbox, sem dinheiro real)"}</strong></div>
+          <div>Saldo da conta: <strong>{moeda(estado.saldo)}</strong></div>
+          <div>Cobrança automática: <strong>{estado.cobrancaAtiva ? "ligada" : "ainda não ligada"}</strong></div>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="btn btn-ghost" disabled={ocupado} onClick={() => chamar("asaasStatus")}>Testar conexão</button>
+        <button className="btn btn-primario" disabled={ocupado} onClick={() => chamar("asaasConfigurarWebhook", "Pronto: o Asaas vai avisar o PsiCoWorking de cada pagamento, e a cobrança automática está ligada.")}>Ligar cobrança automática</button>
+      </div>
+      {msg && <div className={msg.startsWith("Erro") ? "msg-erro" : "msg-ok"}>{msg}</div>}
+    </div>
+  );
+}
+
 // ── Planos e preços ──────────────────────────────────────────
 function PaginaPlanos() {
   const planos = usarPlanos();
@@ -941,6 +987,7 @@ function PaginaPlanos() {
   return (
     <div>
       <div className="pagina-titulo">Planos e preços</div>
+      <PainelAsaas />
       <div className="painel-form" style={{ maxWidth: 560 }}>
         <div className="subtitulo-painel">Essencial (sem IA)</div>
         <div className="form-grupo"><label>Mensal (R$)</label><input {...campo("essMensal")} /></div>

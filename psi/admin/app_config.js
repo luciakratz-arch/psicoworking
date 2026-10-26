@@ -18,6 +18,8 @@ function CartaoMeuPlano({ usuario }) {
   const [ciclo, setCiclo] = useState("mensal");
   const [enviando, setEnviando] = useState(false);
   const [msg, setMsg] = useState("");
+  const [documento, setDocumento] = useState("");
+  const [assinando, setAssinando] = useState(false);
 
   useEffect(() => {
     return db.collection("plataforma_config").doc("planos").onSnapshot(
@@ -56,7 +58,26 @@ function CartaoMeuPlano({ usuario }) {
     cancelada: "Cancelada",
   }[a.situacao] || a.situacao;
   const pendente = pedido && pedido.status === "pendente";
+  const cobrancaAutomatica = !!(planos && planos.asaasAtivo);
   const jaEhEsse = !fundadora && !cortesia && a.situacao !== "teste" && a.plano === para;
+
+  // Cobrança automática (Asaas): cria a assinatura e abre o link de pagamento.
+  async function assinarAgora() {
+    setAssinando(true);
+    setMsg("");
+    try {
+      const fn = appAdmin.functions("southamerica-east1").httpsCallable("asaasAssinar");
+      const r = await fn({ plano: para, ciclo, cpfCnpj: documento });
+      if (r.data && r.data.link) {
+        window.open(r.data.link, "_blank", "noopener");
+        setMsg("Abrimos a página de pagamento em outra aba. Assim que o pagamento for confirmado, o seu plano é liberado automaticamente.");
+      }
+    } catch (e) {
+      setMsg(e.message || "Não foi possível gerar a cobrança.");
+    } finally {
+      setAssinando(false);
+    }
+  }
 
   async function pedirMudanca() {
     setEnviando(true);
@@ -97,10 +118,28 @@ function CartaoMeuPlano({ usuario }) {
               <option value="mensal">Pagamento mensal</option>
               <option value="anual">Pagamento anual ({moeda(p(para).precoAnual)}, com desconto)</option>
             </select>
-            <button type="button" className="botao-secundario" onClick={pedirMudanca} disabled={enviando || pendente || jaEhEsse}>
-              {pendente ? "Pedido já enviado" : jaEhEsse ? "Este já é o seu plano" : enviando ? "Enviando..." : "Quero este plano"}
-            </button>
+            {cobrancaAutomatica ? (
+              <button type="button" className="botao-primario" onClick={assinarAgora} disabled={assinando || jaEhEsse}>
+                {jaEhEsse ? "Este já é o seu plano" : assinando ? "Gerando cobrança..." : "Assinar agora"}
+              </button>
+            ) : (
+              <button type="button" className="botao-secundario" onClick={pedirMudanca} disabled={enviando || pendente || jaEhEsse}>
+                {pendente ? "Pedido já enviado" : jaEhEsse ? "Este já é o seu plano" : enviando ? "Enviando..." : "Quero este plano"}
+              </button>
+            )}
           </div>
+          {cobrancaAutomatica && !jaEhEsse && (
+            <div style={{ marginTop: 10, maxWidth: 360 }}>
+              <label style={{ fontSize: 12 }}>CPF ou CNPJ para a cobrança</label>
+              <input value={documento} onChange={(e) => setDocumento(e.target.value)} placeholder="somente números" inputMode="numeric" />
+            </div>
+          )}
+          {a.linkCobranca && a.planoPretendido && (
+            <p className="dica-campo" style={{ marginTop: 8 }}>
+              Você tem uma cobrança em aberto do plano {p(a.planoPretendido).nome}.{" "}
+              <a href={a.linkCobranca} target="_blank" rel="noopener" style={{ color: "var(--cor-marca)", fontWeight: 700 }}>Pagar agora</a>
+            </p>
+          )}
           {pendente && (
             <p className="dica-campo" style={{ marginTop: 8 }}>
               Você já pediu {p(pedido.para).nome} ({pedido.ciclo}) em {dataBr(pedido.pedidoEm)}. Aguarde o nosso contato.
