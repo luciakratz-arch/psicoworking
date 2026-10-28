@@ -410,6 +410,13 @@ service cloud.firestore {
                           || (request.method == 'create' && ehPsicologaEscrevendo(request.resource.data.psi_id));
     }
 
+    // ── Plano de Ensino ABA (alvos de aquisição e de redução; 1 doc por paciente) ──
+    // Sigilo igual ao do prontuário: só a psicóloga da clínica (nem a secretária, nem o paciente).
+    match /clinica_aba_planos/{id} {
+      allow read, write: if ehPsicologaMantendoClinica()
+                          || (request.method == 'create' && ehPsicologaEscrevendo(request.resource.data.psi_id));
+    }
+
     // ── Endereço de cada clínica: apelido (slug) -> psi_id ──
     // Leitura pública (só serve para mostrar a marca antes do login). Gravação só pelas
     // Cloud Functions (reservarSlug / definirSlugClinica), que garantem apelido único.

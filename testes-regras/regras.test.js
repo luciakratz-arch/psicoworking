@@ -62,6 +62,7 @@ beforeEach(async () => {
     await setDoc(doc(d, "clinica_prontuarios/prontB"), { psi_id: "clinB", pacienteId: "pacB1", textoBruto: "sigiloso B" });
     await setDoc(doc(d, "clinica_crises/criseA"), { psi_id: "clinA", pacienteId: "pacA1", intensidade: "leve" });
     await setDoc(doc(d, "clinica_perfil_clinico/pacA1"), { psi_id: "clinA", pacienteId: "pacA1", cids: [] });
+    await setDoc(doc(d, "clinica_aba_planos/pacA1"), { psi_id: "clinA", pacienteId: "pacA1", alvos: [] });
     await setDoc(doc(d, "clinica_laudos/laudoA"), { psi_id: "clinA", pacienteId: "pacA1", visivelPaciente: false });
     await setDoc(doc(d, "clinica_laudos/laudoVisivel"), { psi_id: "clinA", pacienteId: "pacA1", visivelPaciente: true });
     await setDoc(doc(d, "clinica_diario/diarioA1"), { psi_id: "clinA", pacienteId: "pacA1", texto: "diario" });
@@ -85,7 +86,7 @@ beforeEach(async () => {
 describe("Visitante sem login", () => {
   for (const caminho of [
     "clinica_pacientes/pacA1", "clinica_sessoes/sessA1", "clinica_prontuarios/prontA",
-    "clinica_crises/criseA", "clinica_perfil_clinico/pacA1", "clinica_laudos/laudoA",
+    "clinica_crises/criseA", "clinica_perfil_clinico/pacA1", "clinica_aba_planos/pacA1", "clinica_laudos/laudoA",
     "clinica_diario/diarioA1", "clinica_lancamentos/lancA", "clinica_config/clinA",
     "clinica_audit_log/log1",
   ]) {
@@ -149,7 +150,7 @@ describe("Equipe da clínica A", () => {
 describe("Isolamento: equipe da clínica B não vê a clínica A", () => {
   for (const caminho of [
     "clinica_pacientes/pacA1", "clinica_sessoes/sessA1", "clinica_prontuarios/prontA",
-    "clinica_crises/criseA", "clinica_perfil_clinico/pacA1", "clinica_laudos/laudoA",
+    "clinica_crises/criseA", "clinica_perfil_clinico/pacA1", "clinica_aba_planos/pacA1", "clinica_laudos/laudoA",
     "clinica_diario/diarioA1", "clinica_lancamentos/lancA", "clinica_config/clinA",
   ]) {
     test("não lê " + caminho, async () => { await assertFails(getDoc(doc(psiB(), caminho))); });
@@ -236,18 +237,22 @@ describe("Administradora da plataforma (admin_matriz)", () => {
 });
 
 describe("Secretária não acessa o prontuário (sigilo profissional)", () => {
-  for (const caminho of ["clinica_prontuarios/prontA", "clinica_crises/criseA", "clinica_perfil_clinico/pacA1"]) {
+  for (const caminho of ["clinica_prontuarios/prontA", "clinica_crises/criseA", "clinica_perfil_clinico/pacA1", "clinica_aba_planos/pacA1"]) {
     test("não lê " + caminho, async () => { await assertFails(getDoc(doc(secA(), caminho))); });
   }
   test("não grava prontuário, crise nem perfil clínico", async () => {
     await assertFails(addDoc(collection(secA(), "clinica_prontuarios"), { psi_id: "clinA", pacienteId: "pacA1" }));
     await assertFails(addDoc(collection(secA(), "clinica_crises"), { psi_id: "clinA", pacienteId: "pacA1" }));
     await assertFails(updateDoc(doc(secA(), "clinica_perfil_clinico/pacA1"), { cids: [] }));
+    await assertFails(updateDoc(doc(secA(), "clinica_aba_planos/pacA1"), { alvos: [] }));
+    await assertFails(addDoc(collection(secA(), "clinica_aba_planos"), { psi_id: "clinA", pacienteId: "pacA2" }));
   });
   test("a psicóloga continua acessando normalmente", async () => {
     await assertSucceeds(getDoc(doc(psiA(), "clinica_prontuarios/prontA")));
     await assertSucceeds(getDoc(doc(psiA(), "clinica_crises/criseA")));
     await assertSucceeds(getDoc(doc(psiA(), "clinica_perfil_clinico/pacA1")));
+    await assertSucceeds(getDoc(doc(psiA(), "clinica_aba_planos/pacA1")));
+    await assertSucceeds(setDoc(doc(psiA(), "clinica_aba_planos/pacA1"), { psi_id: "clinA", pacienteId: "pacA1", alvos: [{ id: "a1" }] }));
   });
   test("a secretária segue acessando cadastro, agenda e financeiro", async () => {
     await assertSucceeds(getDoc(doc(secA(), "clinica_pacientes/pacA1")));

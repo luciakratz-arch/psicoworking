@@ -7,6 +7,34 @@
 // ═══════════════════════════════════════════════════════════════════
 
 // ── Utilidades compartilhadas ──────────────────────────────────────
+// Sistema antigo da clínica (outro banco): quando uma anotação TCC é salva para uma sessão que veio de lá,
+// deixamos na sessão antiga só a marca "prontuário preenchido" (sim + data, sem nenhum conteúdo clínico),
+// para o botão "Prontuário TCC" de lá ficar verde. O banco antigo aceita gravação sem login.
+let _appClinicaAntiga = null;
+function dbClinicaAntiga() {
+  if (!_appClinicaAntiga) {
+    _appClinicaAntiga = firebase.apps.find(a => a.name === "clinica-antiga") || firebase.initializeApp({
+      apiKey: "AIzaSyDnrgaY8R0Zetkr18uHQJAZXIUa4EwDnv4",
+      authDomain: "entrevista-inicial.firebaseapp.com",
+      projectId: "entrevista-inicial",
+      storageBucket: "entrevista-inicial.firebasestorage.app",
+      messagingSenderId: "437375609844",
+      appId: "1:437375609844:web:2ed0e16a7da5d46c2e27a1"
+    }, "clinica-antiga");
+  }
+  return _appClinicaAntiga.firestore();
+}
+const _marcadasNaClinicaAntiga = new Set();
+async function marcarProntuarioNaClinicaAntiga(sessaoAntigaId) {
+  if (!sessaoAntigaId || _marcadasNaClinicaAntiga.has(sessaoAntigaId)) return;
+  try {
+    await dbClinicaAntiga().collection("clinica_sessoes").doc(sessaoAntigaId).update({
+      prontuarioTcc: true,
+      prontuarioTccEm: new Date().toISOString()
+    });
+    _marcadasNaClinicaAntiga.add(sessaoAntigaId);
+  } catch (e) {/* sessão antiga inexistente ou sem rede: tenta de novo na próxima vez */}
+}
 function prontHojeISO() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -3065,6 +3093,7 @@ function ModalAnotacaoTCC({
       });
       setNotaId(ref.id);
     }
+    if (textoAtual && textoAtual.trim()) marcarProntuarioNaClinicaAntiga(sessao.sessaoAntigaId);
     // Crise da sessão: um documento por sessão, para poder medir a evolução.
     const idCrise = idCriseDaSessao(paciente.id, sessao.id);
     if (crise === true && intensidadeCrise) {
@@ -3451,7 +3480,7 @@ function AbaSessoesTCC({
       setNotas(snap.docs.map(d => ({
         id: d.id,
         ...d.data()
-      })));
+      })).filter(n => !n.modelo || n.modelo === "tcc"));
       setNotasCarregadas(true);
     }, () => setNotasCarregadas(true));
     const unsubPerfil = db.collection("clinica_perfil_clinico").where("psi_id", "==", usuario.psiId).where("pacienteId", "==", paciente.id).onSnapshot(snap => setPerfil(snap.docs.length ? {
@@ -3472,6 +3501,13 @@ function AbaSessoesTCC({
       unsubCrises();
     };
   }, [usuario.psiId, paciente.id]);
+
+  // Anotações de sessões que vieram do sistema antigo: garante a marca verde de lá (anotações feitas antes desta função).
+  useEffect(() => {
+    notas.forEach(n => {
+      if (n.sessaoAntigaId && (n.textoBruto || "").trim()) marcarProntuarioNaClinicaAntiga(n.sessaoAntigaId);
+    });
+  }, [notas]);
   const mesesDisponiveis = [...new Set(sessoes.map(s => (s.data || "").slice(0, 7)).filter(Boolean))].sort().reverse();
   // Mês escolhido na lista = período do primeiro ao último dia daquele mês.
   const mesFiltro = de && ate && de.endsWith("-01") && ate.endsWith("-31") && de.slice(0, 7) === ate.slice(0, 7) ? de.slice(0, 7) : "";

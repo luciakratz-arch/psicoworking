@@ -55,6 +55,11 @@ const ABAS_PACIENTE = [
   { id: "questionarios", rotulo: "Questionários", icone: "clipboard-list" },
   { id: "links", rotulo: "Links Partilhados", icone: "link" },
   { id: "sessoes-tcc", rotulo: "Sessões TCC", icone: "notebook-pen" },
+  { id: "plano-aba", rotulo: "Plano ABA", icone: "target" },
+  { id: "sessoes-aba", rotulo: "Sessões ABA", icone: "notebook-pen" },
+  { id: "mod-avaliacao", rotulo: "Avaliação", icone: "clipboard-list" },
+  { id: "mod-neuromodulacao", rotulo: "Neuromodulação", icone: "activity" },
+  { id: "mod-musicoterapia", rotulo: "Musicoterapia", icone: "music" },
 ];
 
 function TelaPacientes({ usuario }) {
@@ -257,6 +262,28 @@ function CamposPaciente({ form, setForm, mostrarStatus }) {
           <option value="">Selecione</option>
           {GENEROS.map((g) => <option key={g}>{g}</option>)}
         </select>
+      </div>
+      <div className="campo-largura-total">
+        <label>Modalidades de atendimento <span className="opcional">(definem os modelos de prontuário; sem marcar vale o atendimento clínico)</span></label>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+          {MODALIDADES_ATENDIMENTO.map((m) => {
+            const marcada = (form.modalidades || []).includes(m.id);
+            return (
+              <button
+                type="button"
+                key={m.id}
+                className={"pill-status" + (marcada ? " pill-status-ativa" : "")}
+                style={{ "--cor-pill": "var(--cor-marca)" }}
+                onClick={() => {
+                  const atuais = form.modalidades || [];
+                  setForm({ ...form, modalidades: marcada ? atuais.filter((x) => x !== m.id) : [...atuais, m.id] });
+                }}
+              >
+                {m.rotulo}{m.pronto ? "" : " (em breve)"}
+              </button>
+            );
+          })}
+        </div>
       </div>
       {mostrarStatus && (
         <div>
@@ -529,6 +556,14 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
   const podeVerProntuario = usuario.role === "psi";
   const [aba, setAba] = useState(podeVerProntuario && acaoPorLinkPendente() && acaoPorLink.pacienteId === paciente.id ? "sessoes-tcc" : "perfil");
   const [excluindo, setExcluindo] = useState(false);
+  // Modalidades marcadas no cadastro decidem quais modelos de prontuário aparecem (sem marcar = clínico).
+  const modalidades = modalidadesDoPaciente(paciente);
+  const abaVisivel = (a) => {
+    if (a.id === "sessoes-tcc") return podeVerProntuario && modalidades.includes("clinico");
+    if (a.id === "plano-aba" || a.id === "sessoes-aba") return podeVerProntuario && modalidades.includes("aba");
+    if (a.id.startsWith("mod-")) return podeVerProntuario && modalidades.includes(a.id.slice(4));
+    return true;
+  };
 
   async function excluirPaciente() {
     if (!confirm(`Excluir ${paciente.nome}? Isso remove o cadastro clínico dele — não pode ser desfeito.`)) return;
@@ -558,7 +593,7 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
       </div>
 
       <div className="abas-financeiro abas-perfil-paciente">
-        {ABAS_PACIENTE.filter((a) => a.id !== "sessoes-tcc" || podeVerProntuario).map((a) => (
+        {ABAS_PACIENTE.filter(abaVisivel).map((a) => (
           <button
             key={a.id}
             className={"aba-financeiro" + (aba === a.id ? " aba-financeiro-ativa" : "")}
@@ -571,7 +606,7 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
 
       {aba === "perfil" && <AbaPerfilPaciente paciente={paciente} />}
       {aba === "modulos" && <AbaModulosPaciente paciente={paciente} />}
-      {aba === "questionarios" && <AbaQuestionarios paciente={paciente} />}
+      {aba === "questionarios" && <AbaQuestionariosPaciente usuario={usuario} paciente={paciente} />}
 
       {aba === "metas" && <AbaMetasPaciente usuario={usuario} paciente={paciente} />}
       {aba === "laudos" && <AbaLaudosPaciente usuario={usuario} paciente={paciente} />}
@@ -579,6 +614,14 @@ function PerfilPaciente({ usuario, paciente, aoFechar, aoExcluir }) {
       {aba === "saude-ocupacional" && <AbaSaudeOcupacionalPaciente usuario={usuario} paciente={paciente} />}
       {aba === "links" && <AbaLinksPaciente usuario={usuario} paciente={paciente} />}
       {aba === "sessoes-tcc" && podeVerProntuario && <AbaSessoesTCC usuario={usuario} paciente={paciente} />}
+      {aba === "plano-aba" && podeVerProntuario && <AbaPlanoABA usuario={usuario} paciente={paciente} />}
+      {aba === "sessoes-aba" && podeVerProntuario && <AbaSessoesABA usuario={usuario} paciente={paciente} />}
+      {aba.startsWith("mod-") && podeVerProntuario && (
+        <div className="cartao-secao">
+          <div className="titulo-cartao-secao"><Icone nome="hammer" tamanho={16} /> Modelo em construção</div>
+          <p className="descricao-cartao-secao">O prontuário desta modalidade ainda está sendo preparado. A modalidade já está marcada no cadastro e, quando o modelo ficar pronto, ele aparece aqui.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -882,82 +925,36 @@ const QUESTIONARIOS_DISPONIVEIS = [
 // Cada grupo agrupa hipóteses diagnósticas. A psicóloga seleciona as
 // hipóteses relevantes por paciente e gera um link de rastreamento
 // personalizado (token em clinica_rastreamento_tokens).
-const GRUPOS_DIAGNOSTICOS = [
-  {
-    id: "G1", icone: "bar-chart", titulo: "Transtornos do Humor",
-    descricao: "Depressão, bipolar e ciclotimia — avaliação do eixo do humor",
-    cor: "#4F46E5", corBg: "#EEF2FF",
+const GRUPOS_DIAGNOSTICOS = [ // HUB_UNICO
+  { id: "G1", icone: "waves", titulo: "Instabilidade Emocional", descricao: "Humor, identidade e regulação emocional", cor: "#7B00C4", corBg: "#F5F3FF",
     hipoteses: [
-      { id: "tdm",        rotulo: "Depressão Maior (TDM)" },
-      { id: "distimia",   rotulo: "Depressão Persistente (Distimia)" },
-      { id: "ciclotimia", rotulo: "Ciclotimia" },
-      { id: "bipolar_I",  rotulo: "Transtorno Bipolar tipo I (Mania)" },
-      { id: "bipolar_II", rotulo: "Transtorno Bipolar tipo II (Hipomania + Depressão)" },
-    ],
-  },
-  {
-    id: "G2", icone: "wind", titulo: "Transtornos de Ansiedade",
-    descricao: "Ansiedade generalizada, pânico e ansiedade social",
-    cor: "#0D9488", corBg: "#F0FDFA",
+      { id: "bipolar_I", rotulo: "Transtorno Bipolar tipo I (Mania)" }, { id: "bipolar_II", rotulo: "Transtorno Bipolar tipo II (Hipomania + Depressão)" },
+      { id: "ciclotimia", rotulo: "Ciclotimia" }, { id: "borderline", rotulo: "TP Borderline" }, { id: "histrionico", rotulo: "TP Histriônico" }, { id: "narcisista", rotulo: "TP Narcisista" },
+    ] },
+  { id: "G2", icone: "puzzle", titulo: "Neurodesenvolvimento", descricao: "Atenção, comportamento e interação social", cor: "#6D28D9", corBg: "#EDE9FE",
     hipoteses: [
-      { id: "tag",          rotulo: "Ansiedade Generalizada (TAG)" },
-      { id: "panico",       rotulo: "Transtorno do Pânico" },
-      { id: "fobia_social", rotulo: "Ansiedade Social (Fobia Social)" },
-    ],
-  },
-  {
-    id: "G3", icone: "rotate-cw", titulo: "TOC e Transtornos Relacionados",
-    descricao: "Obsessões, compulsões e comportamentos repetitivos",
-    cor: "#D97706", corBg: "#FFFBEB",
+      { id: "tdah_des", rotulo: "TDAH — Predominantemente Desatento" }, { id: "tdah_hip", rotulo: "TDAH — Hiperativo/Impulsivo" },
+      { id: "tea", rotulo: "TEA — Transtorno do Espectro Autista" }, { id: "tod", rotulo: "TOD — Transtorno Opositivo-Desafiador" },
+    ] },
+  { id: "G3", icone: "cloud", titulo: "Ansiedade e Internalização", descricao: "Depressão, ansiedade, pânico, TOC e trauma", cor: "#1D4ED8", corBg: "#EFF6FF",
     hipoteses: [
-      { id: "toc", rotulo: "TOC — Transtorno Obsessivo-Compulsivo" },
-    ],
-  },
-  {
-    id: "G4", icone: "zap", titulo: "Trauma e Estressores",
-    descricao: "TEPT, TEPT Complexo, dissociativo e adaptação",
-    cor: "#DC2626", corBg: "#FEF2F2",
+      { id: "tdm", rotulo: "Depressão Maior (TDM)" }, { id: "distimia", rotulo: "Depressão Persistente (Distimia)" }, { id: "tag", rotulo: "Ansiedade Generalizada (TAG)" },
+      { id: "panico", rotulo: "Transtorno do Pânico" }, { id: "fobia_social", rotulo: "Ansiedade Social (Fobia Social)" }, { id: "toc", rotulo: "TOC — Transtorno Obsessivo-Compulsivo" },
+      { id: "tept", rotulo: "TEPT — Estresse Pós-Traumático" },
+    ] },
+  { id: "G4", icone: "apple", titulo: "Comportamento Alimentar", descricao: "Anorexia, bulimia e transtornos alimentares", cor: "#15803D", corBg: "#F0FDF4",
+    hipoteses: [ { id: "anorexia", rotulo: "Anorexia Nervosa" }, { id: "bulimia", rotulo: "Bulimia / TCA" } ] },
+  { id: "G5", icone: "zap", titulo: "Comportamento Aditivo", descricao: "Substâncias, jogos, apostas e TP Antissocial", cor: "#B45309", corBg: "#FEF3C7",
     hipoteses: [
-      { id: "tept",          rotulo: "TEPT — Estresse Pós-Traumático" },
-      { id: "tept_complexo", rotulo: "TEPT Complexo (CID-11)" },
-      { id: "dissociativo",  rotulo: "Transtorno Dissociativo" },
-      { id: "adaptacao",     rotulo: "Transtorno de Adaptação" },
-    ],
-  },
-  {
-    id: "G5", icone: "user", titulo: "Transtornos de Personalidade",
-    descricao: "Padrões persistentes de experiência e comportamento desadaptativos",
-    cor: "#BE185D", corBg: "#FDF2F8",
+      { id: "substancias", rotulo: "Transtorno por Uso de Substâncias" }, { id: "gaming", rotulo: "Transtorno de Jogos Digitais (Gaming)" },
+      { id: "gambling", rotulo: "Transtorno de Apostas (Gambling)" }, { id: "antissocial", rotulo: "TP Antissocial (≥18 anos)" },
+    ] },
+  { id: "G6", icone: "flower", titulo: "Saúde Sexual", descricao: "Disfunções e comportamento sexual", cor: "#BE185D", corBg: "#FDF2F8", abre: "sexual",
+    hipoteses: [ { id: "sexual", rotulo: "Disfunções e Saúde Sexual" } ] },
+  { id: "G7", icone: "leaf", titulo: "Trauma e Dissociação", descricao: "Trauma complexo, dissociação e adaptação", cor: "#0F766E", corBg: "#F0FDFA",
     hipoteses: [
-      { id: "borderline",  rotulo: "TP Borderline" },
-      { id: "histrionico", rotulo: "TP Histriônico" },
-      { id: "narcisista",  rotulo: "TP Narcisista" },
-      { id: "antissocial", rotulo: "TP Antissocial" },
-    ],
-  },
-  {
-    id: "G6", icone: "cpu", titulo: "Neurodesenvolvimento",
-    descricao: "TDAH, TEA, TOD e outros transtornos do desenvolvimento",
-    cor: "#7C3AED", corBg: "#F5F3FF",
-    hipoteses: [
-      { id: "tdah_des", rotulo: "TDAH — Predominantemente Desatento" },
-      { id: "tdah_hip", rotulo: "TDAH — Hiperativo/Impulsivo" },
-      { id: "tea",      rotulo: "TEA — Transtorno do Espectro Autista" },
-      { id: "tod",      rotulo: "TOD — Transtorno Opositivo-Desafiador" },
-    ],
-  },
-  {
-    id: "G7", icone: "layers", titulo: "Comportamentos Aditivos e Alimentares",
-    descricao: "Dependência química, jogos e transtornos alimentares",
-    cor: "#059669", corBg: "#ECFDF5",
-    hipoteses: [
-      { id: "substancias", rotulo: "Dependência Química / Substâncias" },
-      { id: "gaming",      rotulo: "Transtorno de Jogos Digitais (Gaming)" },
-      { id: "gambling",    rotulo: "Transtorno de Apostas (Gambling)" },
-      { id: "anorexia",    rotulo: "Anorexia Nervosa" },
-      { id: "bulimia",     rotulo: "Bulimia / TCA" },
-    ],
-  },
+      { id: "tept_complexo", rotulo: "TEPT Complexo (CID-11)" }, { id: "dissociativo", rotulo: "Transtorno Dissociativo" }, { id: "adaptacao", rotulo: "Transtorno de Adaptação" },
+    ] },
 ];
 
 // Dados de cada instrumento de rastreamento já portado — a lista
@@ -3228,6 +3225,7 @@ function PainelGrupoDiagnostico({ usuario, paciente, grupo, onVoltar }) {
 function AbaQuestionariosPaciente({ usuario, paciente }) {
   const [aberto, setAberto] = useState(null);
   const [enviandoId, setEnviandoId] = useState(null);
+  const [mostrarAnteriores, setMostrarAnteriores] = useState(false);
 
   if (aberto?.tipo === "grupo") {
     const grupo = GRUPOS_DIAGNOSTICOS.find((g) => g.id === aberto.id);
@@ -3293,61 +3291,105 @@ function AbaQuestionariosPaciente({ usuario, paciente }) {
     }
   }
 
+  async function copiarLinkAnamnese() {
+    setEnviandoId("anamnese");
+    try {
+      const cfgDoc = await db.collection("psi_config").doc(usuario.psiId).get();
+      const cfg = cfgDoc.exists ? cfgDoc.data() : {};
+      const token = gerarTokenLink();
+      await db.collection("clinica_links_partilhados").doc(token).set({
+        psi_id: usuario.psiId, pacienteId: paciente.id, pacienteNome: paciente.nome || "", tipo: "anamnese", titulo: "Formulário de Anamnese",
+        nomeClinica: cfg.nome || "PsiCoWorking", corMarca: cfg.corPrimaria || "#6A2BD9", logoUrl: cfg.logoUrl || "",
+        status: "enviado", cancelado: false, criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      const link = window.location.origin + "/psi/atividade/?t=" + token;
+      try { await navigator.clipboard.writeText(link); alert("Link copiado!"); } catch (e) { prompt("Copie o link:", link); }
+    } catch (e) { alert("Não foi possível gerar o link: " + e.message); }
+    finally { setEnviandoId(null); }
+  }
+
+  const botaoAnamnese = { display: "flex", alignItems: "center", gap: 5, borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", border: "none" };
+
   return (
     <div>
-      {/* ── 7 Grupos Diagnósticos DSM-5 ── */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 4 }}>7 Grupos Diagnósticos DSM-5</div>
-        <p className="subtitulo-pagina" style={{ marginBottom: 16 }}>Selecione um grupo, escolha as hipóteses e gere um link de rastreamento personalizado para o paciente.</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))", gap: 12 }}>
-          {GRUPOS_DIAGNOSTICOS.map((grupo) => (
-            <div
-              key={grupo.id}
-              className="cartao-recurso"
-              style={{ cursor: "pointer", borderTop: "3px solid " + grupo.cor, paddingTop: 14 }}
-              onClick={() => setAberto({ tipo: "grupo", id: grupo.id })}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <span style={{ color: grupo.cor }}><Icone nome={grupo.icone} tamanho={20} /></span>
-                <span style={{ fontWeight: 700, fontSize: 13, color: "#111827", lineHeight: 1.3 }}>{grupo.titulo}</span>
-              </div>
-              <p style={{ fontSize: 11.5, color: "#6B7280", marginBottom: 10, lineHeight: 1.45 }}>{grupo.descricao}</p>
-              <span style={{ fontSize: 11, color: grupo.cor, fontWeight: 600 }}>{grupo.hipoteses.length} hipóteses disponíveis</span>
+      <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 4 }}>Questionários Clínicos</div>
+      <p className="subtitulo-pagina" style={{ marginBottom: 18 }}>Selecione um grupo para escolher as hipóteses diagnósticas e gerar o link personalizado.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
+        <div style={{ border: "1px solid #E5E7EB", borderRadius: 14, padding: 18, background: "white", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <span style={{ color: "var(--cor-marca)" }}><Icone nome="clipboard-list" tamanho={26} /></span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827", marginBottom: 3 }}>Anamnese</div>
+              <div style={{ fontSize: 11.5, color: "#6B7280", lineHeight: 1.5 }}>Formulário clínico completo — histórico, desenvolvimento e queixas</div>
             </div>
-          ))}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <button style={{ ...botaoAnamnese, background: "var(--cor-marca-clara, #F3E8FF)", color: "var(--cor-marca)" }} onClick={() => setAberto("anamnese")}><Icone nome="eye" tamanho={13} /> Visualizar</button>
+            <button style={{ ...botaoAnamnese, background: "#F0FDF4", color: "#15803D" }} disabled={enviandoId === "anamnese"} onClick={copiarLinkAnamnese}><Icone nome="link" tamanho={13} /> Copiar Link</button>
+            <button style={{ ...botaoAnamnese, background: "#F0FDF4", color: "#15803D", border: "1px solid #BBF7D0" }} disabled={enviandoId === "anamnese"} onClick={() => enviarPorWhatsApp(QUESTIONARIOS_DISPONIVEIS[0])}><Icone nome="message-circle" tamanho={13} /> WhatsApp</button>
+          </div>
         </div>
-      </div>
 
-      {/* ── Questionários individuais (legado) ── */}
-      <div style={{ borderTop: "1px solid #E5E7EB", paddingTop: 20, marginBottom: 16 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 4 }}>Questionários Individuais</div>
-        <p className="subtitulo-pagina" style={{ marginBottom: 16 }}>Visualize as respostas ou envie o questionário ao paciente pelo WhatsApp.</p>
-      </div>
-      <div className="grade-cartoes-recursos">
-        {QUESTIONARIOS_DISPONIVEIS.map((q) => (
-          <div key={q.id} className="cartao-recurso" style={{ opacity: q.pronto ? 1 : 0.6 }}>
-            <div className="cabecalho-cartao-recurso">
-              <div className="icone-cartao-recurso" style={{ "--cor-cat": "var(--cor-marca)" }}>
-                <Icone nome={q.icone} tamanho={20} />
+        {GRUPOS_DIAGNOSTICOS.map((g) => (
+          <div key={g.id} style={{ border: "1px solid #E5E7EB", borderRadius: 14, padding: 18, background: "white", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <span style={{ color: g.cor }}><Icone nome={g.icone} tamanho={26} /></span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827", marginBottom: 3 }}>{g.titulo}</div>
+                <div style={{ fontSize: 11.5, color: "#6B7280", lineHeight: 1.5 }}>{g.descricao}</div>
+                <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {g.hipoteses.map((h) => (
+                    <span key={h.id} style={{ fontSize: 9.5, background: g.corBg, color: g.cor, borderRadius: 4, padding: "2px 6px", fontWeight: 600 }}>{h.rotulo.split(" — ")[0].split(" (")[0]}</span>
+                  ))}
+                </div>
               </div>
-              <div className="titulo-cartao-recurso">{q.rotulo}</div>
             </div>
-            <p className="descricao-cartao-recurso">{q.desc}</p>
-            {q.pronto ? (
-              <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                <button className="botao-secundario" onClick={() => setAberto(q.id)}>
-                  <Icone nome="eye" tamanho={14} /> Visualizar
-                </button>
-                <button className="botao-primario" style={{ background: "#25D366" }} disabled={enviandoId === q.id} onClick={() => enviarPorWhatsApp(q)}>
-                  <Icone nome="message-circle" tamanho={14} /> {enviandoId === q.id ? "Gerando..." : "Enviar WhatsApp"}
-                </button>
-              </div>
-            ) : (
-              <span className="texto-vazio" style={{ fontSize: 11.5 }}>Em construção</span>
-            )}
+            <button onClick={() => setAberto(g.abre ? g.abre : { tipo: "grupo", id: g.id })}
+              style={{ display: "flex", alignItems: "center", gap: 5, background: g.corBg, color: g.cor, border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", alignSelf: "flex-start" }}>
+              <Icone nome="clipboard-list" tamanho={13} /> Selecionar e Gerar Link
+            </button>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Prévia das perguntas do formulário de anamnese (mesmas do link enviado ao paciente).
+function PreviaFormularioAnamnese({ paciente }) {
+  const idade = (() => {
+    if (!paciente.dataNasc) return null;
+    const n = new Date(paciente.dataNasc + "T12:00:00"), h = new Date();
+    let a = h.getFullYear() - n.getFullYear();
+    if (h < new Date(h.getFullYear(), n.getMonth(), n.getDate())) a--;
+    return a;
+  })();
+  const [perfil, setPerfil] = useState(idade != null && idade < 18 ? "infantil" : "adulto");
+  const modelos = window.ENTREVISTA_ETAPAS;
+  if (!modelos) return null;
+  const etapas = modelos[perfil]();
+  const campos = (lista) => lista.flatMap((c) => (c.type === "grid" ? c.fields : [c]));
+  return (
+    <div className="cartao-secao" style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+        <div className="titulo-cartao-secao" style={{ margin: 0 }}>Prévia do formulário</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[["infantil", "Criança / adolescente"], ["adulto", "Adulto / idoso"]].map(([id, rot]) => (
+            <button key={id} className={"pill-status" + (perfil === id ? " pill-status-ativa" : "")} style={{ "--cor-pill": "var(--cor-marca)" }} onClick={() => setPerfil(id)}>{rot}</button>
+          ))}
+        </div>
+      </div>
+      <p className="descricao-cartao-secao">Estas são as perguntas que o paciente (ou o responsável) recebe pelo link. As respostas aparecem aqui depois que ele enviar.</p>
+      {etapas.map((e, i) => (
+        <div key={i} style={{ marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--cor-marca)", borderBottom: "1px solid #E5E7EB", paddingBottom: 4, marginBottom: 6 }}>{e.titulo}</div>
+          {campos(e.campos).filter((c) => c.label && c.type !== "aviso").map((c, j) => (
+            c.type === "section"
+              ? <div key={j} style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#6B7280", margin: "8px 0 2px" }}>{c.label}</div>
+              : <div key={j} style={{ fontSize: 12.5, color: "#374151", padding: "2px 0" }}>• {String(c.label).replace(/ \*$/, "")}</div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -3462,6 +3504,7 @@ function AbaAnamneseView({ usuario, paciente, aoVoltar }) {
 
       {carregando && <p>Carregando...</p>}
 
+      {!carregando && !anamnese && <PreviaFormularioAnamnese paciente={paciente} />}
       {!carregando && !anamnese && (
         <div className="cartao-secao">
           <p className="texto-vazio" style={{ marginBottom: 16 }}>

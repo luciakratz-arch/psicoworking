@@ -1397,11 +1397,11 @@ function ModalSessoesPacote({
       }
     }, /*#__PURE__*/React.createElement("button", {
       className: "botao-icone",
-      title: nota ? "Ver anotação TCC" : "Anotar TCC",
+      title: nota ? "Prontuário preenchido: ver a anotação" : "Anotar a sessão",
       style: nota ? {
-        background: "#EDE9FE",
-        color: "var(--cor-marca)",
-        borderColor: "#C4B5FD"
+        background: "#16A34A",
+        color: "#FFFFFF",
+        borderColor: "#15803D"
       } : {},
       onClick: () => setSessaoTcc({
         sessao: s,
@@ -1413,14 +1413,14 @@ function ModalSessoesPacote({
     }))));
   }))), sessPac.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
-  }, "Nenhuma sess\xE3o registrada para este pacote."), sessaoTcc && /*#__PURE__*/React.createElement(ModalAnotacaoTCC, {
+  }, "Nenhuma sess\xE3o registrada para este pacote."), sessaoTcc && /*#__PURE__*/React.createElement(AnotacaoDaSessao, {
     usuario: usuario,
     paciente: {
       id: pacote.pacienteId,
       nome: pacienteNome
     },
     sessao: sessaoTcc.sessao,
-    notaExistente: sessaoTcc.nota,
+    notas: notas,
     aoFechar: () => setSessaoTcc(null)
   })));
 }

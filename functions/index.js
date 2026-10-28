@@ -19,7 +19,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const { gerarCartao } = require("./cartoes/cartao");
-const { montarPromptProntuario, normalizarProntuario } = require("./prontuario_prompt");
+const { montarPromptProntuario, normalizarProntuario, montarPromptABA, normalizarABA, montarPromptPlanoABA, normalizarPlanoABA } = require("./prontuario_prompt");
 
 // googleapis é um pacote gigante e demora vários segundos pra
 // carregar — se ficar no topo do arquivo, o deploy falha com
@@ -1798,7 +1798,7 @@ exports.organizarProntuarioIA = onCall(
     if (!request.auth) throw new HttpsError("unauthenticated", "Acesso negado.");
     // Prontuário é da psicóloga; secretária e paciente não usam esta IA.
     if (request.auth.token.role !== "psi") throw new HttpsError("permission-denied", "Sem permissão.");
-    const { textoBruto, pacienteNome, dataSessao, perfilClinico } = request.data || {};
+    const { textoBruto, pacienteNome, dataSessao, perfilClinico, modelo, alvos } = request.data || {};
     if (!textoBruto || !textoBruto.trim()) {
       throw new HttpsError("invalid-argument", "Texto da sessão é obrigatório.");
     }
@@ -1809,7 +1809,13 @@ exports.organizarProntuarioIA = onCall(
       throw new HttpsError("failed-precondition", "Chave do Gemini não configurada.");
     }
 
-    const prompt = montarPromptProntuario({ textoBruto, pacienteNome, dataSessao, perfilClinico });
+    const ehABA = modelo === "aba";
+    const ehPlanoABA = modelo === "plano_aba";
+    const prompt = ehPlanoABA
+      ? montarPromptPlanoABA({ textoBruto, pacienteNome, idadeTexto: String((request.data || {}).idade || "").slice(0, 40) })
+      : ehABA
+        ? montarPromptABA({ textoBruto, pacienteNome, dataSessao, alvosDoPlano: alvos })
+        : montarPromptProntuario({ textoBruto, pacienteNome, dataSessao, perfilClinico });
 
     let resp;
     try {
@@ -1853,7 +1859,10 @@ exports.organizarProntuarioIA = onCall(
     const jsonLimpo = texto.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 
     try {
-      const tcc = normalizarProntuario(JSON.parse(jsonLimpo));
+      const bruto = JSON.parse(jsonLimpo);
+      if (ehPlanoABA) return { plano: normalizarPlanoABA(bruto) };
+      if (ehABA) return { aba: normalizarABA(bruto) };
+      const tcc = normalizarProntuario(bruto);
       return { tcc };
     } catch (parseErr) {
       console.error("organizarProntuarioIA parse error:", parseErr, "texto:", texto.slice(0, 300));

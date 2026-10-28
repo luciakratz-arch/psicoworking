@@ -11,6 +11,7 @@ const ARQUIVOS = [
   "psi/admin/app_dashboard.js",
   "psi/admin/app_pacientes.js",
   "psi/admin/app_prontuario.js",
+  "psi/admin/app_aba.js",
   "psi/admin/app_financeiro.js",
   "psi/admin/app_recursos.js",
   "psi/admin/app_agenda.js",

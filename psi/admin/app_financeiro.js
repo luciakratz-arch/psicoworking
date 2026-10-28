@@ -1047,8 +1047,8 @@ function ModalSessoesPacote({ usuario, pacote, sessoes, pacienteNome, aoFechar }
                   </td>
                   <td style={{ ...tdS, fontSize: 12, color: "var(--texto-suave)" }}>{s.modalidade || "—"}</td>
                   <td style={{ ...tdS, textAlign: "center" }}>
-                    <button className="botao-icone" title={nota ? "Ver anotação TCC" : "Anotar TCC"}
-                      style={nota ? { background: "#EDE9FE", color: "var(--cor-marca)", borderColor: "#C4B5FD" } : {}}
+                    <button className="botao-icone" title={nota ? "Prontuário preenchido: ver a anotação" : "Anotar a sessão"}
+                      style={nota ? { background: "#16A34A", color: "#FFFFFF", borderColor: "#15803D" } : {}}
                       onClick={() => setSessaoTcc({ sessao: s, nota: nota || null })}>
                       <Icone nome="notebook-pen" tamanho={15} />
                     </button>
@@ -1062,11 +1062,11 @@ function ModalSessoesPacote({ usuario, pacote, sessoes, pacienteNome, aoFechar }
         {sessPac.length === 0 && <p className="texto-vazio">Nenhuma sessão registrada para este pacote.</p>}
 
         {sessaoTcc && (
-          <ModalAnotacaoTCC
+          <AnotacaoDaSessao
             usuario={usuario}
             paciente={{ id: pacote.pacienteId, nome: pacienteNome }}
             sessao={sessaoTcc.sessao}
-            notaExistente={sessaoTcc.nota}
+            notas={notas}
             aoFechar={() => setSessaoTcc(null)}
           />
         )}
