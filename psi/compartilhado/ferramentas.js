@@ -39,6 +39,10 @@ function Icone({ nome, tamanho = 16 }) {
 function TextAreaVoz({ value, onChange, rows, placeholder }) {
   const [gravando, setGravando] = useState(false);
   const reconhecimentoRef = useRef(null);
+  // Sempre o texto ATUAL da caixa: o reconhecimento de voz fica ativo por vários minutos e, sem isto,
+  // cada frase ditada apagava as anteriores (só a última sobrava).
+  const valorAtualRef = useRef(value);
+  valorAtualRef.current = value;
   const temSuporte = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
   function alternarGravacao() {
@@ -57,7 +61,8 @@ function TextAreaVoz({ value, onChange, rows, placeholder }) {
         if (e.results[i].isFinal) textoNovo += e.results[i][0].transcript;
       }
       if (textoNovo) {
-        onChange({ target: { value: (value ? value + " " : "") + textoNovo } });
+        const atual = valorAtualRef.current || "";
+        onChange({ target: { value: (atual && !/\s$/.test(atual) ? atual + " " : atual) + textoNovo.trim() } });
       }
     };
     rec.onend = () => setGravando(false);
@@ -2093,6 +2098,8 @@ function LeitorFabula({ usuario, paciente, recurso }) {
     if (r.respostas) setRespostas(r.respostas);
   });
 
+  const [cheia, setCheia] = useState(false);
+  const LEG = window.legendasDaFabula ? window.legendasDaFabula(recurso) : { legendas: [], sobreFaixa: false };
   if (paginas.length === 0) return null;
   const pagina = paginas[idx];
   const textoPagina = typeof pagina === "string" ? pagina : pagina?.texto || "";
@@ -2130,11 +2137,20 @@ function LeitorFabula({ usuario, paciente, recurso }) {
 
       <div style={{ background: "linear-gradient(145deg, #4c0094, var(--cor-marca, #7B00C4))", borderRadius: 20, padding: ehImagem ? 6 : "32px 26px", minHeight: ehImagem ? 0 : 170, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
         {ehImagem ? (
-          <img src={textoPagina} alt={"Painel " + (idx + 1)} style={{ width: "100%", display: "block", borderRadius: 15 }} />
+          (ehImagem && (LEG.legendas || [])[idx] && window.ImagemComLegenda)
+            ? React.createElement(window.ImagemComLegenda, { src: textoPagina, alt: "Painel " + (idx + 1), legenda: LEG.legendas[idx], sobreFaixa: LEG.sobreFaixa, onClick: () => setCheia(true) })
+            : <img src={textoPagina} alt={"Painel " + (idx + 1)} style={{ width: "100%", display: "block", borderRadius: 15 }} />
         ) : (
           <p style={{ fontSize: 18, color: "white", lineHeight: 1.9, textAlign: "center", fontStyle: "italic", margin: 0 }}>{textoPagina}</p>
         )}
       </div>
+
+      {ehImagem && (
+        <button className="botao-secundario-p" style={{ width: "100%", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={() => setCheia(true)}>
+          Ver em tela cheia (horizontal)
+        </button>
+      )}
+      {cheia && window.LeitorTelaCheiaFabula && React.createElement(window.LeitorTelaCheiaFabula, { paginas, idx, setIdx, legendas: LEG.legendas, sobreFaixa: LEG.sobreFaixa, onClose: () => setCheia(false) })}
 
       {concluido && recurso.moral && (
         <div className="cartao" style={{ boxShadow: "none", border: "1px solid #E5E7EB" }}>

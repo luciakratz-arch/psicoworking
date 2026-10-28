@@ -179,6 +179,24 @@ function TelaDashboard({
     return proximaOcorrencia(a) - proximaOcorrencia(b);
   });
   const semDataNasc = pacientesAtivos.filter(p => !p.dataNasc);
+
+  // Cartão de aniversário personalizado (estilo pelo gênero do cadastro; cor, nome e CRP da própria clínica)
+  async function abrirCartao(p) {
+    let cfg = {};
+    try {
+      const d = await db.collection("psi_config").doc(usuario.psiId).get();
+      if (d.exists) cfg = d.data();
+    } catch (e) {}
+    const wa = whatsappDoPaciente(p);
+    window.abrirCartaoAniversario && window.abrirCartaoAniversario({
+      nome: p.nome,
+      genero: p.genero,
+      telefone: wa.numero,
+      cor: cfg.corPrimaria,
+      assinatura: cfg.nome || "",
+      subtitulo: [cfg.crp ? "CRP " + cfg.crp : "", cfg.tituloProfissional || ""].filter(Boolean).join(" · ")
+    });
+  }
   function copiarLinkAniversario() {
     const url = `${window.location.origin}/psi/aniversario/?psi=${usuario.psiId}`;
     navigator.clipboard.writeText(url).then(() => {
@@ -279,7 +297,13 @@ function TelaDashboard({
     }, /*#__PURE__*/React.createElement(Icone, {
       nome: "mail",
       tamanho: 14
-    }), " Enviar e-mail"));
+    }), " Enviar e-mail"), /*#__PURE__*/React.createElement("button", {
+      className: "botao-secundario",
+      onClick: () => abrirCartao(p)
+    }, /*#__PURE__*/React.createElement(Icone, {
+      nome: "cake",
+      tamanho: 14
+    }), " Cart\xE3o de anivers\xE1rio"));
   })), proximosAniv.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14

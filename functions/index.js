@@ -18,6 +18,8 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const { gerarCartao } = require("./cartoes/cartao");
+const { montarPromptProntuario, normalizarProntuario } = require("./prontuario_prompt");
 
 // googleapis é um pacote gigante e demora vários segundos pra
 // carregar — se ficar no topo do arquivo, o deploy falha com
@@ -1657,8 +1659,103 @@ exports.enviarEmailTeste = onCall(async (request) => {
   return { ok: true, destino };
 });
 
-function montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl, responsavel }) {
+// Botão "Ver cartão de aniversário" em Configurações: gera um cartão de exemplo com a identidade
+// da própria clínica (nome, CRP, cor), mostra na tela e manda para o e-mail de quem pediu.
+// `variacao` (0 a 2) permite ver os três fundos de cada estilo, que giram de ano em ano.
+exports.enviarCartaoTeste = onCall({ region: "southamerica-east1", memory: "1GiB", timeoutSeconds: 120, invoker: "public" }, async (request) => {
+  const chamador = request.auth;
+  if (!chamador || !["psi", "secretaria"].includes(chamador.token.role)) {
+    throw new HttpsError("permission-denied", "Só a equipe da clínica pode gerar o cartão de teste.");
+  }
+  const psiId = chamador.token.psi_id;
+  const destino = chamador.token.email;
+  if (!psiId || !destino) throw new HttpsError("failed-precondition", "Conta sem clínica ou sem e-mail cadastrado.");
+
+  const d = request.data || {};
+  const genero = d.genero === "Feminino" ? "Feminino" : "Masculino";
+  const variacao = Math.min(2, Math.max(0, parseInt(d.variacao, 10) || 0));
+  const nome = String(d.nome || "").trim().slice(0, 40) || (genero === "Feminino" ? "Maria" : "João");
+  const ano = new Date().getFullYear() + variacao;
+
+  const cfgDoc = await db.collection("psi_config").doc(psiId).get();
+  const config = cfgDoc.exists ? cfgDoc.data() : {};
+  let jpeg;
+  try {
+    ({ jpeg } = await gerarCartao({
+      nome, genero, ano,
+      cor: config.corPrimaria,
+      assinatura: config.nome || "",
+      subtitulo: [config.crp ? "CRP " + config.crp : "", config.tituloProfissional || ""].filter(Boolean).join(" · "),
+    }));
+  } catch (e) {
+    console.error("Cartão de teste falhou:", e.message);
+    throw new HttpsError("internal", "Não foi possível gerar o cartão agora.");
+  }
+  let url;
+  try {
+    url = await publicarCartaoAniversario(psiId, "teste", ano, jpeg);
+  } catch (e) {
+    console.error("Cartão de teste: falha ao gravar a imagem:", e.message);
+    throw new HttpsError("internal", "O cartão foi montado, mas não foi possível guardá-lo agora.");
+  }
+  await db.collection("clinica_emails").add({
+    to: destino,
+    message: {
+      subject: "Cartão de aniversário (exemplo) — " + (config.nome || "PsiCoWorking"),
+      html: montarEmailAniversarioPaciente({ primeiroNome: nome, anos: 0, nomeClinica: config.nome || "", corMarca: config.corPrimaria || "#7B00C4", logoUrl: config.logoUrl || "", responsavel: null, cartaoUrl: url }),
+    },
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return { ok: true, destino, url };
+});
+
+// Grava o cartão no Storage com um link de acesso próprio (token) e devolve a URL.
+// O arquivo fica em cartoes/{psiId}/..., que as regras do Storage não abrem para ninguém;
+// só quem recebe o link (o e-mail) consegue ver.
+async function publicarCartaoAniversario(psiId, pacienteId, ano, jpeg) {
+  const bucket = admin.storage().bucket(admin.app().options.storageBucket || "psicoworking.firebasestorage.app");
+  const caminho = "cartoes/" + psiId + "/" + pacienteId + "_" + ano + ".jpg";
+  const token = require("crypto").randomUUID();
+  await bucket.file(caminho).save(jpeg, {
+    contentType: "image/jpeg",
+    metadata: { metadata: { firebaseStorageDownloadTokens: token } },
+  });
+  return "https://firebasestorage.googleapis.com/v0/b/" + bucket.name + "/o/" + encodeURIComponent(caminho) + "?alt=media&token=" + token;
+}
+
+// Monta a imagem do cartão do paciente (gênero define o estilo; o ano define o rodízio).
+// Se algo falhar, devolve "" e o e-mail sai no formato simples de sempre.
+async function cartaoDoPaciente(psiId, p, config, ano) {
+  try {
+    const { jpeg } = await gerarCartao({
+      nome: p.nome,
+      genero: p.genero,
+      ano,
+      cor: config.corPrimaria,
+      assinatura: config.nome || "",
+      subtitulo: [config.crp ? "CRP " + config.crp : "", config.tituloProfissional || ""].filter(Boolean).join(" · "),
+    });
+    return await publicarCartaoAniversario(psiId, p.id, ano, jpeg);
+  } catch (e) {
+    console.error("Cartão de aniversário não gerado para " + p.id + ":", e.message);
+    return "";
+  }
+}
+
+function montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl, responsavel, cartaoUrl }) {
   const nome = escHtml(primeiroNome);
+  if (cartaoUrl) {
+    const intro = responsavel
+      ? "Olá" + (responsavel.primeiroNome ? ", " + escHtml(responsavel.primeiroNome) : "") + "! Hoje é o aniversário de " + nome + " e preparamos este cartão com carinho."
+      : "";
+    return (
+      "<div style='font-family:Arial,sans-serif;background:#f5f3ee;padding:20px'><div style='max-width:540px;margin:0 auto'>" +
+      (intro ? "<p style='color:#444;font-size:15px;line-height:1.5;margin:0 0 14px'>" + intro + "</p>" : "") +
+      "<img src='" + cartaoUrl + "' alt='Feliz aniversário, " + nome + "' style='width:100%;height:auto;border-radius:14px;display:block'/>" +
+      "<p style='color:#8a8497;font-size:12px;text-align:center;margin:14px 0 0'>" + escHtml(nomeClinica) + "</p>" +
+      "</div></div>"
+    );
+  }
   // Quando o envio vai para o responsável, o texto fala com ele sobre o paciente.
   const mensagem = responsavel
     ? "Olá" + (responsavel.primeiroNome ? ", <strong style='color:" + corMarca + "'>" + escHtml(responsavel.primeiroNome) + "</strong>" : "") +
@@ -1712,24 +1809,7 @@ exports.organizarProntuarioIA = onCall(
       throw new HttpsError("failed-precondition", "Chave do Gemini não configurada.");
     }
 
-    const prompt =
-      "Você é uma psicóloga especialista em Terapia Cognitivo-Comportamental (TCC).\n" +
-      "Organize as anotações brutas da sessão abaixo no formato de prontuário TCC.\n" +
-      "Retorne SOMENTE um JSON válido, sem markdown, sem explicações extras, com as seguintes chaves:\n" +
-      "humor, agenda, pensamentosAutomaticos, crencas, tecnicas, tarefas, observacoes.\n\n" +
-      "O campo 'tarefas' tem formato especial: é enviado ao paciente por mensagem, então deve ser\n" +
-      "uma lista numerada, uma tarefa por linha, começando em '1- ', escrita em linguagem simples e\n" +
-      "direta, dirigida ao paciente. Exemplo:\n" +
-      "1- Fazer caminhada duas vezes na semana\n" +
-      "2- Tomar um banho relaxante antes de dormir\n" +
-      "Se não houver tarefa alguma na sessão, devolva o campo 'tarefas' como string vazia.\n\n" +
-      "Paciente: " + (pacienteNome || "não informado") + "\n" +
-      "Data: " + (dataSessao || "não informada") + "\n" +
-      (perfilClinico && String(perfilClinico).trim()
-        ? "Contexto clínico já cadastrado (CID, condições e medicações; use só como contexto, não repita nas seções): " +
-          String(perfilClinico).trim().slice(0, 1500) + "\n"
-        : "") +
-      "\nAnotações brutas:\n" + textoBruto.trim();
+    const prompt = montarPromptProntuario({ textoBruto, pacienteNome, dataSessao, perfilClinico });
 
     let resp;
     try {
@@ -1747,8 +1827,8 @@ exports.organizarProntuarioIA = onCall(
             generationConfig: {
               responseMimeType: "application/json",
               // Folga porque o modelo gasta tokens "pensando" antes de responder.
-              maxOutputTokens: 4000,
-              temperature: 0.2,
+              maxOutputTokens: 8000,
+              temperature: 0.1,
             },
           }),
         }
@@ -1773,7 +1853,7 @@ exports.organizarProntuarioIA = onCall(
     const jsonLimpo = texto.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 
     try {
-      const tcc = JSON.parse(jsonLimpo);
+      const tcc = normalizarProntuario(JSON.parse(jsonLimpo));
       return { tcc };
     } catch (parseErr) {
       console.error("organizarProntuarioIA parse error:", parseErr, "texto:", texto.slice(0, 300));
@@ -1933,7 +2013,7 @@ exports.resumirPeriodoIA = onCall(
 );
 
 exports.verificarAniversarios = onSchedule(
-  { schedule: "0 8 * * *", timeZone: "America/Sao_Paulo" },
+  { schedule: "0 8 * * *", timeZone: "America/Sao_Paulo", memory: "1GiB", timeoutSeconds: 300 },
   async () => {
     const hoje = new Date();
     const mes = hoje.getMonth() + 1;
@@ -1965,10 +2045,12 @@ exports.verificarAniversarios = onSchedule(
       let nomeClinica = "Sua clínica";
       let corMarca = "#7B00C4";
       let logoUrl = "";
+      let configClinica = {};
       try {
         const configDoc = await db.collection("psi_config").doc(psiId).get();
         if (configDoc.exists) {
           const config = configDoc.data();
+          configClinica = config;
           nomeClinica = config.nome || nomeClinica;
           corMarca = config.corPrimaria || corMarca;
           logoUrl = config.logoUrl || "";
@@ -1983,11 +2065,16 @@ exports.verificarAniversarios = onSchedule(
         const responsavel = contato.ehResponsavel
           ? { primeiroNome: (contato.nome || "").split(" ")[0], parentesco: contato.parentesco }
           : null;
+        const cartaoUrl = await cartaoDoPaciente(psiId, p, configClinica, hoje.getFullYear());
+        if (cartaoUrl) {
+          // O portal do paciente mostra o cartão no dia (ver psi/paciente/app.js).
+          await db.collection("clinica_pacientes").doc(p.id).set({ cartaoAniversario: { url: cartaoUrl, ano: hoje.getFullYear() } }, { merge: true });
+        }
         await db.collection("clinica_emails").add({
           to: contato.email,
           message: {
             subject: responsavel ? "Hoje é aniversário de " + primeiroNome + "!" : "Feliz Aniversário, " + primeiroNome + "!",
-            html: montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl, responsavel }),
+            html: montarEmailAniversarioPaciente({ primeiroNome, anos, nomeClinica, corMarca, logoUrl, responsavel, cartaoUrl }),
           },
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });

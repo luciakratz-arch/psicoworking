@@ -263,6 +263,10 @@ function paraDestino(f, destino) {
     paginas: Array.isArray(f.paginas) ? f.paginas : [],
     perguntas: Array.isArray(f.perguntas) ? f.perguntas : []
   };
+  if (Array.isArray(f.legendas) && f.legendas.length > 0) {
+    base.legendas = f.legendas;
+    base.legendaSobreFaixa = !!f.legendaSobreFaixa;
+  }
   if (destino === "lk") {
     base.slug = f.slug || slugificar(base.titulo);
     base.corCapa = f.corCapa || "#7B00C4";
@@ -362,18 +366,22 @@ async function atualizar(origemLado) {
       alvo.paginas.length === paginasOrigem.length &&
       alvo.paginas.every((p, i) => p === paginasOrigem[i]);
 
-    if (mesmasPaginas && (alvo.tipo || "texto") === tipoOrigem) {
+    const legOrigem = Array.isArray(f.legendas) ? f.legendas : [];
+    const mesmasLegendas = legOrigem.length === 0 ||
+      (JSON.stringify(Array.isArray(alvo.legendas) ? alvo.legendas : []) === JSON.stringify(legOrigem) &&
+       !!alvo.legendaSobreFaixa === !!f.legendaSobreFaixa);
+
+    if (mesmasPaginas && (alvo.tipo || "texto") === tipoOrigem && mesmasLegendas) {
       registrar("já estava igual: " + titulo, "pulo");
       iguais++;
       continue;
     }
 
     try {
-      await dbDest.collection(colDest).doc(alvo.id).update({
-        tipo: tipoOrigem,
-        paginas: paginasOrigem
-      });
-      registrar("atualizada (" + tipoOrigem + ", " + paginasOrigem.length + " pág.): " + titulo, "ok");
+      const upd = { tipo: tipoOrigem, paginas: paginasOrigem };
+      if (legOrigem.length > 0) { upd.legendas = legOrigem; upd.legendaSobreFaixa = !!f.legendaSobreFaixa; }
+      await dbDest.collection(colDest).doc(alvo.id).update(upd);
+      registrar("atualizada (" + tipoOrigem + ", " + paginasOrigem.length + " pág." + (legOrigem.length ? ", com texto em caixa" : "") + "): " + titulo, "ok");
       atualizadas++;
     } catch (e) {
       registrar("falhou: " + titulo + " — " + e.message, "err");

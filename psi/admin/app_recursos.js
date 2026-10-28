@@ -573,6 +573,9 @@ function TelaRecursos({ usuario }) {
                   {abaAtual.id !== "fabulas" && item.descricao && <p className="descricao-cartao-recurso">{item.descricao}</p>}
                   {abaAtual.id === "fabulas" && (
                     <p className="texto-vazio" style={{ margin: 0 }}>
+                      <span style={{ background: item.tipo === "carousel" ? "#6A2BD9" : "#E5E7EB", color: item.tipo === "carousel" ? "#fff" : "#6B7280", borderRadius: 10, padding: "2px 8px", fontSize: 10, fontWeight: 700, marginRight: 6, letterSpacing: "0.03em" }}>
+                        {item.tipo === "carousel" ? "CARROSSEL" : "SÓ TEXTO"}
+                      </span>
                       {(item.paginas || []).length} pág. · {(item.perguntas || []).length} reflexões
                     </p>
                   )}
@@ -2825,6 +2828,8 @@ function PreviewFabula({ item }) {
   const [idx, setIdx] = useState(0);
   const [respostas, setRespostas] = useState({});
   const [msg, setMsg] = useState("");
+  const [cheia, setCheia] = useState(false);
+  const LEG = window.legendasDaFabula ? window.legendasDaFabula(item) : { legendas: [], sobreFaixa: false };
 
   if (paginas.length === 0) return null;
   const pagina = paginas[idx];
@@ -2844,11 +2849,20 @@ function PreviewFabula({ item }) {
 
       <div style={{ background: "linear-gradient(145deg, var(--cor-marca-escura), var(--cor-marca))", borderRadius: 20, padding: ehImagem ? 6 : "32px 26px", minHeight: ehImagem ? 0 : 170, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
         {ehImagem ? (
-          <img src={textoPagina} alt={"Painel " + (idx + 1)} style={{ width: "100%", display: "block", borderRadius: 15 }} />
+          (ehImagem && (LEG.legendas || [])[idx] && window.ImagemComLegenda)
+            ? React.createElement(window.ImagemComLegenda, { src: textoPagina, alt: "Painel " + (idx + 1), legenda: LEG.legendas[idx], sobreFaixa: LEG.sobreFaixa, onClick: () => setCheia(true) })
+            : <img src={textoPagina} alt={"Painel " + (idx + 1)} style={{ width: "100%", display: "block", borderRadius: 15 }} />
         ) : (
           <p style={{ fontSize: 18, color: "white", lineHeight: 1.9, textAlign: "center", fontStyle: "italic", margin: 0 }}>{textoPagina}</p>
         )}
       </div>
+
+      {ehImagem && (
+        <button className="botao-secundario" style={{ width: "100%", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={() => setCheia(true)}>
+          Ver em tela cheia (horizontal)
+        </button>
+      )}
+      {cheia && window.LeitorTelaCheiaFabula && React.createElement(window.LeitorTelaCheiaFabula, { paginas, idx, setIdx, legendas: LEG.legendas, sobreFaixa: LEG.sobreFaixa, onClose: () => setCheia(false) })}
 
       {concluido && item.moral && (
         <div className="cartao-secao">

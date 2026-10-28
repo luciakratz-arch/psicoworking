@@ -219,6 +219,29 @@ function TelaConfiguracoes({ usuario }) {
   const [linkEquipeCopiado, setLinkEquipeCopiado] = useState(false);
   const [statusEmailTeste, setStatusEmailTeste] = useState("");
 
+  const [cartaoGenero, setCartaoGenero] = useState("Feminino");
+  const [cartaoVariacao, setCartaoVariacao] = useState(0);
+  const [cartaoNome, setCartaoNome] = useState("");
+  const [cartaoGerando, setCartaoGerando] = useState(false);
+  const [cartaoStatus, setCartaoStatus] = useState("");
+  const [cartaoUrl, setCartaoUrl] = useState("");
+
+  async function gerarCartaoTeste() {
+    setCartaoGerando(true);
+    setCartaoStatus("Gerando o cartão...");
+    setCartaoUrl("");
+    try {
+      const fn = appAdmin.functions("southamerica-east1").httpsCallable("enviarCartaoTeste");
+      const r = await fn({ genero: cartaoGenero, variacao: cartaoVariacao, nome: cartaoNome });
+      setCartaoUrl(r.data.url);
+      setCartaoStatus("Cartão enviado para " + r.data.destino + " (pode levar 1 minuto para chegar).");
+    } catch (e) {
+      setCartaoStatus("Erro: " + (e.message || "não foi possível gerar o cartão."));
+    } finally {
+      setCartaoGerando(false);
+    }
+  }
+
   async function enviarEmailTeste() {
     setStatusEmailTeste("Enviando...");
     try {
@@ -423,6 +446,40 @@ function TelaConfiguracoes({ usuario }) {
           <Icone nome="mail" tamanho={15} /> Enviar e-mail de teste
         </button>
         {statusEmailTeste && <p className="dica-campo" style={{ marginTop: 10 }}>{statusEmailTeste}</p>}
+      </div>
+
+      <div className="cartao-config" style={{ marginTop: 16 }}>
+        <label>Cartão de aniversário dos pacientes</label>
+        <p className="dica-campo">
+          No dia do aniversário, o paciente recebe por e-mail (e vê no portal) um cartão com o nome dele, a sua assinatura e a sua cor.
+          O estilo segue o gênero do cadastro, e o desenho e a mensagem mudam a cada ano. Aqui você vê um exemplo e recebe uma cópia no seu e-mail.
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div>
+            <label>Estilo</label>
+            <select value={cartaoGenero} onChange={(e) => setCartaoGenero(e.target.value)}>
+              <option value="Feminino">Feminino</option>
+              <option value="Masculino">Masculino / neutro</option>
+            </select>
+          </div>
+          <div>
+            <label>Desenho do ano</label>
+            <select value={cartaoVariacao} onChange={(e) => setCartaoVariacao(Number(e.target.value))}>
+              <option value={0}>Este ano</option>
+              <option value={1}>Ano que vem</option>
+              <option value={2}>Daqui a 2 anos</option>
+            </select>
+          </div>
+          <div style={{ flex: 1, minWidth: 140 }}>
+            <label>Nome de exemplo</label>
+            <input value={cartaoNome} onChange={(e) => setCartaoNome(e.target.value)} placeholder="Maria" maxLength={40} />
+          </div>
+        </div>
+        <button type="button" className="botao-secundario" style={{ marginTop: 12 }} onClick={gerarCartaoTeste} disabled={cartaoGerando}>
+          <Icone nome="cake" tamanho={15} /> {cartaoGerando ? "Gerando..." : "Ver cartão e enviar para o meu e-mail"}
+        </button>
+        {cartaoStatus && <p className="dica-campo" style={{ marginTop: 10 }}>{cartaoStatus}</p>}
+        {cartaoUrl && <img src={cartaoUrl} alt="Cartão de aniversário de exemplo" style={{ width: "100%", maxWidth: 380, borderRadius: 14, marginTop: 10, display: "block" }} />}
       </div>
     </div>
   );

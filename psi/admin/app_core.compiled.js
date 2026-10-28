@@ -485,6 +485,10 @@ function TextAreaVoz({
 }) {
   const [gravando, setGravando] = useState(false);
   const reconhecimentoRef = useRef(null);
+  // Sempre o texto ATUAL da caixa: o reconhecimento de voz fica ativo por vários minutos e, sem isto,
+  // cada frase ditada apagava as anteriores (só a última sobrava).
+  const valorAtualRef = useRef(value);
+  valorAtualRef.current = value;
   const temSuporte = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
   function alternarGravacao() {
     if (gravando) {
@@ -502,9 +506,10 @@ function TextAreaVoz({
         if (e.results[i].isFinal) textoNovo += e.results[i][0].transcript;
       }
       if (textoNovo) {
+        const atual = valorAtualRef.current || "";
         onChange({
           target: {
-            value: (value ? value + " " : "") + textoNovo
+            value: (atual && !/\s$/.test(atual) ? atual + " " : atual) + textoNovo.trim()
           }
         });
       }

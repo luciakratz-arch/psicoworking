@@ -215,7 +215,7 @@ function usarConfiguracaoClinica(psiId) {
 // paciente (campo clinica_pacientes.dataNasc). Confete em CSS puro
 // (sem emoji, regra permanente do projeto) — cada quadradinho cai e
 // gira com uma animação simples.
-function ModalAniversario({ nome, nomeClinica, corMarca, onClose }) {
+function ModalAniversario({ nome, nomeClinica, corMarca, cartaoUrl, onClose }) {
   const [visivel, setVisivel] = useState(false);
   const [confetes, setConfetes] = useState([]);
 
@@ -270,6 +270,10 @@ function ModalAniversario({ nome, nomeClinica, corMarca, onClose }) {
           transition: "transform .4s cubic-bezier(.34,1.56,.64,1)",
         }}
       >
+        {cartaoUrl && (
+          <img src={cartaoUrl} alt={"Feliz aniversário, " + primeiroNome} style={{ width: "100%", height: "auto", borderRadius: 14, display: "block", margin: "-20px 0 20px", maxWidth: "calc(100% + 0px)" }} />
+        )}
+        {!cartaoUrl && (<>
         <div style={{ color: "var(--cor-marca)", animation: "pulsar-bolo 1.5s ease-in-out infinite", marginBottom: 8 }}>
           <Icone nome="cake" tamanho={64} />
         </div>
@@ -287,6 +291,7 @@ function ModalAniversario({ nome, nomeClinica, corMarca, onClose }) {
             <strong style={{ color: "var(--cor-marca)", fontSize: 16 }}>{nomeClinica}</strong>
           </div>
         )}
+        </>)}
         <button
           onClick={onClose}
           className="botao-primario-p"
@@ -464,7 +469,7 @@ function App() {
   return (
     <div className="layout-paciente">
       {mostrarAniversario && (
-        <ModalAniversario nome={paciente?.nome} nomeClinica={configClinica?.nome} corMarca={configClinica?.corPrimaria} onClose={() => setMostrarAniversario(false)} />
+        <ModalAniversario nome={paciente?.nome} nomeClinica={configClinica?.nome} corMarca={configClinica?.corPrimaria} cartaoUrl={paciente?.cartaoAniversario && paciente.cartaoAniversario.ano === new Date().getFullYear() ? paciente.cartaoAniversario.url : ""} onClose={() => setMostrarAniversario(false)} />
       )}
       <aside className="barra-lateral-p">
         <div className="marca-barra-lateral-p">

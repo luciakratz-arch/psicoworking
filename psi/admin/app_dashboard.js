@@ -168,6 +168,21 @@ function TelaDashboard({ usuario, aoAbrirPaciente }) {
     });
   const semDataNasc = pacientesAtivos.filter((p) => !p.dataNasc);
 
+  // Cartão de aniversário personalizado (estilo pelo gênero do cadastro; cor, nome e CRP da própria clínica)
+  async function abrirCartao(p) {
+    let cfg = {};
+    try { const d = await db.collection("psi_config").doc(usuario.psiId).get(); if (d.exists) cfg = d.data(); } catch (e) {}
+    const wa = whatsappDoPaciente(p);
+    window.abrirCartaoAniversario && window.abrirCartaoAniversario({
+      nome: p.nome,
+      genero: p.genero,
+      telefone: wa.numero,
+      cor: cfg.corPrimaria,
+      assinatura: cfg.nome || "",
+      subtitulo: [cfg.crp ? "CRP " + cfg.crp : "", cfg.tituloProfissional || ""].filter(Boolean).join(" · "),
+    });
+  }
+
   function copiarLinkAniversario() {
     const url = `${window.location.origin}/psi/aniversario/?psi=${usuario.psiId}`;
     navigator.clipboard
@@ -254,6 +269,9 @@ function TelaDashboard({ usuario, aoAbrirPaciente }) {
                         <Icone nome="mail" tamanho={14} /> Enviar e-mail
                       </a>
                     )}
+                    <button className="botao-secundario" onClick={() => abrirCartao(p)}>
+                      <Icone nome="cake" tamanho={14} /> Cartão de aniversário
+                    </button>
                   </div>
                 );
               })}

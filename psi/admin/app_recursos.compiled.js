@@ -881,7 +881,18 @@ function TelaRecursos({
       style: {
         margin: 0
       }
-    }, (item.paginas || []).length, " p\xE1g. \xB7 ", (item.perguntas || []).length, " reflex\xF5es"), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        background: item.tipo === "carousel" ? "#6A2BD9" : "#E5E7EB",
+        color: item.tipo === "carousel" ? "#fff" : "#6B7280",
+        borderRadius: 10,
+        padding: "2px 8px",
+        fontSize: 10,
+        fontWeight: 700,
+        marginRight: 6,
+        letterSpacing: "0.03em"
+      }
+    }, item.tipo === "carousel" ? "CARROSSEL" : "SÓ TEXTO"), (item.paginas || []).length, " p\xE1g. \xB7 ", (item.perguntas || []).length, " reflex\xF5es"), /*#__PURE__*/React.createElement("div", {
       className: "acoes-cartao-recurso"
     }, /*#__PURE__*/React.createElement("button", {
       className: "botao-secundario",
@@ -5232,6 +5243,11 @@ function PreviewFabula({
   const [idx, setIdx] = useState(0);
   const [respostas, setRespostas] = useState({});
   const [msg, setMsg] = useState("");
+  const [cheia, setCheia] = useState(false);
+  const LEG = window.legendasDaFabula ? window.legendasDaFabula(item) : {
+    legendas: [],
+    sobreFaixa: false
+  };
   if (paginas.length === 0) return null;
   const pagina = paginas[idx];
   const textoPagina = typeof pagina === "string" ? pagina : pagina?.texto || "";
@@ -5284,7 +5300,13 @@ function PreviewFabula({
       justifyContent: "center",
       overflow: "hidden"
     }
-  }, ehImagem ? /*#__PURE__*/React.createElement("img", {
+  }, ehImagem ? ehImagem && (LEG.legendas || [])[idx] && window.ImagemComLegenda ? React.createElement(window.ImagemComLegenda, {
+    src: textoPagina,
+    alt: "Painel " + (idx + 1),
+    legenda: LEG.legendas[idx],
+    sobreFaixa: LEG.sobreFaixa,
+    onClick: () => setCheia(true)
+  }) : /*#__PURE__*/React.createElement("img", {
     src: textoPagina,
     alt: "Painel " + (idx + 1),
     style: {
@@ -5301,7 +5323,25 @@ function PreviewFabula({
       fontStyle: "italic",
       margin: 0
     }
-  }, textoPagina)), concluido && item.moral && /*#__PURE__*/React.createElement("div", {
+  }, textoPagina)), ehImagem && /*#__PURE__*/React.createElement("button", {
+    className: "botao-secundario",
+    style: {
+      width: "100%",
+      marginBottom: 16,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    },
+    onClick: () => setCheia(true)
+  }, "Ver em tela cheia (horizontal)"), cheia && window.LeitorTelaCheiaFabula && React.createElement(window.LeitorTelaCheiaFabula, {
+    paginas,
+    idx,
+    setIdx,
+    legendas: LEG.legendas,
+    sobreFaixa: LEG.sobreFaixa,
+    onClose: () => setCheia(false)
+  }), concluido && item.moral && /*#__PURE__*/React.createElement("div", {
     className: "cartao-secao"
   }, /*#__PURE__*/React.createElement("strong", null, "Moral da hist\xF3ria"), /*#__PURE__*/React.createElement("p", {
     className: "texto-visualizar-recurso"

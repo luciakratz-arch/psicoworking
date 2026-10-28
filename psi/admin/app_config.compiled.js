@@ -268,6 +268,31 @@ function TelaConfiguracoes({
   const [linkCopiado, setLinkCopiado] = useState(false);
   const [linkEquipeCopiado, setLinkEquipeCopiado] = useState(false);
   const [statusEmailTeste, setStatusEmailTeste] = useState("");
+  const [cartaoGenero, setCartaoGenero] = useState("Feminino");
+  const [cartaoVariacao, setCartaoVariacao] = useState(0);
+  const [cartaoNome, setCartaoNome] = useState("");
+  const [cartaoGerando, setCartaoGerando] = useState(false);
+  const [cartaoStatus, setCartaoStatus] = useState("");
+  const [cartaoUrl, setCartaoUrl] = useState("");
+  async function gerarCartaoTeste() {
+    setCartaoGerando(true);
+    setCartaoStatus("Gerando o cartão...");
+    setCartaoUrl("");
+    try {
+      const fn = appAdmin.functions("southamerica-east1").httpsCallable("enviarCartaoTeste");
+      const r = await fn({
+        genero: cartaoGenero,
+        variacao: cartaoVariacao,
+        nome: cartaoNome
+      });
+      setCartaoUrl(r.data.url);
+      setCartaoStatus("Cartão enviado para " + r.data.destino + " (pode levar 1 minuto para chegar).");
+    } catch (e) {
+      setCartaoStatus("Erro: " + (e.message || "não foi possível gerar o cartão."));
+    } finally {
+      setCartaoGerando(false);
+    }
+  }
   async function enviarEmailTeste() {
     setStatusEmailTeste("Enviando...");
     try {
@@ -481,5 +506,71 @@ function TelaConfiguracoes({
     style: {
       marginTop: 10
     }
-  }, statusEmailTeste)));
+  }, statusEmailTeste)), /*#__PURE__*/React.createElement("div", {
+    className: "cartao-config",
+    style: {
+      marginTop: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Cart\xE3o de anivers\xE1rio dos pacientes"), /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo"
+  }, "No dia do anivers\xE1rio, o paciente recebe por e-mail (e v\xEA no portal) um cart\xE3o com o nome dele, a sua assinatura e a sua cor. O estilo segue o g\xEAnero do cadastro, e o desenho e a mensagem mudam a cada ano. Aqui voc\xEA v\xEA um exemplo e recebe uma c\xF3pia no seu e-mail."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      flexWrap: "wrap",
+      alignItems: "flex-end"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Estilo"), /*#__PURE__*/React.createElement("select", {
+    value: cartaoGenero,
+    onChange: e => setCartaoGenero(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "Feminino"
+  }, "Feminino"), /*#__PURE__*/React.createElement("option", {
+    value: "Masculino"
+  }, "Masculino / neutro"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Desenho do ano"), /*#__PURE__*/React.createElement("select", {
+    value: cartaoVariacao,
+    onChange: e => setCartaoVariacao(Number(e.target.value))
+  }, /*#__PURE__*/React.createElement("option", {
+    value: 0
+  }, "Este ano"), /*#__PURE__*/React.createElement("option", {
+    value: 1
+  }, "Ano que vem"), /*#__PURE__*/React.createElement("option", {
+    value: 2
+  }, "Daqui a 2 anos"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 140
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Nome de exemplo"), /*#__PURE__*/React.createElement("input", {
+    value: cartaoNome,
+    onChange: e => setCartaoNome(e.target.value),
+    placeholder: "Maria",
+    maxLength: 40
+  }))), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    style: {
+      marginTop: 12
+    },
+    onClick: gerarCartaoTeste,
+    disabled: cartaoGerando
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "cake",
+    tamanho: 15
+  }), " ", cartaoGerando ? "Gerando..." : "Ver cartão e enviar para o meu e-mail"), cartaoStatus && /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo",
+    style: {
+      marginTop: 10
+    }
+  }, cartaoStatus), cartaoUrl && /*#__PURE__*/React.createElement("img", {
+    src: cartaoUrl,
+    alt: "Cart\xE3o de anivers\xE1rio de exemplo",
+    style: {
+      width: "100%",
+      maxWidth: 380,
+      borderRadius: 14,
+      marginTop: 10,
+      display: "block"
+    }
+  })));
 }
