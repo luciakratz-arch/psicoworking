@@ -485,4 +485,24 @@ describe("Autocadastro de psicóloga e pedido de mudança de plano", () => {
     await assertSucceeds(setDoc(doc(psiA(), "psi_pedidos_plano/clinA"), pedido()));
     await assertSucceeds(updateDoc(doc(matriz(), "psi_pedidos_plano/clinA"), { status: "atendido" }));
   });
+  const cancel = (o) => ({ psi_id: "clinA", nomeClinica: "Clínica A", motivo: "Mudança de cidade", status: "pendente", pedidoEm: new Date(), ...o });
+  test("a psicóloga pede o cancelamento da própria conta; a administradora lê", async () => {
+    await assertSucceeds(setDoc(doc(psiA(), "psi_pedidos_cancelamento/clinA"), cancel()));
+    await assertSucceeds(getDoc(doc(psiA(), "psi_pedidos_cancelamento/clinA")));
+    await assertSucceeds(getDoc(doc(matriz(), "psi_pedidos_cancelamento/clinA")));
+  });
+  test("ninguém cancela conta de outra clínica, se autoaprova ou escreve fora do formato", async () => {
+    await assertFails(setDoc(doc(psiA(), "psi_pedidos_cancelamento/clinB"), cancel({ psi_id: "clinB" })));
+    await assertFails(setDoc(doc(psiA(), "psi_pedidos_cancelamento/clinA"), cancel({ status: "atendido" })));
+    await assertFails(setDoc(doc(psiA(), "psi_pedidos_cancelamento/clinA"), cancel({ motivo: "x".repeat(600) })));
+    await assertFails(setDoc(doc(psiA(), "psi_pedidos_cancelamento/clinA"), { ...cancel(), extra: 1 }));
+    await assertFails(setDoc(doc(secA(), "psi_pedidos_cancelamento/clinA"), cancel()));
+    await assertFails(setDoc(doc(pacA1(), "psi_pedidos_cancelamento/clinA"), cancel()));
+    await assertFails(getDoc(doc(psiB(), "psi_pedidos_cancelamento/clinA")));
+    await assertFails(getDoc(doc(semLogin(), "psi_pedidos_cancelamento/clinA")));
+  });
+  test("a administradora marca o cancelamento como atendido", async () => {
+    await assertSucceeds(setDoc(doc(psiA(), "psi_pedidos_cancelamento/clinA"), cancel()));
+    await assertSucceeds(updateDoc(doc(matriz(), "psi_pedidos_cancelamento/clinA"), { status: "atendido" }));
+  });
 });

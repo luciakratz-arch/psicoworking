@@ -22,6 +22,14 @@ function CartaoMeuPlano({
   const [msg, setMsg] = useState("");
   const [documento, setDocumento] = useState("");
   const [assinando, setAssinando] = useState(false);
+  const [cancelamento, setCancelamento] = useState(null);
+  const [confirmandoCancel, setConfirmandoCancel] = useState(false);
+  const [motivoCancel, setMotivoCancel] = useState("");
+  const [confirmaTexto, setConfirmaTexto] = useState("");
+  const [mostrarMudanca, setMostrarMudanca] = useState(false);
+  useEffect(() => {
+    return db.collection("psi_pedidos_cancelamento").doc(usuario.psiId).onSnapshot(s => setCancelamento(s.exists ? s.data() : null), () => setCancelamento(null));
+  }, [usuario.psiId]);
   useEffect(() => {
     return db.collection("plataforma_config").doc("planos").onSnapshot(s => setPlanos(s.exists ? s.data() : {}), () => setPlanos({}));
   }, []);
@@ -86,6 +94,28 @@ function CartaoMeuPlano({
       setAssinando(false);
     }
   }
+  const cancelPendente = cancelamento && cancelamento.status === "pendente";
+  async function pedirCancelamento() {
+    setEnviando(true);
+    setMsg("");
+    try {
+      await db.collection("psi_pedidos_cancelamento").doc(usuario.psiId).set({
+        psi_id: usuario.psiId,
+        nomeClinica: usuario.email,
+        motivo: motivoCancel.trim().slice(0, 500),
+        status: "pendente",
+        pedidoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setConfirmandoCancel(false);
+      setMotivoCancel("");
+      setConfirmaTexto("");
+      setMsg("Pedido de cancelamento enviado. Entraremos em contato para combinar a exportação dos seus dados e o encerramento. Até lá, a conta continua funcionando normalmente.");
+    } catch (e) {
+      setMsg("Não foi possível enviar: " + e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
   async function pedirMudanca() {
     setEnviando(true);
     setMsg("");
@@ -115,7 +145,20 @@ function CartaoMeuPlano({
     className: "dica-campo"
   }, /*#__PURE__*/React.createElement("strong", null, nomePlano), " \xB7 ", situacaoTxt), /*#__PURE__*/React.createElement(AvisoPlanoIA, {
     usuario: usuario
-  }), !fundadora && /*#__PURE__*/React.createElement("div", {
+  }), fundadora && !mostrarMudanca && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => setMostrarMudanca(true)
+  }, "Mudar de plano / fazer upgrade"), /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo",
+    style: {
+      marginTop: 8
+    }
+  }, "Como fundadora voc\xEA tem acesso integral sem cobran\xE7a. Mudar para um plano pago encerra esse acesso gratuito: o pedido chega \xE0 administradora, que combina o pagamento com voc\xEA.")), (!fundadora || mostrarMudanca) && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12
     }
@@ -140,7 +183,7 @@ function CartaoMeuPlano({
     value: "mensal"
   }, "Pagamento mensal"), /*#__PURE__*/React.createElement("option", {
     value: "anual"
-  }, "Pagamento anual (", moeda(p(para).precoAnual), ", com desconto)")), cobrancaAutomatica ? /*#__PURE__*/React.createElement("button", {
+  }, "Pagamento anual (", moeda(p(para).precoAnual), ", com desconto)")), cobrancaAutomatica && !fundadora ? /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "botao-primario",
     onClick: assinarAgora,
@@ -150,7 +193,7 @@ function CartaoMeuPlano({
     className: "botao-secundario",
     onClick: pedirMudanca,
     disabled: enviando || pendente || jaEhEsse
-  }, pendente ? "Pedido já enviado" : jaEhEsse ? "Este já é o seu plano" : enviando ? "Enviando..." : "Quero este plano")), cobrancaAutomatica && !jaEhEsse && /*#__PURE__*/React.createElement("div", {
+  }, pendente ? "Pedido já enviado" : jaEhEsse ? "Este já é o seu plano" : enviando ? "Enviando..." : "Quero este plano")), cobrancaAutomatica && !fundadora && !jaEhEsse && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 10,
       maxWidth: 360
@@ -187,7 +230,95 @@ function CartaoMeuPlano({
     style: {
       marginTop: 8
     }
-  }, msg)));
+  }, msg)), fundadora && msg && /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo",
+    style: {
+      marginTop: 8
+    }
+  }, msg), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 18,
+      paddingTop: 14,
+      borderTop: "1px solid var(--borda)"
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Cancelar a conta"), cancelPendente ? /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo"
+  }, "Pedido de cancelamento enviado em ", dataBr(cancelamento.pedidoEm), ". Aguarde o nosso contato: a conta continua funcionando at\xE9 o encerramento.") : !confirmandoCancel ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    className: "dica-campo"
+  }, "Se quiser encerrar o uso do PsiCoWorking, fa\xE7a o pedido aqui. Antes de encerrar, combinamos com voc\xEA a exporta\xE7\xE3o dos dados dos seus pacientes."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    style: {
+      color: "#B91C1C",
+      borderColor: "#FCA5A5"
+    },
+    onClick: () => {
+      setMsg("");
+      setConfirmandoCancel(true);
+    }
+  }, "Cancelar minha conta")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#FEF2F2",
+      border: "1px solid #FCA5A5",
+      borderRadius: 10,
+      padding: "12px 14px",
+      marginTop: 8,
+      maxWidth: 520
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "0 0 8px",
+      fontSize: 13,
+      color: "#7F1D1D"
+    }
+  }, /*#__PURE__*/React.createElement("strong", null, "Aten\xE7\xE3o:"), " isto pede o encerramento da conta e do acesso aos dados dos pacientes. Nada \xE9 apagado agora: a administradora entra em contato para combinar a exporta\xE7\xE3o dos dados e a data do encerramento."), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12
+    }
+  }, "Motivo (opcional)"), /*#__PURE__*/React.createElement("textarea", {
+    rows: 2,
+    value: motivoCancel,
+    onChange: e => setMotivoCancel(e.target.value),
+    maxLength: 500,
+    style: {
+      width: "100%",
+      boxSizing: "border-box"
+    }
+  }), /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      marginTop: 8,
+      display: "block"
+    }
+  }, "Para confirmar, digite CANCELAR"), /*#__PURE__*/React.createElement("input", {
+    value: confirmaTexto,
+    onChange: e => setConfirmaTexto(e.target.value),
+    placeholder: "CANCELAR",
+    style: {
+      maxWidth: 220
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-secundario",
+    onClick: () => {
+      setConfirmandoCancel(false);
+      setConfirmaTexto("");
+    }
+  }, "Voltar"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    className: "botao-primario",
+    style: {
+      background: "#B91C1C"
+    },
+    disabled: enviando || confirmaTexto.trim().toUpperCase() !== "CANCELAR",
+    onClick: pedirCancelamento
+  }, enviando ? "Enviando..." : "Enviar pedido de cancelamento")))));
 }
 function TelaMeuPlano({
   usuario

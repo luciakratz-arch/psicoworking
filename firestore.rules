@@ -473,6 +473,19 @@ service cloud.firestore {
       allow update, delete: if ehAdminMatriz();
     }
 
+    // ── Pedido de cancelamento da conta (um por clínica) ──
+    // A psicóloga só consegue pedir; o encerramento (e a exportação dos dados) é combinado com a administradora.
+    match /psi_pedidos_cancelamento/{psiId} {
+      allow read: if ehAdminMatriz() || ehEquipeDaClinica(psiId);
+      allow create, update: if ehPsicologaDaClinica(psiId)
+                            && request.resource.data.keys().hasOnly(['psi_id', 'nomeClinica', 'motivo', 'status', 'pedidoEm'])
+                            && request.resource.data.psi_id == psiId
+                            && request.resource.data.status == 'pendente'
+                            && request.resource.data.motivo is string
+                            && request.resource.data.motivo.size() <= 500;
+      allow update, delete: if ehAdminMatriz();
+    }
+
     match /clinica_comissoes/{comissaoId} {
       allow read, write: if ehEquipeMantendoClinica()
                           || (request.method == 'create' && ehEquipeEscrevendo(request.resource.data.psi_id));

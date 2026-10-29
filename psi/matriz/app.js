@@ -387,6 +387,44 @@ function CartaoPedidosPlano({ lista, planos, irPara }) {
   );
 }
 
+// Pedidos de cancelamento de conta feitos pelas psicólogas.
+function CartaoPedidosCancelamento({ lista, irPara }) {
+  const [pedidos, setPedidos] = useState([]);
+  useEffect(() => {
+    return db.collection("psi_pedidos_cancelamento").onSnapshot(
+      (snap) => setPedidos(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.status === "pendente")),
+      () => {}
+    );
+  }, []);
+  async function atender(p) {
+    try { await db.collection("psi_pedidos_cancelamento").doc(p.id).update({ status: "atendido" }); } catch (e) { alert("Erro: " + e.message); }
+  }
+  if (pedidos.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div className="pagina-titulo" style={{ fontSize: 15, color: "#B91C1C" }}>Pedidos de cancelamento de conta ({pedidos.length})</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {pedidos.map((p) => {
+          const c = lista.find((x) => x.id === p.psi_id);
+          return (
+            <div key={p.id} className="painel-form" style={{ maxWidth: 720, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", borderColor: "#FCA5A5" }}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{(c && c.nome) || p.nomeClinica || p.psi_id}</div>
+                <div style={{ fontSize: 12, color: "#6B7280" }}>{"Pediu o cancelamento" + (p.pedidoEm ? " em " + dataBr(p.pedidoEm) : "") + (p.motivo ? " · motivo: " + p.motivo : "")}</div>
+                <div style={{ fontSize: 12, color: "#6B7280" }}>Combine a exportação dos dados antes de encerrar.</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-ghost" onClick={() => atender(p)}>Marcar atendido</button>
+                <button className="btn btn-primario" onClick={() => irPara("clinicas", { abrir: p.psi_id })}>Abrir clínica</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Painel ───────────────────────────────────────────────────
 function PaginaDashboard({ irPara }) {
   const planos = usarPlanos();
@@ -442,6 +480,7 @@ function PaginaDashboard({ irPara }) {
       </div>
       <CartaoVencimentos lista={lista} planos={planos} irPara={irPara} />
       <CartaoPedidosPlano lista={lista} planos={planos} irPara={irPara} />
+      <CartaoPedidosCancelamento lista={lista} irPara={irPara} />
       <div className="pagina-titulo" style={{ fontSize: 15 }}>Últimas entradas</div>
       <div className="tabela">
         <table>

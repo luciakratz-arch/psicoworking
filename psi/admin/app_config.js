@@ -20,7 +20,18 @@ function CartaoMeuPlano({ usuario }) {
   const [msg, setMsg] = useState("");
   const [documento, setDocumento] = useState("");
   const [assinando, setAssinando] = useState(false);
+  const [cancelamento, setCancelamento] = useState(null);
+  const [confirmandoCancel, setConfirmandoCancel] = useState(false);
+  const [motivoCancel, setMotivoCancel] = useState("");
+  const [confirmaTexto, setConfirmaTexto] = useState("");
+  const [mostrarMudanca, setMostrarMudanca] = useState(false);
 
+  useEffect(() => {
+    return db.collection("psi_pedidos_cancelamento").doc(usuario.psiId).onSnapshot(
+      (s) => setCancelamento(s.exists ? s.data() : null),
+      () => setCancelamento(null)
+    );
+  }, [usuario.psiId]);
   useEffect(() => {
     return db.collection("plataforma_config").doc("planos").onSnapshot(
       (s) => setPlanos(s.exists ? s.data() : {}),
@@ -79,6 +90,29 @@ function CartaoMeuPlano({ usuario }) {
     }
   }
 
+  const cancelPendente = cancelamento && cancelamento.status === "pendente";
+  async function pedirCancelamento() {
+    setEnviando(true);
+    setMsg("");
+    try {
+      await db.collection("psi_pedidos_cancelamento").doc(usuario.psiId).set({
+        psi_id: usuario.psiId,
+        nomeClinica: usuario.email,
+        motivo: motivoCancel.trim().slice(0, 500),
+        status: "pendente",
+        pedidoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setConfirmandoCancel(false);
+      setMotivoCancel("");
+      setConfirmaTexto("");
+      setMsg("Pedido de cancelamento enviado. Entraremos em contato para combinar a exportação dos seus dados e o encerramento. Até lá, a conta continua funcionando normalmente.");
+    } catch (e) {
+      setMsg("Não foi possível enviar: " + e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   async function pedirMudanca() {
     setEnviando(true);
     setMsg("");
@@ -107,7 +141,13 @@ function CartaoMeuPlano({ usuario }) {
         <strong>{nomePlano}</strong> · {situacaoTxt}
       </p>
       <AvisoPlanoIA usuario={usuario} />
-      {!fundadora && (
+      {fundadora && !mostrarMudanca && (
+        <div style={{ marginTop: 12 }}>
+          <button type="button" className="botao-secundario" onClick={() => setMostrarMudanca(true)}>Mudar de plano / fazer upgrade</button>
+          <p className="dica-campo" style={{ marginTop: 8 }}>Como fundadora você tem acesso integral sem cobrança. Mudar para um plano pago encerra esse acesso gratuito: o pedido chega à administradora, que combina o pagamento com você.</p>
+        </div>
+      )}
+      {(!fundadora || mostrarMudanca) && (
         <div style={{ marginTop: 12 }}>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <select value={para} onChange={(e) => setPara(e.target.value)}>
@@ -118,7 +158,7 @@ function CartaoMeuPlano({ usuario }) {
               <option value="mensal">Pagamento mensal</option>
               <option value="anual">Pagamento anual ({moeda(p(para).precoAnual)}, com desconto)</option>
             </select>
-            {cobrancaAutomatica ? (
+            {cobrancaAutomatica && !fundadora ? (
               <button type="button" className="botao-primario" onClick={assinarAgora} disabled={assinando || jaEhEsse}>
                 {jaEhEsse ? "Este já é o seu plano" : assinando ? "Gerando cobrança..." : "Assinar agora"}
               </button>
@@ -128,7 +168,7 @@ function CartaoMeuPlano({ usuario }) {
               </button>
             )}
           </div>
-          {cobrancaAutomatica && !jaEhEsse && (
+          {cobrancaAutomatica && !fundadora && !jaEhEsse && (
             <div style={{ marginTop: 10, maxWidth: 360 }}>
               <label style={{ fontSize: 12 }}>CPF ou CNPJ para a cobrança</label>
               <input value={documento} onChange={(e) => setDocumento(e.target.value)} placeholder="somente números" inputMode="numeric" />
@@ -148,6 +188,31 @@ function CartaoMeuPlano({ usuario }) {
           {msg && <p className="dica-campo" style={{ marginTop: 8 }}>{msg}</p>}
         </div>
       )}
+      {fundadora && msg && <p className="dica-campo" style={{ marginTop: 8 }}>{msg}</p>}
+
+      <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--borda)" }}>
+        <label>Cancelar a conta</label>
+        {cancelPendente ? (
+          <p className="dica-campo">Pedido de cancelamento enviado em {dataBr(cancelamento.pedidoEm)}. Aguarde o nosso contato: a conta continua funcionando até o encerramento.</p>
+        ) : !confirmandoCancel ? (
+          <>
+            <p className="dica-campo">Se quiser encerrar o uso do PsiCoWorking, faça o pedido aqui. Antes de encerrar, combinamos com você a exportação dos dados dos seus pacientes.</p>
+            <button type="button" className="botao-secundario" style={{ color: "#B91C1C", borderColor: "#FCA5A5" }} onClick={() => { setMsg(""); setConfirmandoCancel(true); }}>Cancelar minha conta</button>
+          </>
+        ) : (
+          <div style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, padding: "12px 14px", marginTop: 8, maxWidth: 520 }}>
+            <p style={{ margin: "0 0 8px", fontSize: 13, color: "#7F1D1D" }}><strong>Atenção:</strong> isto pede o encerramento da conta e do acesso aos dados dos pacientes. Nada é apagado agora: a administradora entra em contato para combinar a exportação dos dados e a data do encerramento.</p>
+            <label style={{ fontSize: 12 }}>Motivo (opcional)</label>
+            <textarea rows={2} value={motivoCancel} onChange={(e) => setMotivoCancel(e.target.value)} maxLength={500} style={{ width: "100%", boxSizing: "border-box" }} />
+            <label style={{ fontSize: 12, marginTop: 8, display: "block" }}>Para confirmar, digite CANCELAR</label>
+            <input value={confirmaTexto} onChange={(e) => setConfirmaTexto(e.target.value)} placeholder="CANCELAR" style={{ maxWidth: 220 }} />
+            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+              <button type="button" className="botao-secundario" onClick={() => { setConfirmandoCancel(false); setConfirmaTexto(""); }}>Voltar</button>
+              <button type="button" className="botao-primario" style={{ background: "#B91C1C" }} disabled={enviando || confirmaTexto.trim().toUpperCase() !== "CANCELAR"} onClick={pedirCancelamento}>{enviando ? "Enviando..." : "Enviar pedido de cancelamento"}</button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
