@@ -124,6 +124,9 @@ function resolverFormularioKey(item) {
 // Ferramentas de passos numerados viram formulário (resposta com microfone, régua de intensidade, observações).
 // As demais continuam como slides de leitura.
 function LeitorConteudo({ item, usuario, paciente }) {
+  // Psicoeducações com página própria (a mesma do sistema da clínica), escolhidas pelo título.
+  const Visual = window.PSICO_VISUAIS && window.PSICO_VISUAIS[(item.titulo || "").trim()];
+  if (Visual) return React.createElement(Visual, { cat: { label: "Psicoeducação", cor: "#7B00C4", bg: "#f3e6ff", accent: "#7B00C4" } });
   const guiada = window.passosDaFerramenta && window.FerramentaGuiada && window.passosDaFerramenta(item);
   if (guiada) return React.createElement(window.FerramentaGuiada, { item, modo: "paciente", usuario, paciente });
   return <LeitorConteudoSlides item={item} />;

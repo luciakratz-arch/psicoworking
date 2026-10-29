@@ -5710,6 +5710,15 @@ function PreviewBlocosPsicoeducacao({
 function PreviewConteudoTexto({
   item
 }) {
+  const Visual = window.PSICO_VISUAIS && window.PSICO_VISUAIS[(item.titulo || "").trim()];
+  if (Visual) return React.createElement(Visual, {
+    cat: {
+      label: "Psicoeducação",
+      cor: "#7B00C4",
+      bg: "#f3e6ff",
+      accent: "#7B00C4"
+    }
+  });
   const guiada = window.passosDaFerramenta && window.FerramentaGuiada && window.passosDaFerramenta(item);
   if (guiada) return React.createElement(window.FerramentaGuiada, {
     item,
