@@ -2274,13 +2274,13 @@ function PainelPerfilClinico({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "clipboard-list",
     tamanho: 16
-  }), " Perfil cl\xEDnico: CID, condi\xE7\xF5es e medica\xE7\xF5es"), /*#__PURE__*/React.createElement("p", {
+  }), " Perfil cl\xEDnico: CID / DSM-5, condi\xE7\xF5es e medica\xE7\xF5es"), /*#__PURE__*/React.createElement("p", {
     className: "descricao-cartao-secao"
   }, "Fica vis\xEDvel no topo das anota\xE7\xF5es e \xE9 enviado \xE0 IA como contexto ao organizar cada sess\xE3o."), !editando && /*#__PURE__*/React.createElement("div", null, vazio ? /*#__PURE__*/React.createElement("p", {
     className: "texto-vazio"
   }, "Nada cadastrado ainda para este paciente.") : /*#__PURE__*/React.createElement("div", null, (perfil.cids || []).length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: rotuloLista
-  }, "CID / diagn\xF3sticos"), perfil.cids.map((c, i) => /*#__PURE__*/React.createElement("span", {
+  }, "CID / DSM-5 / diagn\xF3sticos"), perfil.cids.map((c, i) => /*#__PURE__*/React.createElement("span", {
     key: i,
     style: chip
   }, [c.codigo, c.descricao].filter(Boolean).join(" · ")))), (perfil.condicoes || []).length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
@@ -2329,7 +2329,7 @@ function PainelPerfilClinico({
     }
   }, "A IA acrescenta nas listas abaixo. Confira tudo antes de salvar."), /*#__PURE__*/React.createElement("div", {
     style: rotuloLista
-  }, "CID / diagn\xF3sticos"), cids.map((c, i) => /*#__PURE__*/React.createElement("div", {
+  }, "CID / DSM-5 / diagn\xF3sticos"), cids.map((c, i) => /*#__PURE__*/React.createElement("div", {
     key: i,
     style: {
       display: "flex",
@@ -2367,7 +2367,7 @@ function PainelPerfilClinico({
       codigo: "",
       descricao: ""
     }])
-  }, "+ Adicionar CID"), /*#__PURE__*/React.createElement("div", {
+  }, "+ Adicionar diagn\xF3stico (CID ou DSM-5)"), /*#__PURE__*/React.createElement("div", {
     style: rotuloLista
   }, "Outras condi\xE7\xF5es"), condicoes.map((c, i) => /*#__PURE__*/React.createElement("div", {
     key: i,

@@ -1304,7 +1304,7 @@ function PainelPerfilClinico({ usuario, paciente, perfil }) {
 
   return (
     <div className="cartao-secao">
-      <div className="titulo-cartao-secao"><Icone nome="clipboard-list" tamanho={16} /> Perfil clínico: CID, condições e medicações</div>
+      <div className="titulo-cartao-secao"><Icone nome="clipboard-list" tamanho={16} /> Perfil clínico: CID / DSM-5, condições e medicações</div>
       <p className="descricao-cartao-secao">Fica visível no topo das anotações e é enviado à IA como contexto ao organizar cada sessão.</p>
 
       {!editando && (
@@ -1315,7 +1315,7 @@ function PainelPerfilClinico({ usuario, paciente, perfil }) {
             <div>
               {(perfil.cids || []).length > 0 && (
                 <div>
-                  <div style={rotuloLista}>CID / diagnósticos</div>
+                  <div style={rotuloLista}>CID / DSM-5 / diagnósticos</div>
                   {perfil.cids.map((c, i) => <span key={i} style={chip}>{[c.codigo, c.descricao].filter(Boolean).join(" · ")}</span>)}
                 </div>
               )}
@@ -1350,7 +1350,7 @@ function PainelPerfilClinico({ usuario, paciente, perfil }) {
           </button>
           <p style={{ fontSize: 11.5, color: "var(--texto-suave)", margin: "2px 0 0" }}>A IA acrescenta nas listas abaixo. Confira tudo antes de salvar.</p>
 
-          <div style={rotuloLista}>CID / diagnósticos</div>
+          <div style={rotuloLista}>CID / DSM-5 / diagnósticos</div>
           {cids.map((c, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
               <input style={{ width: 110 }} placeholder="Código" value={c.codigo || ""} onChange={(e) => setCids(cids.map((x, j) => (j === i ? { ...x, codigo: e.target.value } : x)))} />
@@ -1358,7 +1358,7 @@ function PainelPerfilClinico({ usuario, paciente, perfil }) {
               <button type="button" className="botao-secundario" onClick={() => setCids(cids.filter((_, j) => j !== i))}>Remover</button>
             </div>
           ))}
-          <button type="button" className="botao-secundario" onClick={() => setCids([...cids, { codigo: "", descricao: "" }])}>+ Adicionar CID</button>
+          <button type="button" className="botao-secundario" onClick={() => setCids([...cids, { codigo: "", descricao: "" }])}>+ Adicionar diagnóstico (CID ou DSM-5)</button>
 
           <div style={rotuloLista}>Outras condições</div>
           {condicoes.map((c, i) => (
