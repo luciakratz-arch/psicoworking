@@ -237,6 +237,10 @@ function Sidebar({ usuario, telaAtiva, aoTrocarTela, configClinica }) {
             Painel da plataforma
           </a>
         )}
+        <a className="item-menu" href="/instalar/" target="_blank" rel="noopener">
+          <Icone nome="download" tamanho={17} />
+          Instalar o aplicativo
+        </a>
       </nav>
       <div className="rodape-barra-lateral">
         {configClinica?.fotoUrl ? (

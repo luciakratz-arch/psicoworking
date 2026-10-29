@@ -281,7 +281,15 @@ function Sidebar({
   }, /*#__PURE__*/React.createElement(Icone, {
     nome: "building-2",
     tamanho: 17
-  }), "Painel da plataforma")), /*#__PURE__*/React.createElement("div", {
+  }), "Painel da plataforma"), /*#__PURE__*/React.createElement("a", {
+    className: "item-menu",
+    href: "/instalar/",
+    target: "_blank",
+    rel: "noopener"
+  }, /*#__PURE__*/React.createElement(Icone, {
+    nome: "download",
+    tamanho: 17
+  }), "Instalar o aplicativo")), /*#__PURE__*/React.createElement("div", {
     className: "rodape-barra-lateral"
   }, configClinica?.fotoUrl ? /*#__PURE__*/React.createElement("img", {
     src: configClinica.fotoUrl,

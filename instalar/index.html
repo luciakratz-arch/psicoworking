@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instalar os aplicativos — PsiCoWorking</title>
+  <meta name="theme-color" content="#6A2BD9" />
+  <link rel="manifest" href="/instalar/manifest.webmanifest" />
+  <link rel="icon" href="/instalar/icone-192.png" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --escuro:#3B0D6F; --principal:#6A2BD9; --claro:#A97BEF; --lavanda:#EADDFC; --grafite:#1F1B2E; --cinza:#6B7280; --fundo:#F3F4F6; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"DM Sans",system-ui,sans-serif; background:var(--fundo); color:var(--grafite); }
+    header { background:var(--escuro); color:#fff; padding:28px 16px; text-align:center; }
+    header h1 { margin:0 0 6px; font-size:24px; }
+    header p { margin:0; color:var(--lavanda); font-size:15px; }
+    main { max-width:760px; margin:0 auto; padding:24px 16px 48px; display:grid; gap:18px; }
+    .cartao { background:#fff; border-radius:16px; padding:22px; border:1px solid #E5E7EB; }
+    .cartao h2 { margin:0 0 6px; font-size:20px; }
+    .cartao p { margin:0 0 14px; color:var(--cinza); font-size:15px; line-height:1.5; }
+    .botao { display:inline-block; background:var(--principal); color:#fff; border:0; border-radius:10px; padding:12px 20px; font:600 15px "DM Sans",sans-serif; text-decoration:none; cursor:pointer; }
+    .botao-contorno { background:#fff; color:var(--principal); border:1.5px solid var(--principal); }
+    .passos { margin:14px 0 0; padding-left:20px; color:var(--grafite); font-size:14.5px; line-height:1.7; }
+    .aviso { font-size:13px; color:var(--cinza); margin:14px 0 0; }
+    [hidden] { display:none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Instalar os aplicativos</h1>
+    <p>Abra direto da tela inicial do celular ou do computador, sem digitar o endereço.</p>
+  </header>
+  <main>
+    <section class="cartao">
+      <h2>PsiCoWorking</h2>
+      <p>Painel da psicóloga: agenda, pacientes, prontuário, financeiro e recursos.</p>
+      <button class="botao" id="instalar" hidden>Instalar o PsiCoWorking</button>
+      <a class="botao botao-contorno" href="/entrar">Abrir no navegador</a>
+      <ol class="passos" id="passos-ios" hidden>
+        <li>Abra esta página no <b>Safari</b>.</li>
+        <li>Toque no botão de compartilhar (quadrado com seta para cima).</li>
+        <li>Escolha <b>Adicionar à Tela de Início</b>.</li>
+      </ol>
+      <p class="aviso" id="aviso-outro" hidden>Se o botão de instalar não aparecer, abra o menu do navegador (três pontinhos) e escolha <b>Instalar aplicativo</b> ou <b>Adicionar à tela inicial</b>.</p>
+    </section>
+    <section class="cartao">
+      <h2>Gestão Dra. Lucia Kratz</h2>
+      <p>Sistema da clínica: agenda, pacientes, prontuário e financeiro da Dra. Lucia Kratz.</p>
+      <a class="botao" href="https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/admin/">Abrir a gestão</a>
+      <p class="aviso">Para instalar, abra o link, toque nos três pontinhos do navegador e escolha <b>Adicionar à tela inicial</b> (no iPhone: compartilhar, depois <b>Adicionar à Tela de Início</b>).</p>
+    </section>
+  </main>
+  <script>
+    var pedido = null;
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    var jaInstalado = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+    var botao = document.getElementById("instalar");
+    if (jaInstalado) { botao.hidden = false; botao.textContent = "Já instalado neste aparelho"; botao.disabled = true; }
+    else if (ios) { document.getElementById("passos-ios").hidden = false; }
+    else { document.getElementById("aviso-outro").hidden = false; }
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault(); pedido = e;
+      if (!jaInstalado) { botao.hidden = false; document.getElementById("aviso-outro").hidden = true; }
+    });
+    botao.addEventListener("click", function () {
+      if (!pedido) return;
+      pedido.prompt();
+      pedido.userChoice.then(function () { pedido = null; botao.hidden = true; });
+    });
+  </script>
+</body>
+</html>
