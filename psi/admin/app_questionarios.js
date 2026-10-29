@@ -323,7 +323,7 @@ function AbaRastreamentoDependencia({ paciente }) {
 
   function enviarWhatsApp(){
     const url = `https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/rastreamento/dependencia/?paciente=${encodeURIComponent(paciente.nome||"")}`;
-    const msg = `Olá! 😊\n\nSua psicóloga Dra. Lucia Kratz preparou um questionário clínico para você preencher.\n\n💊 *Rastreamento de Dependência Química e Substâncias*\nResponda com calma e honestidade — leva cerca de 8 a 12 minutos.\n\n${url}\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_`;
+    const msg = `Olá! 😊\n\nSua psicóloga Dra. Lucia Kratz preparou um questionário clínico para você preencher.\n\n*Questionário Clínico*\nResponda com calma e honestidade — leva cerca de 8 a 12 minutos.\n\n${url}\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_`;
     window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
   }
 
@@ -507,7 +507,7 @@ function AbaRastreamentoJogos({ paciente }) {
 
   function enviarWhatsApp(){
     const url = `https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/rastreamento/jogos/?paciente=${encodeURIComponent(paciente.nome||"")}`;
-    const msg = `Olá! 😊\n\nSua psicóloga Dra. Lucia Kratz preparou um questionário clínico para você preencher.\n\n🎮 *Rastreamento de Dependência de Jogos e Apostas*\nResponda com calma e honestidade — leva cerca de 5 a 10 minutos.\n\n${url}\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_`;
+    const msg = `Olá! 😊\n\nSua psicóloga Dra. Lucia Kratz preparou um questionário clínico para você preencher.\n\n*Questionário Clínico*\nResponda com calma e honestidade — leva cerca de 5 a 10 minutos.\n\n${url}\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_`;
     window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
   }
 
@@ -1579,7 +1579,7 @@ function AbaRastreamento({ paciente }) {
   function enviarWhatsApp() {
     const nome = paciente.nome || "paciente";
     const url = `https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/rastreamento/?paciente=${encodeURIComponent(nome)}`;
-    const msg = "Olá! 😊\n\nA Dra. Lucia Kratz preparou um questionário clínico para você responder sobre *"+nome+"*.\n\n📊 *Rastreamento Clínico*\nResponda com calma e honestidade — leva cerca de 5 a 10 minutos.\n\nAcesse pelo link abaixo:\n"+url+"\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_";
+    const msg = "Olá! 😊\n\nA Dra. Lucia Kratz preparou um questionário clínico para você responder sobre *"+nome+"*.\n\n*Questionário Clínico*\nResponda com calma e honestidade — leva cerca de 5 a 10 minutos.\n\nAcesse pelo link abaixo:\n"+url+"\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_";
     window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
   }
 
@@ -1979,7 +1979,7 @@ function AbaRastreamentoNeuro({ paciente }) {
 
   function enviarWhatsApp(){
     const url = `https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/rastreamento/neuro/?paciente=${encodeURIComponent(paciente.nome||"")}`;
-    const msg = "Olá! 😊\n\nSua psicóloga Dra. Lucia Kratz preparou um questionário clínico para você preencher.\n\n🧩 *Questionário Clínico*\nResponda com calma e honestidade — leva cerca de 10 a 15 minutos.\n\n"+url+"\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_";
+    const msg = "Olá! 😊\n\nSua psicóloga Dra. Lucia Kratz preparou um questionário clínico para você preencher.\n\n*Questionário Clínico*\nResponda com calma e honestidade — leva cerca de 10 a 15 minutos.\n\n"+url+"\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_";
     window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
   }
 
@@ -2313,7 +2313,7 @@ function AbaRastreamentoAlimentar({ paciente }) {
 
   function enviarWhatsApp(){
     const url = `https://luciakratz-arch.github.io/clinica-dra.LuciaKratz/rastreamento/alimentar/?paciente=${encodeURIComponent(paciente.nome||"")}`;
-    const msg = "Olá! 😊\n\nSua psicóloga Dra. Lucia Kratz preparou um questionário clínico para você preencher.\n\n🍎 *Questionário Clínico*\nResponda com calma e honestidade — leva cerca de 5 a 10 minutos.\n\n"+url+"\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_";
+    const msg = "Olá! 😊\n\nSua psicóloga Dra. Lucia Kratz preparou um questionário clínico para você preencher.\n\n*Questionário Clínico*\nResponda com calma e honestidade — leva cerca de 5 a 10 minutos.\n\n"+url+"\n\nQualquer dúvida, estou por aqui!\n_Dra. Lucia Kratz · CRP 09/20590_";
     window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
   }
 
