@@ -118,7 +118,7 @@ function AppAtividade() {
               <VisualizadorBlocos blocos={blocos} usuario={usuario} paciente={paciente} recurso={item} />
             )}
             {!ComponenteFerramenta && paginas.length === 0 && blocos.length === 0 && (
-              <LeitorConteudo item={item} />
+              <LeitorConteudo item={item} usuario={usuario} paciente={paciente} />
             )}
           </div>
         )}

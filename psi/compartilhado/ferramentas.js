@@ -121,6 +121,14 @@ function resolverFormularioKey(item) {
   return TITULO_PARA_FORMULARIO_KEY[chave] || null;
 }
 
+// Ferramentas de passos numerados viram formulário (resposta com microfone, régua de intensidade, observações).
+// As demais continuam como slides de leitura.
+function LeitorConteudo({ item, usuario, paciente }) {
+  const guiada = window.passosDaFerramenta && window.FerramentaGuiada && window.passosDaFerramenta(item);
+  if (guiada) return React.createElement(window.FerramentaGuiada, { item, modo: "paciente", usuario, paciente });
+  return <LeitorConteudoSlides item={item} />;
+}
+
 function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
   const paginas = Array.isArray(item.paginas) ? item.paginas : [];
   const blocos = Array.isArray(item.blocos) ? item.blocos : [];
@@ -144,7 +152,7 @@ function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
           <VisualizadorBlocos blocos={blocos} usuario={usuario} paciente={paciente} recurso={item} />
         )}
         {!ComponenteFerramenta && paginas.length === 0 && blocos.length === 0 && (
-          <LeitorConteudo item={item} />
+          <LeitorConteudo item={item} usuario={usuario} paciente={paciente} />
         )}
       </div>
     </div>
@@ -157,7 +165,7 @@ function DetalheRecurso({ item, usuario, paciente, aoVoltar }) {
 // branco e mostra um "slide" de cada vez, com barra de progresso, em
 // vez de despejar tudo como um parágrafo só. Cobre a maioria das
 // ferramentas do catálogo que ainda não ganharam componente dedicado.
-function LeitorConteudo({ item }) {
+function LeitorConteudoSlides({ item }) {
   const conteudo = item.conteudo || item.passos || item.texto || "";
   const objetivo = item.objetivo || item.descricao || "";
   const slides = conteudo.split("\n\n").map((p) => p.trim()).filter((p) => p.length > 2);

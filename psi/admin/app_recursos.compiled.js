@@ -760,6 +760,9 @@ function TelaRecursos({
     // "avaliacao" (Anamnese, Entrevista Clínica, Rastreamentos DSM-5...)
     // não é ferramenta de biblioteca compartilhada — é questionário
     // individual do paciente, mora na aba Questionários do perfil dele.
+    // Também saem das ferramentas os rastreamentos que migraram para os Questionários, mesmo em outra categoria.
+    const MIGRADOS_PARA_QUESTIONARIOS = ["rastreamento-compulsao-sexual"];
+    if (aba === "ferramentas" && MIGRADOS_PARA_QUESTIONARIOS.includes(it.formularioKey)) return false;
     return !(aba === "ferramentas" && it.categoria === "avaliacao");
   });
   const filtrados = itensDaAba.filter(it => {
@@ -5703,6 +5706,20 @@ function PreviewBlocosPsicoeducacao({
   }));
 }
 
+// Ferramentas de passos numerados aparecem como formulário (como o paciente verá); as outras seguem em slides.
+function PreviewConteudoTexto({
+  item
+}) {
+  const guiada = window.passosDaFerramenta && window.FerramentaGuiada && window.passosDaFerramenta(item);
+  if (guiada) return React.createElement(window.FerramentaGuiada, {
+    item,
+    modo: "previa"
+  });
+  return /*#__PURE__*/React.createElement(PreviewConteudoTextoSlides, {
+    item: item
+  });
+}
+
 // ─── Preview: conteúdo simples em texto ──────────────────────────
 // Cobre o formato mais antigo/simples de ferramenta ou psicoeducação:
 // só um texto corrido (campo conteudo/passos/texto), com a descrição
@@ -5715,7 +5732,7 @@ function PreviewBlocosPsicoeducacao({
 // cobre a grande maioria das ferramentas do catálogo que ainda não
 // ganharam um componente dedicado (Registro ABC, Gestão da Ansiedade
 // etc. têm o próprio; todas as outras caem aqui).
-function PreviewConteudoTexto({
+function PreviewConteudoTextoSlides({
   item
 }) {
   const conteudo = item.conteudo || item.passos || item.texto || "";
