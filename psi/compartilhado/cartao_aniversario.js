@@ -108,24 +108,37 @@ const capitalizarNome = (n) => (n === n.toLowerCase() || n === n.toUpperCase()) 
     const primeiro = capitalizarNome(String(dados.nome || "").trim().split(/\s+/)[0] || "");
     const texto = "Feliz aniversário, " + primeiro + "! " + (dados.assinatura || "");
 
-    botao("Enviar pelo WhatsApp", "background:" + (dados.cor || "#6A2BD9") + ";color:#fff", async () => {
-      try {
-        if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
-          await navigator.share({ files: [arquivo], text: texto });
-          return;
-        }
-      } catch (e) { if (e && e.name === "AbortError") return; }
-      // computador: copia a imagem (para colar na conversa) e abre o WhatsApp do paciente
-      let copiou = false;
+    const noCelular = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+    // Copia a imagem para colar na conversa (computador).
+    async function copiarImagem() {
       try {
         const png = await blobDe(canvas, "image/png");
         await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
-        copiou = true;
-      } catch (e) {}
+        return true;
+      } catch (e) { return false; }
+    }
+
+    botao("Enviar pelo WhatsApp", "background:" + (dados.cor || "#6A2BD9") + ";color:#fff", async () => {
+      // Celular: o menu de compartilhar lista o WhatsApp e o WhatsApp Business instalados.
+      if (noCelular) {
+        try {
+          if (navigator.canShare && navigator.canShare({ files: [arquivo] })) { await navigator.share({ files: [arquivo], text: texto }); return; }
+        } catch (e) { if (e && e.name === "AbortError") return; }
+      }
+      // Computador: o menu do Windows não lista o WhatsApp Business. Abre o WhatsApp Web (aceita a conta Business)
+      // direto na conversa do paciente e deixa a imagem copiada para colar.
+      const copiou = await copiarImagem();
       const n = numeroWhats(dados.telefone);
-      window.open("https://wa.me/" + n + "?text=" + encodeURIComponent(texto), "_blank");
-      msg.textContent = copiou ? "Imagem copiada. Na conversa do WhatsApp, aperte Ctrl + V para colar o cartão e envie." : "Use o botão Baixar imagem e anexe o cartão na conversa do WhatsApp.";
+      window.open("https://web.whatsapp.com/send?" + (n ? "phone=" + n + "&" : "") + "text=" + encodeURIComponent(texto), "_blank");
+      msg.textContent = copiou
+        ? "WhatsApp Web aberto. Quando a conversa carregar, clique na caixa de mensagem e aperte Ctrl + V para colar o cartão. Depois envie."
+        : "WhatsApp Web aberto. Use o botão Baixar imagem e anexe o cartão na conversa.";
     });
+    if (!noCelular && navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+      botao("Compartilhar em outro aplicativo", "background:#fff;color:" + (dados.cor || "#6A2BD9"), async () => {
+        try { await navigator.share({ files: [arquivo], text: texto }); } catch (e) {}
+      });
+    }
     botao("Baixar imagem", "background:#fff;color:" + (dados.cor || "#6A2BD9"), () => { const a = document.createElement("a"); a.href = url; a.download = nomeArq; a.click(); });
     botao("Fechar", "background:#fff;color:#666;border-color:#ddd", fechar);
   }
