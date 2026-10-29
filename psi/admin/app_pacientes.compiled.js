@@ -4847,6 +4847,9 @@ function AbaQuestionariosPaciente({
         pacienteNome: paciente.nome || "",
         tipo,
         titulo: q.rotulo,
+        ...(tipo === "anamnese" ? {
+          cadastro: dadosCadastroParaLink(paciente)
+        } : {}),
         nomeClinica: cfg.nome || "PsiCoWorking",
         corMarca: cfg.corPrimaria || "#6A2BD9",
         logoUrl: cfg.logoUrl || "",
@@ -4877,6 +4880,7 @@ function AbaQuestionariosPaciente({
         pacienteNome: paciente.nome || "",
         tipo: "anamnese",
         titulo: "Formulário de Anamnese",
+        cadastro: dadosCadastroParaLink(paciente),
         nomeClinica: cfg.nome || "PsiCoWorking",
         corMarca: cfg.corPrimaria || "#6A2BD9",
         logoUrl: cfg.logoUrl || "",
@@ -5170,6 +5174,25 @@ function PreviaFormularioAnamnese({
     }
   }, "\u2022 ", String(c.label).replace(/ \*$/, ""))))));
 }
+
+// Dados do cadastro que o formulário de anamnese usa para pré-preencher (nada de CPF nem de dados clínicos).
+function dadosCadastroParaLink(p) {
+  const o = {
+    nome: p.nome || "",
+    dataNasc: p.dataNasc || "",
+    genero: p.genero || "",
+    email: p.email || "",
+    telefone: p.telefone || "",
+    responsavelNome: p.responsavelNome || "",
+    responsavelParentesco: p.responsavelParentesco || "",
+    responsavelEmail: p.responsavelEmail || "",
+    responsavelTelefone: p.responsavelTelefone || ""
+  };
+  Object.keys(o).forEach(k => {
+    if (!o[k]) delete o[k];
+  });
+  return o;
+}
 function AbaAnamneseView({
   usuario,
   paciente,
@@ -5207,6 +5230,7 @@ function AbaAnamneseView({
         pacienteNome: paciente.nome || "",
         tipo: "anamnese",
         titulo: "Formulário de Anamnese",
+        cadastro: dadosCadastroParaLink(paciente),
         nomeClinica: cfg.nome || "PsiCoWorking",
         corMarca: cfg.corPrimaria || "#6A2BD9",
         logoUrl: cfg.logoUrl || "",

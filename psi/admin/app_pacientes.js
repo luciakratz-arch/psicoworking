@@ -3265,6 +3265,7 @@ function AbaQuestionariosPaciente({ usuario, paciente }) {
         pacienteNome: paciente.nome || "",
         tipo,
         titulo: q.rotulo,
+        ...(tipo === "anamnese" ? { cadastro: dadosCadastroParaLink(paciente) } : {}),
         nomeClinica: cfg.nome || "PsiCoWorking",
         corMarca: cfg.corPrimaria || "#6A2BD9",
         logoUrl: cfg.logoUrl || "",
@@ -3298,7 +3299,7 @@ function AbaQuestionariosPaciente({ usuario, paciente }) {
       const cfg = cfgDoc.exists ? cfgDoc.data() : {};
       const token = gerarTokenLink();
       await db.collection("clinica_links_partilhados").doc(token).set({
-        psi_id: usuario.psiId, pacienteId: paciente.id, pacienteNome: paciente.nome || "", tipo: "anamnese", titulo: "Formulário de Anamnese",
+        psi_id: usuario.psiId, pacienteId: paciente.id, pacienteNome: paciente.nome || "", tipo: "anamnese", titulo: "Formulário de Anamnese", cadastro: dadosCadastroParaLink(paciente),
         nomeClinica: cfg.nome || "PsiCoWorking", corMarca: cfg.corPrimaria || "#6A2BD9", logoUrl: cfg.logoUrl || "",
         status: "enviado", cancelado: false, criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
       });
@@ -3394,6 +3395,18 @@ function PreviaFormularioAnamnese({ paciente }) {
   );
 }
 
+// Dados do cadastro que o formulário de anamnese usa para pré-preencher (nada de CPF nem de dados clínicos).
+function dadosCadastroParaLink(p) {
+  const o = {
+    nome: p.nome || "", dataNasc: p.dataNasc || "", genero: p.genero || "",
+    email: p.email || "", telefone: p.telefone || "",
+    responsavelNome: p.responsavelNome || "", responsavelParentesco: p.responsavelParentesco || "",
+    responsavelEmail: p.responsavelEmail || "", responsavelTelefone: p.responsavelTelefone || "",
+  };
+  Object.keys(o).forEach((k) => { if (!o[k]) delete o[k]; });
+  return o;
+}
+
 function AbaAnamneseView({ usuario, paciente, aoVoltar }) {
   const [anamnese, setAnamnese] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -3431,6 +3444,7 @@ function AbaAnamneseView({ usuario, paciente, aoVoltar }) {
         pacienteNome: paciente.nome || "",
         tipo: "anamnese",
         titulo: "Formulário de Anamnese",
+        cadastro: dadosCadastroParaLink(paciente),
         nomeClinica: cfg.nome || "PsiCoWorking",
         corMarca: cfg.corPrimaria || "#6A2BD9",
         logoUrl: cfg.logoUrl || "",

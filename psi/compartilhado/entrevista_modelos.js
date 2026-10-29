@@ -4,20 +4,20 @@
   function etapasAnamneseInfantil() {
     return [
       { titulo: "1. Identificação", sub: "Dados básicos sobre a criança ou adolescente e o motivo da avaliação.", campos: [
-        { id: "nome", type: "text", label: "Nome completo", placeholder: "Nome da criança ou adolescente" },
+        { id: "nome", type: "text", label: "Nome completo da criança ou adolescente", placeholder: "Nome da criança ou adolescente" },
         { type: "grid", fields: [
-          { id: "dataNasc", type: "date", label: "Data de Nascimento *" },
-          { id: "idade", type: "text", label: "Idade atual", placeholder: "Ex: 8 anos" },
+          { id: "dataNasc", type: "date", label: "Data de nascimento da criança ou adolescente *" },
+          { id: "idade", type: "text", label: "Idade atual (calculada pela data de nascimento)", placeholder: "Calculada automaticamente" },
         ] },
         { type: "grid", fields: [
-          { id: "email", type: "email", label: "E-mail *", placeholder: "seu@email.com" },
-          { id: "telefone", type: "tel", label: "WhatsApp / Telefone *", placeholder: "(62) 9 9999-9999" },
+          { id: "email", type: "email", label: "Seu e-mail (de quem está preenchendo) *", placeholder: "seu@email.com" },
+          { id: "telefone", type: "tel", label: "Seu WhatsApp (de quem está preenchendo) *", placeholder: "(62) 9 9999-9999" },
         ] },
         { type: "grid", fields: [
-          { id: "cpf", type: "text", label: "CPF *", placeholder: "000.000.000-00" },
-          { id: "genero", type: "select", label: "Gênero *", options: ["Masculino", "Feminino", "Não-binário", "Prefiro não informar"] },
+          { id: "cpf", type: "text", label: "CPF da criança ou adolescente *", placeholder: "000.000.000-00" },
+          { id: "genero", type: "select", label: "Gênero da criança ou adolescente *", options: ["Masculino", "Feminino", "Não-binário", "Prefiro não informar"] },
         ] },
-        { id: "escolaridade", type: "select", label: "Escolaridade *", options: ["Nunca estudou", "Ensino Fundamental incompleto", "Ensino Fundamental completo", "Ensino Médio incompleto", "Ensino Médio completo", "Ensino Superior incompleto", "Ensino Superior completo", "Pós-graduação"] },
+        { id: "escolaridade", type: "select", label: "Escolaridade atual da criança ou adolescente *", options: ["Nunca estudou", "Ensino Fundamental incompleto", "Ensino Fundamental completo", "Ensino Médio incompleto", "Ensino Médio completo", "Ensino Superior incompleto", "Ensino Superior completo", "Pós-graduação"] },
         { id: "informante", type: "text", label: "Quem está respondendo e qual a relação com a criança", placeholder: "Ex: Mãe, pai, avó..." },
         { id: "encaminhador", type: "text", label: "Quem indicou ou encaminhou para a avaliação", placeholder: "Médico, escola, iniciativa própria...", optional: true },
         { id: "queixa", type: "textarea", label: "Qual o motivo principal desta avaliação?", placeholder: "Descreva com suas palavras o que está preocupando..." },

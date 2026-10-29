@@ -95,6 +95,20 @@ function CampoRadio({ campo, valor, onChange }) {
   );
 }
 
+// Idade em anos e meses a partir da data de nascimento (AAAA-MM-DD). Ex.: "8 anos e 4 meses", "10 meses".
+function idadeAnosMeses(iso) {
+  if (!iso) return "";
+  const n = new Date(iso + "T12:00:00"), h = new Date();
+  if (isNaN(n) || n > h) return "";
+  let meses = (h.getFullYear() - n.getFullYear()) * 12 + (h.getMonth() - n.getMonth());
+  if (h.getDate() < n.getDate()) meses--;
+  if (meses < 0) return "";
+  const anos = Math.floor(meses / 12), resto = meses % 12;
+  const pa = anos + (anos === 1 ? " ano" : " anos"), pm = resto + (resto === 1 ? " mês" : " meses");
+  if (anos === 0) return pm;
+  return resto === 0 ? pa : pa + " e " + pm;
+}
+
 function renderCampoAnamnese(campo, respostas, setResposta) {
   if (campo.type === "section") {
     return (
@@ -130,20 +144,20 @@ function renderCampoAnamnese(campo, respostas, setResposta) {
 function etapasAnamneseInfantil() {
   return [
     { titulo: "1. Identificação", sub: "Dados básicos sobre a criança ou adolescente e o motivo da avaliação.", campos: [
-      { id: "nome", type: "text", label: "Nome completo", placeholder: "Nome da criança ou adolescente" },
+      { id: "nome", type: "text", label: "Nome completo da criança ou adolescente", placeholder: "Nome da criança ou adolescente" },
       { type: "grid", fields: [
-        { id: "dataNasc", type: "date", label: "Data de Nascimento *" },
-        { id: "idade", type: "text", label: "Idade atual", placeholder: "Ex: 8 anos" },
+        { id: "dataNasc", type: "date", label: "Data de nascimento da criança ou adolescente *" },
+        { id: "idade", type: "text", label: "Idade atual (calculada pela data de nascimento)", placeholder: "Calculada automaticamente" },
       ] },
       { type: "grid", fields: [
-        { id: "email", type: "email", label: "E-mail *", placeholder: "seu@email.com" },
-        { id: "telefone", type: "tel", label: "WhatsApp / Telefone *", placeholder: "(62) 9 9999-9999" },
+        { id: "email", type: "email", label: "Seu e-mail (de quem está preenchendo) *", placeholder: "seu@email.com" },
+        { id: "telefone", type: "tel", label: "Seu WhatsApp (de quem está preenchendo) *", placeholder: "(62) 9 9999-9999" },
       ] },
       { type: "grid", fields: [
-        { id: "cpf", type: "text", label: "CPF *", placeholder: "000.000.000-00" },
-        { id: "genero", type: "select", label: "Gênero *", options: ["Masculino", "Feminino", "Não-binário", "Prefiro não informar"] },
+        { id: "cpf", type: "text", label: "CPF da criança ou adolescente *", placeholder: "000.000.000-00" },
+        { id: "genero", type: "select", label: "Gênero da criança ou adolescente *", options: ["Masculino", "Feminino", "Não-binário", "Prefiro não informar"] },
       ] },
-      { id: "escolaridade", type: "select", label: "Escolaridade *", options: ["Nunca estudou", "Ensino Fundamental incompleto", "Ensino Fundamental completo", "Ensino Médio incompleto", "Ensino Médio completo", "Ensino Superior incompleto", "Ensino Superior completo", "Pós-graduação"] },
+      { id: "escolaridade", type: "select", label: "Escolaridade atual da criança ou adolescente *", options: ["Nunca estudou", "Ensino Fundamental incompleto", "Ensino Fundamental completo", "Ensino Médio incompleto", "Ensino Médio completo", "Ensino Superior incompleto", "Ensino Superior completo", "Pós-graduação"] },
       { id: "informante", type: "text", label: "Quem está respondendo e qual a relação com a criança", placeholder: "Ex: Mãe, pai, avó..." },
       { id: "encaminhador", type: "text", label: "Quem indicou ou encaminhou para a avaliação", placeholder: "Médico, escola, iniciativa própria...", optional: true },
       { id: "queixa", type: "textarea", label: "Qual o motivo principal desta avaliação?", placeholder: "Descreva com suas palavras o que está preocupando..." },
@@ -381,12 +395,28 @@ function FormularioAnamnese({ link, onConcluido }) {
   );
 
   function setResposta(id, v) {
-    setRespostas((r) => ({ ...r, [id]: v }));
+    setRespostas((r) => (id === "dataNasc" ? { ...r, dataNasc: v, idade: idadeAnosMeses(v) } : { ...r, [id]: v }));
   }
 
   function iniciar() {
     if (!perfil) { setErro("Selecione para quem é a avaliação."); return; }
     setErro("");
+    // Puxa do cadastro o que a psicóloga já preencheu (o responsável não precisa digitar de novo).
+    const c = (link && link.cadastro) || {};
+    const genero = { "Masculino": "Masculino", "Feminino": "Feminino", "Não-binário": "Não-binário", "Não informar": "Prefiro não informar" }[c.genero] || "";
+    const doResp = perfil === "infantil";
+    setRespostas((r) => ({
+      ...r,
+      nome: r.nome || c.nome || "",
+      dataNasc: r.dataNasc || c.dataNasc || "",
+      idade: r.idade || idadeAnosMeses(c.dataNasc || ""),
+      genero: r.genero || genero,
+      email: r.email || (doResp ? c.responsavelEmail || c.email : c.email) || "",
+      telefone: r.telefone || (doResp ? c.responsavelTelefone || c.telefone : c.telefone) || "",
+      informante: r.informante || (doResp && c.responsavelParentesco ? c.responsavelParentesco : ""),
+    }));
+    if (doResp && !nomeRespondente && c.responsavelNome) setNomeRespondente(c.responsavelNome);
+    if (doResp && !parentescoRespondente && c.responsavelParentesco) setParentescoRespondente(c.responsavelParentesco);
     setEtapas(perfil === "infantil" ? etapasAnamneseInfantil() : etapasAnamneseAdulto());
     setEtapaIdx(0);
     setTela("formulario");
