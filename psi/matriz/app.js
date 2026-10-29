@@ -157,7 +157,11 @@ function TelaLogin({ aoLogar }) {
 // ── Planos, assinaturas e dados compartilhados entre as telas ──────
 const DOMINIO_PUBLICO = "https://psicoworking.app.br";
 
+// Preço por faixa de pacientes ativos. A 1ª faixa usa o preço mensal dos planos; as demais ficam aqui.
+const FAIXAS_BASE = { lim1: 20, lim2: 40, lim3: 60, ess2: 54.9, plus2: 89.9, ess3: 69.9, plus3: 109.9, extra: 1.5 };
+
 const PLANOS_BASE = {
+  faixas: FAIXAS_BASE,
   testeDias: 30,
   testeIaUsos: 5,
   somenteLeituraDias: 15,
@@ -205,6 +209,7 @@ function usarPlanos() {
           ...c,
           essencial: { ...PLANOS_BASE.essencial, ...(c.essencial || {}) },
           plus: { ...PLANOS_BASE.plus, ...(c.plus || {}) },
+          faixas: { ...FAIXAS_BASE, ...(c.faixas || {}) },
         });
       },
       () => {}
@@ -1105,6 +1110,8 @@ function PaginaPlanos() {
         essMensal: planos.essencial.precoMensal, essAnual: planos.essencial.precoAnual,
         plusMensal: planos.plus.precoMensal, plusAnual: planos.plus.precoAnual, plusCota: planos.plus.cotaIaMes,
         testeDias: planos.testeDias, testeIaUsos: planos.testeIaUsos, leituraDias: planos.somenteLeituraDias,
+        fLim1: planos.faixas.lim1, fLim2: planos.faixas.lim2, fLim3: planos.faixas.lim3,
+        fEss2: planos.faixas.ess2, fPlus2: planos.faixas.plus2, fEss3: planos.faixas.ess3, fPlus3: planos.faixas.plus3, fExtra: planos.faixas.extra,
       });
     }
   }, [planos]);
@@ -1116,6 +1123,7 @@ function PaginaPlanos() {
       testeIaUsos: planos.testeIaUsos,
       essencial: { nome: planos.essencial.nome, precoMensal: Number(planos.essencial.precoMensal), precoAnual: Number(planos.essencial.precoAnual) },
       plus: { nome: planos.plus.nome, precoMensal: Number(planos.plus.precoMensal), precoAnual: Number(planos.plus.precoAnual), cotaIaMes: Number(planos.plus.cotaIaMes) },
+      faixas: Object.fromEntries(Object.entries(planos.faixas || FAIXAS_BASE).map(([k, v]) => [k, Number(v)])),
     }).catch(() => {});
   }, [planos]);
 
@@ -1131,6 +1139,7 @@ function PaginaPlanos() {
         testeDias: num(f.testeDias), testeIaUsos: num(f.testeIaUsos), somenteLeituraDias: num(f.leituraDias),
         essencial: { nome: "Essencial", precoMensal: num(f.essMensal), precoAnual: num(f.essAnual) },
         plus: { nome: "Plus", precoMensal: num(f.plusMensal), precoAnual: num(f.plusAnual), cotaIaMes: num(f.plusCota) },
+        faixas: { lim1: num(f.fLim1), lim2: num(f.fLim2), lim3: num(f.fLim3), ess2: num(f.fEss2), plus2: num(f.fPlus2), ess3: num(f.fEss3), plus3: num(f.fPlus3), extra: num(f.fExtra) },
       }, { merge: true });
       setMsg("Planos salvos. Valem para novos cadastros e para as próximas mudanças de plano; quem já assina mantém o que foi gravado.");
     } catch (e) { setMsg("Erro: " + e.message); } finally { setSalvando(false); }
@@ -1148,6 +1157,16 @@ function PaginaPlanos() {
         <div className="form-grupo"><label>Mensal (R$)</label><input {...campo("plusMensal")} /></div>
         <div className="form-grupo"><label>Anual (R$)</label><input {...campo("plusAnual")} /></div>
         <div className="form-grupo"><label>Usos de IA por mês</label><input {...campo("plusCota")} /></div>
+        <div className="subtitulo-painel" style={{ marginTop: 18 }}>Faixas por pacientes ativos (valores mensais)</div>
+        <p style={{ fontSize: 12, color: "#6B7280", margin: "0 0 10px" }}>A 1ª faixa usa os preços mensais acima. Quem passa do último limite vê uma estimativa: valor da última faixa + o valor por paciente acima do limite. O plano anual segue a mesma proporção do anual de cada plano.</p>
+        <div className="form-grupo"><label>1ª faixa: até quantos pacientes</label><input {...campo("fLim1")} /></div>
+        <div className="form-grupo"><label>2ª faixa: até quantos pacientes</label><input {...campo("fLim2")} /></div>
+        <div className="form-grupo"><label>2ª faixa: Essencial (R$/mês)</label><input {...campo("fEss2")} /></div>
+        <div className="form-grupo"><label>2ª faixa: Plus (R$/mês)</label><input {...campo("fPlus2")} /></div>
+        <div className="form-grupo"><label>3ª faixa: até quantos pacientes</label><input {...campo("fLim3")} /></div>
+        <div className="form-grupo"><label>3ª faixa: Essencial (R$/mês)</label><input {...campo("fEss3")} /></div>
+        <div className="form-grupo"><label>3ª faixa: Plus (R$/mês)</label><input {...campo("fPlus3")} /></div>
+        <div className="form-grupo"><label>Acima da 3ª faixa: R$ por paciente a mais (estimativa)</label><input {...campo("fExtra")} /></div>
         <div className="subtitulo-painel" style={{ marginTop: 18 }}>Teste</div>
         <div className="form-grupo"><label>Dias de teste</label><input {...campo("testeDias")} /></div>
         <div className="form-grupo"><label>Usos de IA durante o teste</label><input {...campo("testeIaUsos")} /></div>

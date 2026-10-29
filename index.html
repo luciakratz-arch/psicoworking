@@ -136,6 +136,11 @@
     .plano li svg { flex-shrink: 0; color: var(--principal); margin-top: 3px; }
     .plano li.sem { color: #9CA3AF; }
     .plano li.sem svg { color: #CBD5E1; }
+    .calc { max-width: 520px; margin: 22px auto 0; background: #fff; border: 1px solid var(--borda); border-radius: 16px; padding: 16px 18px; text-align: left; }
+    .calc label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+    .calc input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--borda); border-radius: 10px; font-size: 16px; font-family: inherit; box-sizing: border-box; }
+    .calc .faixa-txt { font-size: 13px; color: var(--cinza); margin-top: 8px; line-height: 1.5; }
+    .calc .faixa-txt a { color: var(--roxo, #6A2BD9); font-weight: 700; }
     .nota-planos { font-size: 13px; color: var(--cinza); margin-top: 26px; max-width: 700px; margin-left: auto; margin-right: auto; }
 
     /* Segurança */
@@ -328,6 +333,11 @@
           <button type="button" id="b-anual">Anual</button>
         </div>
         <div class="economia" id="economia"></div>
+        <div class="calc">
+          <label for="n-pac">Quantos pacientes ativos você atende?</label>
+          <input id="n-pac" type="number" min="0" inputmode="numeric" placeholder="Ex.: 22" />
+          <div class="faixa-txt" id="faixa-txt">Digite o número e veja o valor do seu plano. Cada plano inclui 1 psicóloga e 1 secretária (com acesso só à agenda e ao financeiro).</div>
+        </div>
 
         <div class="grade-planos">
           <div class="plano">
@@ -469,7 +479,27 @@
       essencial: { nome: "Essencial", precoMensal: 39.9, precoAnual: 399 },
       plus: { nome: "Plus", precoMensal: 69.9, precoAnual: 699, cotaIaMes: 200 }
     };
+    var faixas = { lim1: 20, lim2: 40, lim3: 60, ess2: 54.9, plus2: 89.9, ess3: 69.9, plus3: 109.9, extra: 1.5 };
+    var nPac = 0;
     var modo = "mensal";
+
+    // Valor mensal do plano para o número de pacientes informado (e se é só uma estimativa).
+    function mensalPara(id) {
+      var p = planos[id], n = nPac, fx = faixas;
+      if (!n || n <= fx.lim1) return { v: p.precoMensal, estimativa: false };
+      var v2 = id === "plus" ? fx.plus2 : fx.ess2, v3 = id === "plus" ? fx.plus3 : fx.ess3;
+      if (n <= fx.lim2) return { v: v2, estimativa: false };
+      if (n <= fx.lim3) return { v: v3, estimativa: false };
+      return { v: v3 + (n - fx.lim3) * fx.extra, estimativa: true };
+    }
+    function textoFaixa() {
+      var fx = faixas, n = nPac;
+      if (!n) return "Digite o número e veja o valor do seu plano. Cada plano inclui 1 psicóloga e 1 secretária (com acesso só à agenda e ao financeiro).";
+      if (n <= fx.lim1) return "Faixa: até " + fx.lim1 + " pacientes ativos.";
+      if (n <= fx.lim2) return "Faixa: de " + (fx.lim1 + 1) + " a " + fx.lim2 + " pacientes ativos.";
+      if (n <= fx.lim3) return "Faixa: de " + (fx.lim2 + 1) + " a " + fx.lim3 + " pacientes ativos.";
+      return "Acima de " + fx.lim3 + " pacientes: o valor abaixo é uma <strong>estimativa</strong>. <a href=\"mailto:contato@luciakratz.com.br?subject=Orcamento%20PsiCoWorking\">Peça um orçamento</a> para confirmar.";
+    }
 
     function reais(v) { return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -478,19 +508,28 @@
         var p = planos[id];
         document.getElementById("n-" + id).textContent = p.nome;
         var anual = modo === "anual";
-        document.getElementById("p-" + id).textContent = reais(anual ? p.precoAnual : p.precoMensal);
+        var m = mensalPara(id);
+        var fator = p.precoMensal > 0 ? p.precoAnual / p.precoMensal : 12;
+        var valor = anual ? m.v * fator : m.v;
+        document.getElementById("p-" + id).textContent = (m.estimativa ? "~ " : "") + reais(valor);
         document.getElementById("u-" + id).textContent = anual ? "/ano" : "/mês";
-        document.getElementById("a-" + id).textContent = anual ? "equivale a " + reais(p.precoAnual / 12) + " por mês" : "";
+        document.getElementById("a-" + id).textContent = anual ? "equivale a " + reais(valor / 12) + " por mês" : (m.estimativa ? "estimativa, confirme no orçamento" : "");
       });
       var e = document.getElementById("economia");
       var cheio = planos.essencial.precoMensal * 12;
       var pct = cheio > 0 ? Math.round((1 - planos.essencial.precoAnual / cheio) * 100) : 0;
       e.textContent = modo === "anual" && pct > 0 ? "Economize cerca de " + pct + "% pagando o ano inteiro" : "";
       document.getElementById("cota-plus").textContent = (planos.plus.cotaIaMes ? planos.plus.cotaIaMes + " usos de IA por mês" : "IA sem limite mensal");
+      document.getElementById("faixa-txt").innerHTML = textoFaixa();
       document.getElementById("dias-teste").textContent = planos.testeDias;
       document.getElementById("usos-teste").textContent = planos.testeIaUsos;
     }
 
+    document.getElementById("n-pac").addEventListener("input", function () {
+      var n = parseInt(this.value, 10);
+      nPac = isNaN(n) || n < 0 ? 0 : Math.min(n, 100000);
+      pintar();
+    });
     document.getElementById("b-mensal").onclick = function () { modo = "mensal"; this.classList.add("ativo"); document.getElementById("b-anual").classList.remove("ativo"); pintar(); };
     document.getElementById("b-anual").onclick = function () { modo = "anual"; this.classList.add("ativo"); document.getElementById("b-mensal").classList.remove("ativo"); pintar(); };
 
@@ -509,6 +548,8 @@
         if (num(plu.precoMensal) !== undefined) planos.plus.precoMensal = num(plu.precoMensal);
         if (num(plu.precoAnual) !== undefined) planos.plus.precoAnual = num(plu.precoAnual);
         if (num(plu.cotaIaMes) !== undefined) planos.plus.cotaIaMes = num(plu.cotaIaMes);
+        var fxc = mapa(f.faixas);
+        ["lim1", "lim2", "lim3", "ess2", "plus2", "ess3", "plus3", "extra"].forEach(function (k) { if (num(fxc[k]) !== undefined) faixas[k] = num(fxc[k]); });
         pintar();
       })
       .catch(function () {});
