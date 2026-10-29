@@ -130,7 +130,7 @@
     .plano .desc { font-size: 14px; color: var(--cinza); margin: 4px 0 18px; }
     .preco { font-size: 44px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
     .preco small { font-size: 15px; font-weight: 500; color: var(--cinza); letter-spacing: 0; }
-    .preco-apoio { font-size: 13px; color: var(--cinza); margin: 6px 0 22px; min-height: 20px; }
+    .preco-apoio { font-size: 14px; font-weight: 600; color: #5B21B6; margin: 6px 0 22px; min-height: 20px; }
     .plano ul { list-style: none; margin-bottom: 26px; flex: 1; }
     .plano li { display: flex; gap: 10px; font-size: 14.5px; padding: 6px 0; }
     .plano li svg { flex-shrink: 0; color: var(--principal); margin-top: 3px; }
@@ -269,9 +269,9 @@
           <div class="cartao"><div class="icone"><i data-lucide="notebook-pen"></i></div><h3>Prontuário por modalidade</h3><p>Cada paciente tem as abas do seu tipo de atendimento: sessões em TCC e em ABA, com plano de tratamento e gráficos de evolução. Dite por voz; a IA organiza o texto em seções, e você revisa e salva.</p></div>
           <div class="cartao"><div class="icone"><i data-lucide="activity"></i></div><h3>Crises e perfil clínico</h3><p>Registre crises com intensidade, acompanhe a evolução, e mantenha o CID e o DSM-5, as condições e as medicações sempre à vista na anotação.</p></div>
           <div class="cartao"><div class="icone"><i data-lucide="file-text"></i></div><h3>Relatórios e documentos</h3><p>Relatório detalhado para a sua análise e resumo para enviar a terceiros, com a sua logo e o seu CRP. Declarações e laudos conforme a CFP 06/2019.</p></div>
-          <div class="cartao"><div class="icone"><i data-lucide="users"></i></div><h3>Portal do paciente</h3><p>Seu paciente acessa com a identidade da sua clínica: diário, humor, metas, ferramentas e confirmação de presença.</p></div>
-          <div class="cartao"><div class="icone"><i data-lucide="clipboard-check"></i></div><h3>Questionários e rastreamentos</h3><p>Anamnese (adulto e infantil) e rastreamentos com base no DSM-5, organizados em sete grupos: instabilidade emocional, neurodesenvolvimento (TDAH, TEA, TOD), ansiedade e depressão, comportamento alimentar, comportamento aditivo, saúde sexual, trauma e dissociação. Você escolhe as hipóteses, e o paciente recebe o link pelo WhatsApp, responde no celular e o resultado volta com pontuação e laudo.</p></div>
-          <div class="cartao"><div class="icone"><i data-lucide="wrench"></i></div><h3>Ferramentas, psicoeducação e fábulas</h3><p>Um catálogo com ferramentas terapêuticas, psicoeducações e fábulas ilustradas para enviar ao paciente por link, com um clique.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="users"></i></div><h3>Portal do paciente</h3><p>Seu paciente acessa com a identidade da sua clínica: diário, humor, metas, ferramentas e confirmação de presença, tudo no celular.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="clipboard-check"></i></div><h3>Questionários e rastreamentos</h3><p>Anamnese adulto e infantil e rastreamentos com base no DSM-5, em sete grupos. Você escolhe as hipóteses, o paciente responde no celular pelo link do WhatsApp, e o resultado volta com pontuação e laudo.</p></div>
+          <div class="cartao"><div class="icone"><i data-lucide="wrench"></i></div><h3>Ferramentas e fábulas</h3><p>Um catálogo com ferramentas terapêuticas, psicoeducações e fábulas ilustradas, para enviar ao paciente por link, com um clique.</p></div>
           <div class="cartao"><div class="icone"><i data-lucide="circle-dollar-sign"></i></div><h3>Financeiro ligado à agenda</h3><p>Pacotes e sessões conectados à agenda, com controle de pagamentos e reagendamentos, além de lançamentos, comissões e orçamentos por WhatsApp, sem sair do sistema.</p></div>
           <div class="cartao"><div class="icone"><i data-lucide="calendar-days"></i></div><h3>Agenda Google</h3><p>Conectada à sua Google Agenda: sem agenda duplicada e sem trabalho em dobro.</p></div>
           <div class="cartao"><div class="icone"><i data-lucide="message-circle"></i></div><h3>Tarefas por WhatsApp</h3><p>As tarefas de casa saem prontas para enviar ao paciente, em linguagem simples, direto do prontuário.</p></div>
@@ -513,7 +513,12 @@
         var valor = anual ? m.v * fator : m.v;
         document.getElementById("p-" + id).textContent = (m.estimativa ? "~ " : "") + reais(valor);
         document.getElementById("u-" + id).textContent = anual ? "/ano" : "/mês";
-        document.getElementById("a-" + id).textContent = anual ? "equivale a " + reais(valor / 12) + " por mês" : (m.estimativa ? "estimativa, confirme no orçamento" : "");
+        var fxs = faixas, nn = nPac, rotuloFaixa;
+        if (!nn || nn <= fxs.lim1) rotuloFaixa = "para até " + fxs.lim1 + " pacientes ativos";
+        else if (nn <= fxs.lim2) rotuloFaixa = "para " + (fxs.lim1 + 1) + " a " + fxs.lim2 + " pacientes ativos";
+        else if (nn <= fxs.lim3) rotuloFaixa = "para " + (fxs.lim2 + 1) + " a " + fxs.lim3 + " pacientes ativos";
+        else rotuloFaixa = "estimativa para " + nn + " pacientes, confirme no orçamento";
+        document.getElementById("a-" + id).textContent = rotuloFaixa + (anual ? " · equivale a " + reais(valor / 12) + " por mês" : "");
       });
       var e = document.getElementById("economia");
       var cheio = planos.essencial.precoMensal * 12;
