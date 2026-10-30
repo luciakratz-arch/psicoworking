@@ -512,3 +512,53 @@ describe("Autocadastro de psicóloga e pedido de mudança de plano", () => {
     await assertSucceeds(updateDoc(doc(matriz(), "psi_pedidos_cancelamento/clinA"), { status: "atendido" }));
   });
 });
+
+describe("Área do Membro (cursos, livros e bônus)", () => {
+  const aluna = () => env.authenticatedContext("alunaX", { }).firestore();
+  const outra = () => env.authenticatedContext("alunaY", { }).firestore();
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await setDoc(doc(d, "produtos_membro/curso1"), { titulo: "Curso", tipo: "curso" });
+      await setDoc(doc(d, "produtos_membro/curso1/modulos/m1"), { titulo: "Módulo 1", ordem: 1 });
+      await setDoc(doc(d, "produtos_membro/curso1/aulas/a1"), { titulo: "Aula 1", moduloId: "m1", bunnyVideoId: "x" });
+      await setDoc(doc(d, "produtos_membro/livro2"), { titulo: "Livro", tipo: "livro", paginas: ["u"] });
+      await setDoc(doc(d, "membros/alunaX/acessos/curso1"), { origem: "teste" });
+    });
+  });
+  test("quem tem acesso abre o produto, os módulos e as aulas", async () => {
+    await assertSucceeds(getDoc(doc(aluna(), "produtos_membro/curso1")));
+    await assertSucceeds(getDoc(doc(aluna(), "produtos_membro/curso1/modulos/m1")));
+    await assertSucceeds(getDoc(doc(aluna(), "produtos_membro/curso1/aulas/a1")));
+    await assertSucceeds(getDocs(collection(aluna(), "produtos_membro/curso1/aulas")));
+  });
+  test("quem não comprou aquele produto não abre nada dele", async () => {
+    await assertFails(getDoc(doc(aluna(), "produtos_membro/livro2")));
+    await assertFails(getDoc(doc(outra(), "produtos_membro/curso1")));
+    await assertFails(getDoc(doc(outra(), "produtos_membro/curso1/aulas/a1")));
+    await assertFails(getDocs(collection(outra(), "produtos_membro/curso1/aulas")));
+  });
+  test("visitante, equipe de clínica e paciente não entram", async () => {
+    await assertFails(getDoc(doc(semLogin(), "produtos_membro/curso1")));
+    await assertFails(getDoc(doc(psiA(), "produtos_membro/curso1")));
+    await assertFails(getDoc(doc(pacA1(), "produtos_membro/curso1/aulas/a1")));
+  });
+  test("ninguém além da administradora cria ou altera produto, aula ou acesso", async () => {
+    await assertFails(setDoc(doc(aluna(), "produtos_membro/curso1"), { titulo: "x" }));
+    await assertFails(setDoc(doc(aluna(), "produtos_membro/curso1/aulas/a2"), { titulo: "x" }));
+    await assertFails(setDoc(doc(aluna(), "membros/alunaX/acessos/livro2"), { origem: "eu mesma" }));
+    await assertFails(setDoc(doc(outra(), "membros/alunaY/acessos/curso1"), { origem: "eu mesma" }));
+    await assertSucceeds(setDoc(doc(matriz(), "produtos_membro/curso2"), { titulo: "Novo" }));
+    await assertSucceeds(setDoc(doc(matriz(), "membros/alunaY/acessos/curso1"), { origem: "compra" }));
+    await assertSucceeds(getDoc(doc(matriz(), "produtos_membro/curso1/aulas/a1")));
+  });
+  test("cada pessoa lê só os próprios acessos e grava só o próprio progresso", async () => {
+    await assertSucceeds(getDocs(collection(aluna(), "membros/alunaX/acessos")));
+    await assertFails(getDocs(collection(outra(), "membros/alunaX/acessos")));
+    await assertSucceeds(setDoc(doc(aluna(), "membros/alunaX/progresso/a1"), { concluida: true, em: new Date() }));
+    await assertFails(setDoc(doc(outra(), "membros/alunaX/progresso/a1"), { concluida: true, em: new Date() }));
+    await assertFails(setDoc(doc(aluna(), "membros/alunaX/progresso/a1"), { concluida: true, extra: 1 }));
+    await assertFails(setDoc(doc(aluna(), "membros/alunaX/progresso/a1"), { concluida: "sim" }));
+    await assertFails(getDoc(doc(outra(), "membros/alunaX/progresso/a1")));
+  });
+});

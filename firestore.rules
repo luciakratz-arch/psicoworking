@@ -554,6 +554,42 @@ service cloud.firestore {
       allow read, update, delete: if ehAdminMatriz();
     }
 
+    // ── Área do Membro: cursos, livros e bônus vendidos à parte ──
+    // Cada pessoa só abre o produto que tem em membros/{ela}/acessos. Só a
+    // administradora cria produtos, módulos, aulas e libera acessos.
+    function temAcessoProduto(produtoId) {
+      return estaLogado()
+        && exists(/databases/$(database)/documents/membros/$(request.auth.uid)/acessos/$(produtoId));
+    }
+
+    match /produtos_membro/{produtoId} {
+      allow read: if ehAdminMatriz() || temAcessoProduto(produtoId);
+      allow write: if ehAdminMatriz();
+      match /modulos/{moduloId} {
+        allow read: if ehAdminMatriz() || temAcessoProduto(produtoId);
+        allow write: if ehAdminMatriz();
+      }
+      match /aulas/{aulaId} {
+        allow read: if ehAdminMatriz() || temAcessoProduto(produtoId);
+        allow write: if ehAdminMatriz();
+      }
+    }
+
+    match /membros/{uid} {
+      allow read, write: if ehAdminMatriz();
+      match /acessos/{produtoId} {
+        allow read: if ehAdminMatriz() || (estaLogado() && request.auth.uid == uid);
+        allow write: if ehAdminMatriz();
+      }
+      match /progresso/{aulaId} {
+        allow read: if ehAdminMatriz() || (estaLogado() && request.auth.uid == uid);
+        allow create, update: if estaLogado() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['concluida', 'em'])
+          && request.resource.data.concluida is bool;
+        allow delete: if estaLogado() && request.auth.uid == uid;
+      }
+    }
+
     // ── Tudo que não foi listado: bloqueado por padrão ──────────
     match /{document=**} {
       allow read, write: if false;
