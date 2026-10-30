@@ -366,6 +366,12 @@ describe("Assinatura, planos e situação da clínica", () => {
     await assertFails(updateDoc(doc(psiA(), "plataforma_config/planos"), { testeDias: 999 }));
     await assertFails(getDoc(doc(pacA1(), "plataforma_config/planos")));
     await assertSucceeds(updateDoc(doc(matriz(), "plataforma_config/planos"), { testeDias: 30 }));
+    // vendas importadas do Hotmart: só a administradora
+    await assertSucceeds(setDoc(doc(matriz(), "plataforma_vendas_externas/v1"), { produto: "X", valor: 10, data: "2026-10-01" }));
+    await assertSucceeds(getDoc(doc(matriz(), "plataforma_vendas_externas/v1")));
+    await assertFails(getDoc(doc(psiA(), "plataforma_vendas_externas/v1")));
+    await assertFails(setDoc(doc(psiA(), "plataforma_vendas_externas/v2"), { produto: "X", valor: 10, data: "2026-10-01" }));
+    await assertFails(getDoc(doc(pacA1(), "plataforma_vendas_externas/v1")));
   });
   for (const ok of ["teste", "ativa", "atrasada"]) {
     test("situação " + ok + ": a equipe grava normalmente", async () => {

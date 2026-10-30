@@ -1304,7 +1304,7 @@ function PaginaNovaPsicologa({ prefill }) {
 // ── App Principal ────────────────────────────────────────────
 function App() {
   const [usuario, setUsuario] = useState(undefined);
-  const [pagina, setPagina] = useState("dashboard");
+  const [pagina, setPagina] = useState("geral");
   const [dadosNova, setDadosNova] = useState(null);
 
   function irPara(destino, dados) {
@@ -1344,7 +1344,8 @@ function App() {
   if (!usuario) return <TelaLogin aoLogar={setUsuario} />;
 
   const NAV = [
-    { id: "dashboard", label: "Painel", icone: "layout-dashboard" },
+    { id: "geral", label: "Painel geral", icone: "layout-grid" },
+    { id: "dashboard", label: "PsiCoWorking", icone: "layout-dashboard" },
     { id: "clinicas", label: "Clínicas", icone: "building-2" },
     { id: "aprovacoes", label: "Aprovações", icone: "user-check" },
     { id: "planos", label: "Planos", icone: "credit-card" },
@@ -1354,6 +1355,7 @@ function App() {
   ];
 
   const paginas = {
+    geral: <PaginaPainelGeral irPara={irPara} />,
     dashboard: <PaginaDashboard irPara={irPara} />,
     clinicas: <PaginaClinicas key={(dadosNova && dadosNova.abrir) || "lista"} abrirId={dadosNova && dadosNova.abrir} />,
     aprovacoes: <PaginaAprovacoes irPara={irPara} />,

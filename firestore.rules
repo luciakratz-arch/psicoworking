@@ -454,6 +454,12 @@ service cloud.firestore {
       allow write: if ehAdminMatriz();
     }
 
+    // ── Vendas de fora (Hotmart) importadas por planilha: só a administradora vê e grava ──
+    // Guarda só produto, valor, data e nome do comprador (sem CPF nem contato).
+    match /plataforma_vendas_externas/{docId} {
+      allow read, write: if ehAdminMatriz();
+    }
+
     // ── Planos, preços e regras do teste (editados pela administradora) ──
     match /plataforma_config/{docId} {
       allow read: if ehAdminMatriz() || ehEquipeDeAlgumaClinica();
